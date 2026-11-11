@@ -1,0 +1,25 @@
+
+@{
+    ViewData["Title"] = "Access Denied";
+}
+
+<section class="content-section">
+    <div class="container text-center py-5">
+        <div class="auth-card">
+            <h1 class="display-4 text-danger">403</h1>
+
+            <h2 class="mb-3">Access Denied</h2>
+
+            <p class="text-muted">
+                คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+                กรุณาติดต่อผู้ดูแลระบบหากคิดว่าเกิดข้อผิดพลาด
+            </p>
+
+            <a asp-controller="Home"
+               asp-action="Index"
+               class="btn btn-primary hotel-primary-btn mt-3">
+                กลับหน้าหลัก
+            </a>
+        </div>
+    </div>
+</section>

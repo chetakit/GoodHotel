@@ -1,0 +1,99 @@
+@model GoodHotel.Models.User
+
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Add User";
+}
+
+<div class="container mt-4">
+    <h3 class="mb-3">Add User</h3>
+
+    <form asp-controller="Admin" asp-action="AddUser" method="post">
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="FirstName" class="form-label">First Name</label>
+                    <input asp-for="FirstName" class="form-control" placeholder="Enter first name" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="LastName" class="form-label">Last Name</label>
+                    <input asp-for="LastName" class="form-control" placeholder="Enter last name" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label">Email</label>
+                    <input asp-for="Email" type="email" class="form-control" placeholder="Enter email" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Phone" class="form-label">Phone</label>
+                    <input asp-for="Phone" type="tel" class="form-control" inputmode="numeric"
+                           autocomplete="tel" placeholder="081 234 5678" maxlength="12"
+                           aria-describedby="phoneHelp" />
+                    <div id="phoneHelp" class="form-text">Enter a 10-digit Thai mobile number (06, 08, or 09).</div>
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label">Password</label>
+                    <input asp-for="Password" type="password" class="form-control" placeholder="Enter password" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="BirthDate" class="form-label">Date of Birth</label>
+                    <input asp-for="BirthDate" type="date" class="form-control" />
+                    <span asp-validation-for="BirthDate" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="mb-3">
+                    <label asp-for="Role" class="form-label">Role</label>
+                    <select asp-for="Role" class="form-select">
+                        <option value="">Select a role</option>
+                        <option value="Customer">Customer</option>
+                        <option value="Staff">Staff</option>
+                        <option value="Housekeeper">Housekeeper</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                    <span asp-validation-for="Role" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Add User</button>
+                <a asp-controller="Admin" asp-action="Members" class="btn btn-secondary">Cancel</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    
+<script>
+    const phoneInput = document.getElementById("@Html.IdFor(model => model.Phone)");
+
+    if (phoneInput) {
+        phoneInput.addEventListener("input", () => {
+            const digits = phoneInput.value.replace(/\D/g, "").slice(0, 10);
+
+            phoneInput.value = digits.length > 6
+                ? `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
+                : digits.length > 3
+                    ? `${digits.slice(0, 3)} ${digits.slice(3)}`
+                    : digits;
+        });
+    }
+</script>
+
+}

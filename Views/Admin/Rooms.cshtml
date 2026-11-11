@@ -1,0 +1,93 @@
+@model IEnumerable<GoodHotel.Models.ViewModels.RoomListViewModel>
+
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Rooms";
+}
+
+<div class="table-panel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Room management</h4>
+        <a asp-controller="Admin"
+           asp-action="AddRoom"
+           class="btn btn-primary hotel-primary-btn">
+            + Add room
+        </a>
+    </div>
+
+    @if (TempData["RoomSuccessMessage"] is string successMessage)
+    {
+        <div class="alert alert-success" role="alert">@successMessage</div>
+    }
+
+    @if (TempData["RoomErrorMessage"] is string errorMessage)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Room</th>
+                    <th>Type</th>
+                    <th>Capacity</th>
+                    <th>Status</th>
+                    <th>Rate</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">
+                            No rooms found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var room in Model)
+                    {
+                        <tr>
+                            <td>
+                                <img src="@room.ImagePath"
+                                     alt="Room @room.RoomNumber"
+                                     class="rounded"
+                                     style="width: 96px; height: 64px; object-fit: cover;"
+                                     onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+                            </td>
+                            <td>@room.RoomNumber</td>
+                            <td>@room.Type</td>
+                            <td>@(room.Capacity is int capacity ? $"{capacity} Guests" : "")</td>
+                            <td>
+                                <span class="status-pill">@room.Status</span>
+                            </td>
+                            <td>@(room.Rate.HasValue ? $"฿{room.Rate.Value:N2}" : "")</td>
+                            <td>
+                                <a asp-controller="Admin"
+                                   asp-action="EditRoom"
+                                   asp-route-id="@room.RoomId"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    Edit
+                                </a>
+                                <form asp-controller="Admin"
+                                      asp-action="DeleteRoom"
+                                      method="post"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Delete this room?');">
+                                    <input type="hidden" name="id" value="@room.RoomId" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

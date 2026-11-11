@@ -1,0 +1,91 @@
+@model GoodHotel.Models.ViewModels.AdminReportsViewModel
+
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Reports";
+}
+
+<div class="row g-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="label">Booking records</div>
+            <div class="value">@Model.BookingCount</div>
+            <div class="trend">All records</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="label">Recorded booking amounts</div>
+            <div class="value">@(Model.BookingAmount?.ToString("N2") ?? "N/A")</div>
+            <div class="trend">Sum of Booking.Amount</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="label">Average stay</div>
+            <div class="value">
+                @(Model.AverageStayNights.HasValue
+                    ? $"{Model.AverageStayNights.Value:N2} nights"
+                    : "N/A")
+            </div>
+            <div class="trend">
+                @Model.BookingsWithValidStayDates bookings with valid check-in/out dates
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card">
+            <div class="label">Recorded payment amount</div>
+            <div class="value">@(Model.RecordedPaymentAmount?.ToString("N2") ?? "N/A")</div>
+            <div class="trend">@Model.PaymentCount payment records, all statuses</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-lg-8">
+        <div class="report-card">
+            <h4 class="mb-3">Payment amounts by recorded status</h4>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Payment status</th>
+                            <th>Records</th>
+                            <th>Recorded amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.PaymentsByStatus.Any())
+                        {
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    No payment records.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var payment in Model.PaymentsByStatus)
+                            {
+                                <tr>
+                                    <td>@(string.IsNullOrWhiteSpace(payment.Status) ? "Unspecified" : payment.Status)</td>
+                                    <td>@payment.Count</td>
+                                    <td>@(payment.Amount?.ToString("N2") ?? "N/A")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="report-card">
+            <h4 class="mb-3">Report scope</h4>
+            <p class="text-muted mb-0">
+                Payment totals are sums of Payment.Amount grouped by PaymentStatus. The database does not define which status represents collected revenue, so these totals are not presented as recognized revenue.
+            </p>
+        </div>
+    </div>
+</div>

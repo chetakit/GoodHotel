@@ -1,0 +1,139 @@
+@model GoodHotel.Models.ViewModels.OperationsPageViewModel
+
+@{
+    Layout = Model.BackController == "Admin"
+        ? "_AdminLayout"
+        : "_Layout";
+    ViewData["Title"] = Model.Title;
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Hotel Operations</span>
+            <h2>@Model.Title</h2>
+            <p class="text-muted">@Model.Description</p>
+        </div>
+
+        <div class="alert alert-info" role="status">
+            UI preparation only. Operational data is not connected and all workflow actions are disabled.
+        </div>
+
+        @if (Model.BookingId.HasValue || Model.TaskId.HasValue || Model.ReportId.HasValue)
+        {
+            <div class="alert alert-secondary" role="note">
+                @if (Model.BookingId.HasValue)
+                {
+                    <span>Booking ID: @Model.BookingId — not verified against stored data.</span>
+                }
+                @if (Model.TaskId.HasValue)
+                {
+                    <span>Task ID: @Model.TaskId — not verified against stored data.</span>
+                }
+                @if (Model.ReportId.HasValue)
+                {
+                    <span>Report ID: @Model.ReportId — not verified against stored data.</span>
+                }
+            </div>
+        }
+
+        <div class="row g-4">
+            @for (var index = 0; index < Model.Sections.Count; index++)
+            {
+                var item = Model.Sections[index];
+                <div class="col-12">
+                    <section class="booking-panel h-100" aria-label="@item.Title">
+                        <h3 class="h5 mb-2">@item.Title</h3>
+                        <p class="text-muted mb-3">@item.Description</p>
+
+                        @if (!string.IsNullOrWhiteSpace(item.EmptyState))
+                        {
+                            <div class="alert alert-light border mb-3" role="status">
+                                @item.EmptyState
+                            </div>
+                        }
+
+                        @if (item.Fields.Count > 0)
+                        {
+                            <dl class="row mb-0">
+                                @foreach (var field in item.Fields)
+                                {
+                                    <dt class="col-sm-5 col-lg-4">@field</dt>
+                                    <dd class="col-sm-7 col-lg-8 text-muted">
+                                        Not available until backend integration
+                                    </dd>
+                                }
+                            </dl>
+                        }
+
+                        @if (item.InputFields.Count > 0)
+                        {
+                            <div class="row g-3">
+                                @foreach (var field in item.InputFields)
+                                {
+                                    <div class="col-md-6 col-lg-4">
+                                        <label class="form-label">@field</label>
+                                        <input class="form-control"
+                                               type="text"
+                                               placeholder="Backend integration pending"
+                                               disabled
+                                               aria-label="@field unavailable until backend integration" />
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(item.ActionLabel))
+                        {
+                            <button class="btn btn-primary mt-3"
+                                    type="button"
+                                    disabled
+                                    aria-describedby="disabled-action-@index">
+                                @item.ActionLabel
+                            </button>
+                            <p id="disabled-action-@index"
+                               class="small text-muted mt-2 mb-0">
+                                @item.DisabledActionMessage
+                            </p>
+                        }
+
+                        @foreach (var action in item.Actions)
+                        {
+                            <button class="btn btn-primary mt-3 me-2"
+                                    type="button"
+                                    disabled>
+                                @action
+                            </button>
+                        }
+
+                        @if (item.Actions.Count > 0 &&
+                             !string.IsNullOrWhiteSpace(item.DisabledActionMessage))
+                        {
+                            <p class="small text-muted mt-2 mb-0">
+                                @item.DisabledActionMessage
+                            </p>
+                        }
+                    </section>
+                </div>
+            }
+        </div>
+
+        @if (Model.Links.Count > 0)
+        {
+            <nav class="d-flex flex-wrap gap-2 mt-4" aria-label="Related workflow pages">
+                @foreach (var link in Model.Links)
+                {
+                    <a class="btn btn-outline-primary"
+                       href="@Url.Action(link.Action, link.Controller, link.RouteValues)">
+                        @link.Label
+                    </a>
+                }
+            </nav>
+        }
+
+        <a class="btn btn-outline-primary mt-4"
+           href="@Url.Action(Model.BackAction, Model.BackController)">
+            @(Model.BackLabel ?? "Back")
+        </a>
+    </div>
+</section>

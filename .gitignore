@@ -1,0 +1,16 @@
+
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local configuration and secrets
+appsettings.Development.json
+secrets.json
+appsettings.json
+
+# OS files
+.DS_Store
+Thumbs.db

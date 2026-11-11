@@ -1,0 +1,121 @@
+@model GoodHotel.Models.User
+
+@{
+    ViewData["Title"] = "Register";
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="auth-card">
+            <ul class="nav nav-pills mb-4 justify-content-center">
+                <li class="nav-item">
+                    <a class="nav-link" asp-controller="Home" asp-action="Login">Login</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" asp-controller="Home" asp-action="Register">Register</a>
+                </li>
+            </ul>
+
+            <h2 class="mb-3 text-center">Create your account</h2>
+            @if (ViewBag.Status != null)
+            {
+                <div class="alert alert-warning" role="alert">@ViewBag.Status</div>
+            }
+            <p class="text-muted text-center mb-4">สมัครสมาชิกเพื่อรับสิทธิประโยชน์พิเศษและติดตามการจองอย่างรวดเร็ว</p>
+
+            <form asp-controller="Home" asp-action="Register" method="post">
+                <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label asp-for="FirstName" class="form-label">First name</label>
+                        <input asp-for="FirstName" class="form-control" placeholder="John" />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="LastName" class="form-label">Last name</label>
+                        <input asp-for="LastName" class="form-control" placeholder="Doe" />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="Email" class="form-label">Email</label>
+                        <input asp-for="Email" type="email" class="form-control" placeholder="your@email.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="Phone" class="form-label">Phone</label>
+                        <input asp-for="Phone" type="tel" class="form-control" inputmode="numeric"
+                               autocomplete="tel" placeholder="081 234 5678" maxlength="12" />
+                        <div class="form-text">กรอกหมายเลขโทรศัพท์มือถือไทย 10 หลัก</div>
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="BirthDate" class="form-label">Birth date</label>
+                        <input asp-for="BirthDate" type="date" class="form-control" />
+                        <span asp-validation-for="BirthDate" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label asp-for="Password" class="form-label">Password</label>
+                        <input asp-for="Password" type="password" class="form-control" placeholder="Create password" />
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="ConfirmPassword" class="form-label">Confirm password</label>
+                        <input type="password" id="ConfirmPassword" name="ConfirmPassword"
+                               class="form-control" placeholder="Confirm password" />
+                        @if (ViewData.ModelState.TryGetValue("ConfirmPassword", out var confirmPasswordState)
+                            && confirmPasswordState.Errors.Count > 0)
+                        {
+                            <span class="text-danger">@confirmPasswordState.Errors[0].ErrorMessage</span>
+                        }
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="AgreeToTerms"
+                                   value="true" id="agreeCheck" checked="@(ViewBag.AgreeToTerms == true)" />
+                            <label class="form-check-label" for="agreeCheck">
+                                I agree to the terms and privacy policy
+                            </label>
+                        </div>
+                        @if (ViewData.ModelState.TryGetValue("AgreeToTerms", out var termsState)
+                            && termsState.Errors.Count > 0)
+                        {
+                            <span class="text-danger">@termsState.Errors[0].ErrorMessage</span>
+                        }
+                    </div>
+
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary hotel-primary-btn w-100">
+                            Register
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+    const phoneInput = document.getElementById("@Html.IdFor(model => model.Phone)");
+
+    if (phoneInput) {
+        phoneInput.addEventListener("input", () => {
+            const digits = phoneInput.value.replace(/\D/g, "").slice(0, 10);
+
+            phoneInput.value = digits.length > 6
+                ? `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
+                : digits.length > 3
+                    ? `${digits.slice(0, 3)} ${digits.slice(3)}`
+                    : digits;
+        });
+    }
+</script>
+}

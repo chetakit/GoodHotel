@@ -1,0 +1,124 @@
+@model GoodHotel.Models.ViewModels.RoomFormViewModel
+
+@{
+    Layout = "_AdminLayout";
+    var isEdit = Model.RoomId.HasValue;
+    ViewData["Title"] = isEdit ? "Edit Room" : "Add Room";
+}
+
+<div class="container mt-4">
+    <h3 class="mb-3">@(isEdit ? "Edit Room" : "Add Room")</h3>
+
+    <form asp-controller="Admin"
+          asp-action="@(isEdit ? "EditRoom" : "AddRoom")"
+          method="post"
+          enctype="multipart/form-data">
+        @if (isEdit)
+        {
+            <input asp-for="RoomId" type="hidden" />
+        }
+
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="RoomNumber" class="form-label">Room Number</label>
+                    <input asp-for="RoomNumber" class="form-control" />
+                    <span asp-validation-for="RoomNumber" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Type" class="form-label">Room Type</label>
+                    <input asp-for="Type" class="form-control" />
+                    <span asp-validation-for="Type" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Rate" class="form-label">Room Price</label>
+                    <input asp-for="Rate" type="number" min="0.01" max="99999999.99" step="0.01" class="form-control" />
+                    <span asp-validation-for="Rate" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Capacity" class="form-label">Capacity</label>
+                    <input asp-for="Capacity" type="number" min="1" class="form-control" />
+                    <span asp-validation-for="Capacity" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label asp-for="Status" class="form-label">Status</label>
+                    <select asp-for="Status" class="form-select">
+                        <option value="Available">Available (ว่าง)</option>
+                        <option value="Occupied">Occupied (มีผู้เข้าพัก)</option>
+                        <option value="Reserved">Reserved (ถูกจองแล้ว)</option>
+                        <option value="Maintenance">Maintenance (ปิดปรับปรุง)</option>
+                    </select>
+                    <span asp-validation-for="Status" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="mb-3">
+                    <label asp-for="Image" class="form-label">Room Image</label>
+                    <input asp-for="Image"
+                           type="file"
+                           class="form-control"
+                           accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
+                    <span asp-validation-for="Image" class="text-danger"></span>
+                    <div class="form-text">JPG, JPEG, PNG, or WEBP. Maximum file size: 5 MB.</div>
+                    <img id="roomImagePreview"
+                         src="@Url.Content(Model.ImagePath ?? "~/images/default-room.svg")"
+                         alt="Room image preview"
+                         class="room-image mt-3 rounded"
+                         style="width: 100%; max-width: 420px; object-fit: cover;"
+                         onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label">Description</label>
+                    <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">
+                    @(isEdit ? "Save Changes" : "Add Room")
+                </button>
+                <a asp-controller="Admin" asp-action="Rooms" class="btn btn-secondary">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const roomImageInput = document.getElementById("@Html.IdFor(model => model.Image)");
+        const roomImagePreview = document.getElementById("roomImagePreview");
+        let previewUrl;
+
+        roomImageInput?.addEventListener("change", () => {
+            const image = roomImageInput.files?.[0];
+            if (!image) {
+                if (previewUrl) {
+                    URL.revokeObjectURL(previewUrl);
+                    previewUrl = undefined;
+                }
+                roomImagePreview.src = "@Url.Content(Model.ImagePath ?? "~/images/default-room.svg")";
+                return;
+            }
+
+            if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
+            }
+            previewUrl = URL.createObjectURL(image);
+            roomImagePreview.src = previewUrl;
+        });
+    </script>
+}

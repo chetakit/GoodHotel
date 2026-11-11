@@ -1,0 +1,60 @@
+
+@model GoodHotel.Models.ViewModels.EditUserViewModel
+
+@{
+    ViewData["Title"] = "Edit User";
+    Layout = "_AdminLayout";
+}
+
+<div class="container mt-4">
+    <h2>Edit User</h2>
+
+    <form asp-controller="Admin" asp-action="EditUser" method="post">
+        <input type="hidden" asp-for="UserId" />
+
+        <div class="mb-3">
+            <label asp-for="FirstName" class="form-label">First Name</label>
+            <input asp-for="FirstName" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="LastName" class="form-label">Last Name</label>
+            <input asp-for="LastName" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Email" class="form-label">Email</label>
+            <input asp-for="Email" class="form-control" />
+        </div>
+
+       
+<div class="mb-3">
+    <label asp-for="Phone" class="form-label">Phone</label>
+    <input asp-for="Phone"
+           class="form-control"
+           type="tel"
+           inputmode="numeric"
+           maxlength="10"
+           pattern="0[689][0-9]{8}"
+           oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)"
+           required />
+    <span asp-validation-for="Phone" class="text-danger"></span>
+    <small class="text-muted">กรอกเบอร์มือถือไทย 10 หลัก เช่น 0812345678</small>
+</div>
+
+
+        <div class="mb-3">
+            <label asp-for="Role" class="form-label">Role</label>
+            <select asp-for="Role" class="form-select">
+                <option value="Customer">Customer</option>
+                <option value="Staff">Staff</option>
+                <option value="Housekeeper">Housekeeper</option>
+                <option value="Admin">Admin</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a asp-controller="Admin" asp-action="Members"
+           class="btn btn-secondary">Cancel</a>
+    </form>
+</div>

@@ -1,0 +1,58 @@
+@model IEnumerable<GoodHotel.Models.ViewModels.EmployeeListViewModel>
+
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Employees";
+}
+
+<div class="table-panel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Employee directory</h4>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            No employees found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var employee in Model)
+                    {
+                        <tr>
+                            <td>@employee.UserId</td>
+                            <td>@employee.FirstName @employee.LastName</td>
+                            <td>@employee.Email</td>
+                            <td>@employee.Phone</td>
+                            <td>@employee.Role</td>
+                            <td>
+                                <a asp-controller="Admin"
+                                   asp-action="EmployeeProfile"
+                                   asp-route-id="@employee.UserId"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    Profile
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

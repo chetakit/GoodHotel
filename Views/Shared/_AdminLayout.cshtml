@@ -1,0 +1,174 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Good Hotel Admin</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="admin-body">
+    <div class="admin-shell">
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <span class="brand-mark">G</span>
+                <div>
+                    <strong>Good Hotel</strong>
+                    <small>Management</small>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Dashboard" ? "active" : "")"
+                   asp-controller="Admin" asp-action="Dashboard">
+                    <span>Dashboard</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Rooms" ? "active" : "")"
+                   asp-controller="Admin" asp-action="Rooms">
+                    <span>Rooms</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Promotion" ? "active" : "")"
+                   asp-controller="Admin" asp-action="Promotion">
+                    <span>Promotions</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Members" ? "active" : "")"
+                   asp-controller="Admin" asp-action="Members">
+                    <span>Members</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Employees" ? "active" : "")"
+                   asp-controller="Admin" asp-action="Employees">
+                    <span>Employees</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "HousekeepingAssignments" ? "active" : "")"
+                   asp-controller="Admin" asp-action="HousekeepingAssignments">
+                    <span>Task Assignment</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "HousekeepingReassignments" ? "active" : "")"
+                   asp-controller="Admin" asp-action="HousekeepingReassignments">
+                    <span>Task Reassignment</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "MaintenanceReports" ? "active" : "")"
+                   asp-controller="Admin" asp-action="MaintenanceReports">
+                    <span>Maintenance Reports</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "MaintenanceResolution" ? "active" : "")"
+                   asp-controller="Admin" asp-action="MaintenanceResolution">
+                    <span>Maintenance Resolution</span>
+                </a>
+
+                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Reports" ? "active" : "")"
+                   asp-controller="Admin" asp-action="Reports">
+                    <span>Reports</span>
+                </a>
+            </nav>
+
+            <!-- Admin Account Dropdown -->
+            <div class="sidebar-user-container dropup">
+                <button type="button"
+                        class="sidebar-user w-100 border-0 text-start"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        aria-label="Open account menu">
+
+                    <div class="avatar">AM</div>
+
+                    <div class="flex-grow-1">
+                        <strong>
+                            @(User.Identity?.Name ?? "Admin Manager")
+                        </strong>
+                        <small>Admin Manager</small>
+                    </div>
+
+                    <span class="ms-auto">⌃</span>
+                </button>
+
+                <ul class="dropdown-menu dropdown-menu-dark w-100 shadow mb-2">
+
+                    <li>
+                        <div class="dropdown-item-text">
+                            <strong>Account</strong>
+                            <small class="d-block text-white-50">
+                                @User.Identity?.Name
+                            </small>
+                        </div>
+                    </li>
+
+                    <li><hr class="dropdown-divider" /></li>
+
+                    <li>
+                        <a class="dropdown-item py-2"
+                           asp-controller="Admin"
+                           asp-action="Dashboard">
+                            Admin Manage
+                        </a>
+                    </li>
+
+                    <li>
+                        <a class="dropdown-item py-2"
+                           asp-controller="Home"
+                           asp-action="Index">
+                            Back to Home
+                        </a>
+                    </li>
+
+                    <li><hr class="dropdown-divider" /></li>
+
+                    <li>
+                        <form asp-controller="Home"
+                              asp-action="Logout"
+                              method="post">
+                            <button type="submit"
+                                    class="dropdown-item text-danger py-2">
+                                Logout
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </aside>
+
+        <div class="admin-main">
+            <header class="admin-topbar">
+                <div>
+                    <p class="eyebrow">Hotel Operations</p>
+                    <h2>@ViewData["Title"]</h2>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-outline-secondary btn-sm">
+                        Export
+                    </button>
+
+                    @if (ViewContext.RouteData.Values["Controller"]?.ToString() == "Admin"
+                         && ViewContext.RouteData.Values["Action"]?.ToString() == "Members")
+                    {
+                        <a asp-controller="Admin"
+                           asp-action="AddUser"
+                           class="btn btn-primary btn-sm hotel-primary-btn">
+                            + Add New
+                        </a>
+                    }
+                </div>
+            </header>
+
+            <main class="admin-content">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

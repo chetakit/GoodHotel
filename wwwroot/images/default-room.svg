@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" role="img" aria-label="Room image unavailable">
+  <rect width="900" height="600" fill="#e9eef4"/>
+  <rect x="95" y="115" width="710" height="370" rx="18" fill="#f8fafc"/>
+  <path d="M95 400h710v85H95z" fill="#d5dee8"/>
+  <rect x="150" y="170" width="250" height="155" rx="10" fill="#dce8f1"/>
+  <path d="M275 170v155M150 248h250" stroke="#fff" stroke-width="12"/>
+  <rect x="465" y="285" width="255" height="135" rx="12" fill="#b9c9d8"/>
+  <rect x="445" y="265" width="275" height="36" rx="12" fill="#8da5b9"/>
+  <rect x="480" y="315" width="225" height="74" rx="8" fill="#e9eef4"/>
+  <text x="450" y="535" text-anchor="middle" fill="#526679" font-family="Arial, sans-serif" font-size="26">Room image unavailable</text>
+</svg>

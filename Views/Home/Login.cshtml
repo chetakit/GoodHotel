@@ -1,0 +1,65 @@
+@{
+    ViewData["Title"] = "Login";
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="auth-card">
+            <ul class="nav nav-pills mb-4 justify-content-center">
+                <li class="nav-item">
+                    <a class="nav-link active" asp-controller="Home" asp-action="Login">Login</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" asp-controller="Home" asp-action="Register">Register</a>
+                </li>
+            </ul>
+
+            <div class="row g-4 align-items-center">
+                <div class="col-lg-6">
+                    <h2 class="mb-3">Welcome back</h2>
+                    @if (TempData["RegisterSuccessMessage"] is string successMessage)
+                    {
+                        <div class="alert alert-success" role="alert">@successMessage</div>
+                    }
+                    @if (ViewBag.Status != null)
+                    {
+                        <div class="alert alert-danger">
+                            @ViewBag.Status
+                        </div>
+                    }
+                    <p class="text-muted">เข้าสู่ระบบเพื่อจัดการการจอง ตรวจสอบสถานะห้องพัก และดูประวัติการเข้าพัก</p>
+                    <form asp-controller="Home" asp-action="Login" method="post">
+                        <div class="col-12">
+                            <label class="form-label">Email address</label>
+                            <input type="email" name="Email" class="form-control" placeholder="guest@gmail.com" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Password</label>
+                            <input type="password" name="Password"class="form-control" placeholder="Enter your password" />
+                        </div>
+                        <div class="col-12 d-flex justify-content-between">
+                            @* <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rememberMe" />
+                                <label class="form-check-label" for="rememberMe">Remember me</label>
+                            </div> *@
+                            @* <a href="#" class="text-decoration-none">Forgot password?</a> *@
+                        </div>
+                        <button type="submit" class="btn btn-primary hotel-primary-btn w-100">
+                             Login
+                        </button>
+                    </form>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="summary-card h-100">
+                        <h4 class="text-white mb-3">Member benefits</h4>
+                        <div class="summary-line"><span>Fast checkout</span><strong>✓</strong></div>
+                        <div class="summary-line"><span>Exclusive offers</span><strong>✓</strong></div>
+                        <div class="summary-line"><span>Member points</span><strong>✓</strong></div>
+                        <div class="summary-line"><span>Booking history</span><strong>✓</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

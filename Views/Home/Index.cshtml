@@ -1,0 +1,227 @@
+﻿@model GoodHotel.Models.ViewModels.HomeViewModel
+
+@{
+    ViewData["Title"] = "Home";
+}
+
+<section class="page-hero">
+    <div class="container">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-7">
+                <div class="hero-content">
+                    <span class="eyebrow">Boutique Hotel Experience</span>
+                    <h1>Stay beautifully at Good Hotel</h1>
+                    <p class="hero-subtitle">พักผ่อนในสภาพแวดล้อมที่ผ่อนคลาย พร้อมบริการระดับพรีเมียม เสียงเพลงอ่อน ๆ ของเมืองและห้องพักที่ออกแบบเพื่อความสบายทุกช่วงเวลา</p>
+                    <div class="hero-actions">
+                        <a asp-controller="Home" asp-action="Rooms" class="btn btn-primary hotel-primary-btn">ค้นหาห้องพัก</a>
+                        <a asp-controller="Home" asp-action="Rooms" class="btn btn-outline-light">Book a stay</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="hero-search-card">
+                    <h4 class="mb-3 text-white">ค้นหาการเข้าพัก</h4>
+                    <form asp-controller="Home"
+                          asp-action="Rooms"
+                          method="get"
+                          class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label text-white-50">วันที่เข้าพัก</label>
+                            <input type="date"
+                                   name="CheckIn"
+                                   min="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                                   class="form-control"
+                                   required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-white-50">วันที่ออก</label>
+                            <input type="date"
+                                   name="CheckOut"
+                                   min="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                                   class="form-control"
+                                   required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-white-50">ผู้เข้าพัก</label>
+                            <input type="number"
+                                   name="Guests"
+                                   min="1"
+                                   value="1"
+                                   class="form-control"
+                                   required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary hotel-primary-btn w-100">Check availability</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Featured Rooms</span>
+            <h2>เลือกห้องพักที่เหมาะกับไลฟ์สไตล์ของคุณ</h2>
+        </div>
+
+        <div class="row g-4">
+            @if (!Model.FeaturedRooms.Any())
+            {
+                <div class="col-12">
+                    <div class="feature-box text-center">
+                        <h4>ยังไม่มีห้องพักที่พร้อมให้จอง</h4>
+                        <p class="text-muted mb-0">กรุณากลับมาตรวจสอบห้องพักที่ว่างอีกครั้ง</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @foreach (var room in Model.FeaturedRooms)
+                {
+                    <div class="col-lg-4 col-md-6">
+                        <article class="room-card h-100">
+                            <img class="room-image w-100"
+                                 src="@room.ImagePath"
+                                 alt="@room.Type room @room.RoomNumber"
+                                 onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+                            <div class="room-body">
+                                <div class="room-meta">
+                                    <div>
+                                        <h4 class="mb-1">@room.Type</h4>
+                                        <span class="text-muted">Room @room.RoomNumber</span>
+                                    </div>
+                                    <span class="badge-status available">@room.Status</span>
+                                </div>
+                                <div class="room-price">
+                                    @(room.Rate.HasValue ? $"฿{room.Rate.Value:N2}" : "ราคาไม่ระบุ")
+                                    <small>/night</small>
+                                </div>
+                                <div class="room-features">
+                                    @if (room.Capacity.HasValue)
+                                    {
+                                        <span>@room.Capacity.Value Guests</span>
+                                    }
+                                    else
+                                    {
+                                        <span>ไม่ระบุจำนวนผู้เข้าพัก</span>
+                                    }
+                                </div>
+                                <a asp-controller="Home"
+                                   asp-action="Rooms"
+                                   class="btn btn-primary hotel-primary-btn w-100">
+                                    Book Now
+                                </a>
+                            </div>
+                        </article>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</section>
+
+<section class="content-section bg-light">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Exclusive Offers</span>
+            <h2>Promotion สำหรับการเข้าพักในช่วงเวลาพิเศษ</h2>
+        </div>
+
+        <div class="row g-4">
+            @if (!Model.Promotions.Any())
+            {
+                <div class="col-12">
+                    <div class="promo-card text-center">
+                        <h4>ยังไม่มีโปรโมชั่น</h4>
+                        <p class="text-muted mb-0">ขณะนี้ยังไม่มีข้อเสนอพิเศษ</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @foreach (var promotion in Model.Promotions)
+                {
+                    <div class="col-lg-4 col-md-6">
+                        <div class="promo-card">
+                            <span class="tag">Promotion</span>
+                            <h4>@promotion.PromotionName</h4>
+                            @if (!string.IsNullOrWhiteSpace(promotion.Description))
+                            {
+                                <p class="text-muted mb-3">@promotion.Description</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(promotion.Benefit))
+                            {
+                                <p class="mb-2"><strong>Benefit:</strong> @promotion.Benefit</p>
+                            }
+                            @if (promotion.PromotionCode != null)
+                            {
+                                <p class="mb-2">
+                                    <strong>Code:</strong> @promotion.PromotionCode
+                                    <span class="ms-2">
+                                        @if (promotion.DiscountType == "PERCENT")
+                                        {
+                                            <span>@promotion.DiscountValue?.ToString("0.##")%</span>
+                                        }
+                                        else
+                                        {
+                                            <span>฿@promotion.DiscountValue?.ToString("N2")</span>
+                                        }
+                                    </span>
+                                </p>
+                                <small class="text-muted">
+                                    ใช้ได้ถึงวันจอง @promotion.EndDate?.ToString(
+                                        "yyyy-MM-dd",
+                                        System.Globalization.CultureInfo.InvariantCulture)
+                                </small>
+                            }
+                            else if (promotion.IsLegacyPromotion &&
+                                     !string.IsNullOrWhiteSpace(promotion.Condition))
+                            {
+                                <small class="text-muted">Condition: @promotion.Condition</small>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</section>
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Why Good Hotel</span>
+            <h2>ประสบการณ์ที่ดูแลทุกมิติเพื่อการพักผ่อนที่สมบูรณ์</h2>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-4 col-md-6">
+                <div class="feature-box">
+                    <div class="feature-icon">✦</div>
+                    <h4>Prime location</h4>
+                    <p class="text-muted">ตั้งอยู่ใจกลางเมือง ใกล้แหล่งท่องเที่ยว ศูนย์การค้า และสถานที่สำคัญสำหรับการเดินทาง</p>
+                </div>
+            </div>
+
+            <div class="col-lg-4 col-md-6">
+                <div class="feature-box">
+                    <div class="feature-icon">◎</div>
+                    <h4>Curated comfort</h4>
+                    <p class="text-muted">ออกแบบทุกห้องให้ผ่อนคลาย เหมาะสำหรับพักผ่อนแบบลึก ๆ หรือการเดินทางเพื่อธุรกิจ</p>
+                </div>
+            </div>
+
+            <div class="col-lg-4 col-md-6">
+                <div class="feature-box">
+                    <div class="feature-icon">★</div>
+                    <h4>Thoughtful service</h4>
+                    <p class="text-muted">ทีมพนักงานให้ความใส่ใจในทุกการติดต่อ เพื่อให้ประสบการณ์เข้าพักมีความพึงพอใจสูง</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,20 @@
+
+@{
+    ViewData["Title"] = "Housekeeper Dashboard";
+}
+
+<div class="container mt-5">
+    <h2>Housekeeper Dashboard</h2>
+    <p>ยินดีต้อนรับ พนักงานแม่บ้าน</p>
+
+    <div class="card p-4 mt-3">
+        <h5>Housekeeping</h5>
+        <p>ระบบสำหรับพนักงานดูแลความสะอาดห้องพัก GoodHotel</p>
+    </div>
+
+    <form asp-controller="Home" asp-action="Logout" method="post">
+        <button type="submit" class="btn btn-danger mt-3">
+            Logout
+        </button>
+    </form>
+</div>

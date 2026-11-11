@@ -1,0 +1,94 @@
+
+@model IEnumerable<GoodHotel.Models.ViewModels.MemberListViewModel>
+
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Members";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">Members</h2>
+
+    @if (TempData["SuccessMessage"] is string successMessage)
+    {
+        <div class="alert alert-success" role="alert">@successMessage</div>
+    }
+
+    @if (Context.Request.Query["status"] == "EditSuccess")
+        {
+            <div class="alert alert-success">
+                แก้ไขข้อมูลสมาชิกสำเร็จ!
+            </div>
+        }
+        else if (Context.Request.Query["status"] == "EditFailed")
+        {
+            <div class="alert alert-danger">
+                ไม่พบสมาชิกที่ต้องการแก้ไข
+            </div>
+        }
+        else if (Context.Request.Query["status"] == "DeleteSuccess")
+        {
+            <div class="alert alert-success">
+                ลบสมาชิกสำเร็จ!
+            </div>
+        }
+        else if (Context.Request.Query["status"] == "DeleteFailed")
+        {
+            <div class="alert alert-danger">
+                ไม่พบสมาชิกที่ต้องการลบ
+            </div>
+}
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>User ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Role</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.UserId</td>
+                    <td>@item.FirstName @item.LastName</td>
+                    <td>@item.Email</td>
+                    <td>@item.Phone</td>
+                    <td>@item.Role</td>
+                    <td>
+                    <a asp-controller="Admin"
+                    asp-action="EditUser"
+                    asp-route-id="@item.UserId"
+                    class="btn btn-primary">
+                        Edit
+                    </a>
+
+                    <form asp-controller="Admin"
+                        asp-action="DeleteUser"
+                        method="post"
+                        style="display: inline;"
+                        onsubmit="return confirm('ต้องการลบสมาชิกคนนี้หรือไม่?');">
+
+                        <input type="hidden" name="id" value="@item.UserId" />
+
+                        <button type="submit" class="btn btn-danger">
+                            Delete
+                        </button>
+                    </form>
+                </td>
+                </tr>
+            }
+        </tbody>
+
+        <tfoot>
+            <tr>
+                <th colspan="6">รวม @Model.Count() คน</th>
+            </tr>
+        </tfoot>
+    </table>
+</div>

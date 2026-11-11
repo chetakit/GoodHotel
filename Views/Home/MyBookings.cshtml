@@ -1,0 +1,129 @@
+@model IReadOnlyList<GoodHotel.Models.ViewModels.MyBookingViewModel>
+
+@{
+    ViewData["Title"] = "My Bookings";
+    var dateCulture = System.Globalization.CultureInfo.InvariantCulture;
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Your Stay</span>
+            <h2>ประวัติการจองของฉัน</h2>
+            <p>รายการห้องพักที่จองไว้กับ Good Hotel</p>
+        </div>
+
+        @if (Model.Count == 0)
+        {
+            <div class="feature-box text-center py-5">
+                <div class="feature-icon mx-auto">⌂</div>
+                <h3 class="mb-3">ยังไม่มีประวัติการจอง</h3>
+                <p class="text-muted mb-4">
+                    เลือกห้องพักและวันที่เข้าพักที่เหมาะกับคุณเพื่อเริ่มต้นการเดินทาง
+                </p>
+                <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                    <a asp-controller="Home"
+                       asp-action="Index"
+                       class="btn btn-outline-primary hotel-secondary-btn">
+                        กลับหน้า Home
+                    </a>
+                    <a asp-controller="Home"
+                       asp-action="Rooms"
+                       class="btn btn-primary hotel-primary-btn">
+                        ค้นหาห้องพัก
+                    </a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row g-4">
+                @foreach (var booking in Model)
+                {
+                    <div class="col-12">
+                        <article class="room-card">
+                            <div class="row g-0">
+                                <div class="col-md-4 col-lg-3">
+                                    <img class="room-image w-100 h-100"
+                                         src="@booking.ImagePath"
+                                         alt="@booking.RoomType room @booking.RoomNumber"
+                                         onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+                                </div>
+                                <div class="col-md-8 col-lg-9">
+                                    <div class="room-body h-100 d-flex flex-column">
+                                        <div class="d-flex flex-wrap justify-content-between
+                                                    align-items-start gap-2 mb-3">
+                                            <div>
+                                                <span class="eyebrow text-dark">Booking #@booking.BookingId</span>
+                                                <h3 class="h4 mt-2 mb-1">
+                                                    @(booking.RoomType ?? "Room")
+                                                </h3>
+                                                <span class="text-muted">
+                                                    Room @(booking.RoomNumber ?? "ไม่ระบุ")
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3">
+                                            <div class="col-6 col-lg-3">
+                                                <small class="text-muted d-block">Check-in</small>
+                                                <strong>
+                                                    @(booking.CheckIn?.ToString("dd MMM yyyy", dateCulture)
+                                                        ?? "ไม่ระบุ")
+                                                </strong>
+                                            </div>
+                                            <div class="col-6 col-lg-3">
+                                                <small class="text-muted d-block">Check-out</small>
+                                                <strong>
+                                                    @(booking.CheckOut?.ToString("dd MMM yyyy", dateCulture)
+                                                        ?? "ไม่ระบุ")
+                                                </strong>
+                                            </div>
+                                            <div class="col-6 col-lg-3">
+                                                <small class="text-muted d-block">จำนวนผู้เข้าพัก</small>
+                                                <strong>
+                                                    @(booking.Guests?.ToString() ?? "ไม่ระบุ")
+                                                </strong>
+                                            </div>
+                                            <div class="col-6 col-lg-3">
+                                                <small class="text-muted d-block">จำนวนคืน</small>
+                                                <strong>
+                                                    @(booking.NightCount?.ToString() ?? "ไม่ระบุ")
+                                                </strong>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-auto pt-3">
+                                            <div class="room-price">
+                                                @if (booking.Amount.HasValue)
+                                                {
+                                                    <span>
+                                                        ฿@booking.Amount.Value.ToString("N2",
+                                                            System.Globalization.CultureInfo.InvariantCulture)
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span>ไม่ระบุยอดรวม</span>
+                                                }
+                                                <small>ยอดรวม</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                }
+            </div>
+
+            <div class="mt-4 text-center">
+                <a asp-controller="Home"
+                   asp-action="Rooms"
+                   class="btn btn-primary hotel-primary-btn">
+                    ค้นหาห้องพักเพิ่มเติม
+                </a>
+            </div>
+        }
+    </div>
+</section>

@@ -1,0 +1,248 @@
+@model GoodHotel.Models.ViewModels.BookingConfirmationViewModel
+
+@{
+    ViewData["Title"] = "Booking Confirmation";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Reservation</span>
+            <h2>ตรวจสอบและยืนยันการจอง</h2>
+        </div>
+
+        @if (Model.IsSaved)
+        {
+            <div class="booking-panel summary-card">
+                <h4 class="mb-3 text-white">@Model.StatusMessage</h4>
+                <div class="summary-line">
+                    <span>Booking ID</span>
+                    <strong>@Model.SavedBookingId</strong>
+                </div>
+                <div class="summary-line">
+                    <span>ยอดที่บันทึก</span>
+                    <strong>฿@Model.EstimatedAmount?.ToString("N2")</strong>
+                </div>
+                <div class="summary-line">
+                    <span>Extra Bed</span>
+                    <strong>@Model.ExtraBedCount เตียง</strong>
+                </div>
+                @if (Model.RoomSubtotal.HasValue)
+                {
+                    <div class="summary-line">
+                        <span>Room Subtotal</span>
+                        <strong>฿@Model.RoomSubtotal.Value.ToString("N2")</strong>
+                    </div>
+                    <div class="summary-line">
+                        <span>Promotion Discount</span>
+                        <strong>฿@((Model.DiscountAmount ?? 0m).ToString("N2"))</strong>
+                    </div>
+                    <div class="summary-line">
+                        <span>Extra Bed Amount</span>
+                        <strong>฿@((Model.ExtraBedAmount ?? 0m).ToString("N2"))</strong>
+                    </div>
+                    <div class="summary-line">
+                        <span>Total Amount</span>
+                        <strong>฿@Model.TotalAmount?.ToString("N2")</strong>
+                    </div>
+                }
+                @if (Model.PromotionCode != null)
+                {
+                    <div class="summary-line">
+                        <span>Promotion</span>
+                        <strong>@Model.PromotionCode</strong>
+                    </div>
+                }
+                <p class="text-white-50 mt-3 mb-0">
+                    บันทึกการจองแล้ว การชำระเงินยังไม่ได้ดำเนินการในขั้นตอนนี้
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <div class="booking-panel">
+                        <h4 class="mb-4">Booking details</h4>
+
+                        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+                        {
+                            <div class="alert alert-warning" role="alert">
+                                @Model.StatusMessage
+                            </div>
+                        }
+
+                        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                        @if (Model.RoomNumber != null)
+                        {
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5">Room</dt>
+                                <dd class="col-sm-7">@Model.RoomType - @Model.RoomNumber</dd>
+                                <dt class="col-sm-5">Rate</dt>
+                                <dd class="col-sm-7">@(Model.Rate.HasValue ? $"฿{Model.Rate.Value:N2} / night" : "ไม่ระบุ")</dd>
+                                <dt class="col-sm-5">Capacity</dt>
+                                <dd class="col-sm-7">@(Model.Capacity?.ToString() ?? "ไม่ระบุ") guests</dd>
+                                <dt class="col-sm-5">Check-in</dt>
+                                <dd class="col-sm-7">@Model.CheckIn?.ToString("yyyy-MM-dd", culture)</dd>
+                                <dt class="col-sm-5">Check-out</dt>
+                                <dd class="col-sm-7">@Model.CheckOut?.ToString("yyyy-MM-dd", culture)</dd>
+                                <dt class="col-sm-5">Guests</dt>
+                                <dd class="col-sm-7">@Model.Guests</dd>
+                            </dl>
+                        }
+                        else
+                        {
+                            <p class="text-muted">
+                                กรุณาค้นหาห้องว่างและเลือกวันที่เข้าพักก่อนดำเนินการยืนยัน
+                            </p>
+                        }
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="booking-panel summary-card">
+                        <h4 class="mb-3 text-white">Booking summary</h4>
+                        @if (Model.RoomSubtotal.HasValue)
+                        {
+                            <div class="summary-line">
+                                <span>Room rate</span>
+                                <strong>฿@Model.Rate?.ToString("N2") x @Model.NightCount nights</strong>
+                            </div>
+                            <div class="summary-line">
+                                <span>Room Subtotal</span>
+                                <strong id="booking-room-subtotal">฿@Model.RoomSubtotal.Value.ToString("N2")</strong>
+                            </div>
+                            <div class="summary-line">
+                                <span>Promotion Discount</span>
+                                <strong id="booking-discount">฿@((Model.DiscountAmount ?? 0m).ToString("N2"))</strong>
+                            </div>
+                            <div class="summary-line">
+                                <span>Extra Bed Amount</span>
+                                <strong id="booking-extra-bed-amount">฿@((Model.ExtraBedAmount ?? 0m).ToString("N2"))</strong>
+                            </div>
+                            <div class="summary-line fw-bold">
+                                <span>Total Amount</span>
+                                <strong id="booking-total-amount">฿@Model.TotalAmount?.ToString("N2")</strong>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-white-50 mb-0">
+                                ยังไม่สามารถคำนวณยอดได้ กรุณาตรวจสอบข้อมูลการเข้าพัก
+                            </p>
+                        }
+
+                        @if (User.IsInRole("Customer") && Model.RoomNumber != null)
+                        {
+                            <form id="promotion-preview-form"
+                                  data-apply-url="@Url.Action("ApplyPromotion", "Home")"
+                                  data-currency="฿">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="RoomId" value="@Model.RoomId" />
+                                <input type="hidden"
+                                       name="CheckIn"
+                                       value="@Model.CheckIn?.ToString("yyyy-MM-dd", culture)" />
+                                <input type="hidden"
+                                       name="CheckOut"
+                                       value="@Model.CheckOut?.ToString("yyyy-MM-dd", culture)" />
+                                <input type="hidden" name="Guests" value="@Model.Guests" />
+
+                                <div class="mt-4">
+                                    <label for="booking-extra-bed-count" class="form-label text-white">
+                                        เตียงเสริม (สูงสุด 1 เตียง)
+                                    </label>
+                                    <select asp-for="ExtraBedCount"
+                                            id="booking-extra-bed-count"
+                                            class="form-select">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                    </select>
+                                    <small class="text-white-50">
+                                        ฿500 / เตียง / คืน และเพิ่มความจุได้ 1 คน
+                                    </small>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label for="booking-promotion-code" class="form-label text-white">
+                                        Promotion Code
+                                    </label>
+                                    <div class="input-group">
+                                        <input id="booking-promotion-code"
+                                               name="PromotionCode"
+                                               type="text"
+                                               class="form-control"
+                                               maxlength="32"
+                                               autocomplete="off"
+                                               value="@Model.PromotionCode"
+                                               placeholder="กรอก Code" />
+                                        <button id="booking-apply-promotion"
+                                                type="submit"
+                                                class="btn btn-light">
+                                            Apply
+                                        </button>
+                                    </div>
+                                    <div id="booking-promotion-feedback"
+                                         class="small mt-2"
+                                         role="status"
+                                         aria-live="polite">@Model.PromotionStatusMessage</div>
+                                </div>
+                            </form>
+
+                        }
+
+                        @if (Model.CanConfirm)
+                        {
+                            @if (User.IsInRole("Customer"))
+                            {
+                                <form id="booking-confirm-form"
+                                      asp-controller="Home"
+                                      asp-action="Booking"
+                                      method="post">
+                                    @Html.AntiForgeryToken()
+                                    <input asp-for="RoomId" type="hidden" />
+                                    <input asp-for="CheckIn" type="hidden" />
+                                    <input asp-for="CheckOut" type="hidden" />
+                                    <input asp-for="Guests" type="hidden" />
+                                    <input asp-for="ExtraBedCount" type="hidden" />
+                                    <input asp-for="PromotionCode" type="hidden" />
+                                    <button type="submit"
+                                            class="btn btn-light w-100 mt-3"
+                                            data-booking-confirm>
+                                        Confirm booking
+                                    </button>
+                                </form>
+                            }
+                            else if (User.Identity?.IsAuthenticated == true)
+                            {
+                                <p class="text-white-50 mt-3 mb-0">
+                                    กรุณาเข้าสู่ระบบด้วยบัญชี Customer เพื่อยืนยันการจอง
+                                </p>
+                            }
+                            else
+                            {
+                                <a asp-controller="Home"
+                                   asp-action="Login"
+                                   class="btn btn-light w-100 mt-3">
+                                    Login to confirm booking
+                                </a>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-white-50 mb-0">
+                                ยังไม่สามารถยืนยันการจองได้ กรุณาตรวจสอบข้อมูลหรือค้นหาห้องว่างอีกครั้ง
+                            </p>
+                            <a asp-controller="Home"
+                               asp-action="Rooms"
+                               class="btn btn-light w-100 mt-3">
+                                Back to room search
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</section>

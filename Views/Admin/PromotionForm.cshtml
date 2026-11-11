@@ -1,0 +1,205 @@
+@model GoodHotel.Models.ViewModels.PromotionFormViewModel
+
+@{
+    Layout = "_AdminLayout";
+    var isEdit = Model.PromotionId.HasValue;
+    ViewData["Title"] = isEdit ? "Edit Promotion" : "Add Promotion";
+}
+
+<div class="container mt-4">
+    <h3 class="mb-3">@(isEdit ? "Edit Promotion" : "Add Promotion")</h3>
+
+    @if (!string.IsNullOrWhiteSpace(Model.MetadataError))
+    {
+        <div class="alert alert-danger" role="alert">
+            อ่านข้อมูลโปรโมชั่นเดิมไม่ได้: @Model.MetadataError
+            การบันทึกจะถูกปฏิเสธเพื่อป้องกันข้อมูลเดิมสูญหาย
+        </div>
+    }
+
+    <form asp-controller="Admin"
+          asp-action="@(isEdit ? "EditPromotion" : "AddPromotion")"
+          method="post">
+        @if (isEdit)
+        {
+            <input asp-for="PromotionId" type="hidden" />
+        }
+
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <div class="row">
+            <div class="col-12">
+                <div class="mb-3">
+                    <label asp-for="PromotionName" class="form-label">Promotion Name</label>
+                    <input asp-for="PromotionName" class="form-control" maxlength="100" />
+                    <span asp-validation-for="PromotionName" class="text-danger"></span>
+                </div>
+            </div>
+
+            @if (Model.IsLegacyPromotion)
+            {
+                <div class="col-12">
+                    <div class="alert alert-info" role="status">
+                        Legacy Promotion — ไม่มี Discount Code
+                        Condition เดิมจะคงเดิม เว้นแต่เลือกเปิดใช้ Code ด้านล่าง
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.LegacyCondition))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Condition เดิม</label>
+                            <div class="form-control-plaintext">@Model.LegacyCondition</div>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (isEdit && !Model.IsLegacyPromotion)
+            {
+                <input asp-for="UseDiscountCode" type="hidden" />
+            }
+            else
+            {
+                <div class="col-12">
+                    <div class="form-check form-switch mb-3">
+                        <input asp-for="UseDiscountCode"
+                               class="form-check-input"
+                               role="switch"
+                               id="UseDiscountCode" />
+                        <label asp-for="UseDiscountCode" class="form-check-label">
+                            เปิดใช้ Promotion Code และส่วนลด
+                        </label>
+                    </div>
+                </div>
+            }
+
+            <div class="col-12" data-discount-fields>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="PromotionCode" class="form-label">Promotion Code</label>
+                            <input asp-for="PromotionCode"
+                                   class="form-control"
+                                   maxlength="32"
+                                   autocomplete="off"
+                                   placeholder="SUMMER10" />
+                            <small class="form-text text-muted">
+                                ใช้ A–Z, 0–9, underscore หรือ hyphen; ระบบแปลงเป็นตัวพิมพ์ใหญ่
+                            </small>
+                            <span asp-validation-for="PromotionCode" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="DiscountType" class="form-label">Discount Type</label>
+                            <select asp-for="DiscountType" class="form-select">
+                                <option value="PERCENT">Percentage (%)</option>
+                                <option value="FIXED">Fixed Amount (฿)</option>
+                            </select>
+                            <span asp-validation-for="DiscountType" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="DiscountValue" class="form-label">Discount Value</label>
+                            <input asp-for="DiscountValue"
+                                   class="form-control"
+                                   type="number"
+                                   min="0"
+                                   max="99999999.99"
+                                   step="0.01" />
+                            <span asp-validation-for="DiscountValue" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label d-block">สถานะ</label>
+                            <div class="form-check form-switch">
+                                <input asp-for="IsActive"
+                                       class="form-check-input"
+                                       role="switch" />
+                                <label asp-for="IsActive" class="form-check-label">
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="StartDate" class="form-label">Start Date (Booking Date)</label>
+                            <input asp-for="StartDate" type="date" class="form-control" />
+                            <span asp-validation-for="StartDate" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label asp-for="EndDate" class="form-label">End Date (Booking Date)</label>
+                            <input asp-for="EndDate" type="date" class="form-control" />
+                            <span asp-validation-for="EndDate" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <small class="text-muted">
+                            วันเริ่มต้นและวันสิ้นสุดรวมวันดังกล่าว และอ้างอิงวันที่ลูกค้าทำรายการจอง
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label">Description</label>
+                    <textarea asp-for="Description"
+                              class="form-control"
+                              rows="3"
+                              maxlength="255"></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="mb-3">
+                    <label asp-for="Benefit" class="form-label">Benefit</label>
+                    <textarea asp-for="Benefit"
+                              class="form-control"
+                              rows="2"
+                              maxlength="255"></textarea>
+                    <span asp-validation-for="Benefit" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="col-12">
+                <button type="submit"
+                        class="btn btn-primary"
+                        disabled="@(!string.IsNullOrWhiteSpace(Model.MetadataError))">
+                    @(isEdit ? "Save Changes" : "Add Promotion")
+                </button>
+                <a asp-controller="Admin" asp-action="Promotion" class="btn btn-secondary">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const toggle = document.getElementById("UseDiscountCode");
+            const fields = document.querySelector("[data-discount-fields]");
+            if (!toggle || !fields) {
+                return;
+            }
+
+            const updateFields = () => {
+                const isEnabled = toggle.type === "hidden"
+                    ? toggle.value.toLowerCase() === "true"
+                    : toggle.checked;
+                fields.hidden = !isEnabled;
+                fields.querySelectorAll("input, select").forEach(field => {
+                    field.disabled = !isEnabled;
+                });
+            };
+
+            toggle.addEventListener("change", updateFields);
+            updateFields();
+        })();
+    </script>
+}

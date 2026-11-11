@@ -1,0 +1,42 @@
+@model GoodHotel.Models.ViewModels.EmployeeProfileViewModel
+
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Employee Profile";
+}
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Employee Profile</h4>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">User ID</dt>
+                <dd class="col-sm-9">@Model.UserId</dd>
+
+                <dt class="col-sm-3">Name</dt>
+                <dd class="col-sm-9">@Model.FirstName @Model.LastName</dd>
+
+                <dt class="col-sm-3">Email</dt>
+                <dd class="col-sm-9">@Model.Email</dd>
+
+                <dt class="col-sm-3">Phone</dt>
+                <dd class="col-sm-9">@Model.Phone</dd>
+
+                <dt class="col-sm-3">Date of Birth</dt>
+                <dd class="col-sm-9">@Model.BirthDate?.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-3">Role</dt>
+                <dd class="col-sm-9">@Model.Role</dd>
+            </dl>
+        </div>
+        <div class="card-footer">
+            <a asp-controller="Admin"
+               asp-action="Employees"
+               class="btn btn-secondary">
+                Back to Employees
+            </a>
+        </div>
+    </div>
+</div>
