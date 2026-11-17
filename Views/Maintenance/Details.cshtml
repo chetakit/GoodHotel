@@ -31,8 +31,8 @@
                 <dd class="col-sm-7 col-lg-8">@Model.Description</dd>
                 <dt class="col-sm-5 col-lg-4">สถานะ</dt>
                 <dd class="col-sm-7 col-lg-8">@ThaiText.Status(Model.Status)</dd>
-                <dt class="col-sm-5 col-lg-4">แจ้งโดยผู้ใช้ #</dt>
-                <dd class="col-sm-7 col-lg-8">@Model.ReportedByUserId</dd>
+                <dt class="col-sm-5 col-lg-4">แจ้งโดย</dt>
+                <dd class="col-sm-7 col-lg-8">@(await Users.NameAsync(Model.ReportedByUserId))</dd>
                 <dt class="col-sm-5 col-lg-4">ปิดห้องระหว่างซ่อม</dt>
                 <dd class="col-sm-7 col-lg-8">@(Model.BlocksRoom ? "ปิด" : "ไม่ปิด")</dd>
                 <dt class="col-sm-5 col-lg-4">ปิดห้องตั้งแต่</dt>
@@ -41,8 +41,8 @@
                 <dd class="col-sm-7 col-lg-8">@(Model.BlockUntil.HasValue ? ThaiText.Date(Model.BlockUntil) : "ไม่กำหนด")</dd>
                 @if (Model.Status == "Resolved")
                 {
-                    <dt class="col-sm-5 col-lg-4">ปิดงานโดยผู้ใช้ #</dt>
-                    <dd class="col-sm-7 col-lg-8">@(Model.ResolvedByUserId?.ToString() ?? "-")</dd>
+                    <dt class="col-sm-5 col-lg-4">ปิดงานโดย</dt>
+                    <dd class="col-sm-7 col-lg-8">@(await Users.NameAsync(Model.ResolvedByUserId))</dd>
                     <dt class="col-sm-5 col-lg-4">บันทึกการซ่อม</dt>
                     <dd class="col-sm-7 col-lg-8">@Model.ResolutionNote</dd>
                     <dt class="col-sm-5 col-lg-4">ซ่อมเสร็จเมื่อ</dt>
@@ -88,7 +88,7 @@
                         <li>
                             @ThaiText.Time(entry.OccurredAtUtc) —
                             @(entry.FromStatus == null ? "สร้างรายการ" : ThaiText.Status(entry.FromStatus)) → @ThaiText.Status(entry.ToStatus)
-                            (ผู้ใช้ #@entry.ActorUserId)
+                            (@(await Users.NameAsync(entry.ActorUserId)))
                             @if (!string.IsNullOrWhiteSpace(entry.Note))
                             {
                                 <span> — @entry.Note</span>

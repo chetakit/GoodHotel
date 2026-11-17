@@ -48,6 +48,25 @@ public class HousekeeperController(HousekeepingService housekeeping, GoodHotelDb
     [ValidateAntiForgeryToken]
     public Task<IActionResult> Start(int id, CancellationToken ct) => Transition(id, "Start", ct);
 
+    /// <summary>ปุ่มเดียว: รับงานแล้วเริ่มทำทันที (ประวัติยังบันทึกแยก 2 ขั้นเหมือนเดิม)</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ClaimAndStart(int id, CancellationToken ct)
+    {
+        if (!ModelState.IsValid || id <= 0) return BadRequest();
+        if (!TryGetUserId(out var userId) ||
+            !await db.Users.AsNoTracking().AnyAsync(u => u.UserId == userId, ct))
+            return Forbid();
+
+        if (await housekeeping.TransitionAsync(id, userId, "Claim", ct) &&
+            await housekeeping.TransitionAsync(id, userId, "Start", ct))
+            TempData["TaskSuccess"] = "รับงานแล้ว เริ่มทำได้เลย";
+        else
+            TempData["TaskError"] = "ทำรายการไม่ได้ งานนี้อาจมีคนรับไปแล้ว";
+
+        return RedirectToAction(nameof(Tasks));
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> Complete(int id, CancellationToken ct) => Transition(id, "Complete", ct);

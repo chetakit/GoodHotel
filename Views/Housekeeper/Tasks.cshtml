@@ -5,7 +5,7 @@
 <section class="content-section">
     <div class="container">
         <div class="section-heading"><span class="eyebrow text-dark">Housekeeping</span><h2>งานทำความสะอาด</h2></div>
-        <p class="text-muted">งานจะเด้งเข้ามาเองเมื่อพนักงานต้อนรับเช็คเอาท์ลูกค้า กดรับงาน → เริ่มทำ → ทำเสร็จ</p>
+        <p class="text-muted">งานจะเด้งเข้ามาเองเมื่อพนักงานต้อนรับเช็คเอาท์ลูกค้า กด "รับงานและเริ่มทำ" → ทำความสะอาด → กด "ทำเสร็จแล้ว"</p>
         @if (TempData["TaskSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
         @if (TempData["TaskError"] is string error) { <div class="alert alert-warning" role="alert">@error</div> }
 
@@ -19,7 +19,17 @@
             <ul>
                 @foreach (var task in Model.Assigned)
                 {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.TaskType) — @ThaiText.Status(task.Status)</li>
+                    <li class="mb-2">
+                        <a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.TaskType) — @ThaiText.Status(task.Status)
+                        @if (task.Status == "Accepted")
+                        {
+                            <form asp-action="Start" asp-route-id="@task.TaskId" method="post" class="d-inline ms-2"><button class="btn btn-sm btn-primary" type="submit">เริ่มทำ</button></form>
+                        }
+                        else if (task.Status == "InProgress")
+                        {
+                            <form asp-action="Complete" asp-route-id="@task.TaskId" method="post" class="d-inline ms-2"><button class="btn btn-sm btn-success" type="submit">ทำเสร็จแล้ว</button></form>
+                        }
+                    </li>
                 }
             </ul>
         }
@@ -34,7 +44,10 @@
             <ul>
                 @foreach (var task in Model.Available)
                 {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.TaskType)</li>
+                    <li class="mb-2">
+                        <a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.TaskType)
+                        <form asp-action="ClaimAndStart" asp-route-id="@task.TaskId" method="post" class="d-inline ms-2"><button class="btn btn-sm btn-primary" type="submit">รับงานและเริ่มทำ</button></form>
+                    </li>
                 }
             </ul>
         }

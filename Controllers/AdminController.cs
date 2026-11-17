@@ -102,8 +102,11 @@ namespace GoodHotel.Controllers
             return View(model);
         }
 
-        public IActionResult Rooms()
+        public async Task<IActionResult> Rooms(CancellationToken ct)
         {
+            // สถานะจริงตอนนี้ (รวมการเข้าพัก งานทำความสะอาด งานซ่อม) แสดงคู่กับสถานะที่ Admin ตั้งไว้
+            ViewBag.LiveStatus = (await _roomStatus.GetRoomBoardAsync(ct)).ToDictionary(r => r.RoomId);
+
             var rooms = _db.Rooms
                 .OrderBy(room => room.Room1)
                 .Select(room => new RoomListViewModel
@@ -877,6 +880,11 @@ namespace GoodHotel.Controllers
         public IActionResult DeleteUser(int id)
         {
             if (id <= 0) return BadRequest();
+            if (User.FindFirstValue(ClaimTypes.NameIdentifier) == id.ToString())
+            {
+                TempData["MemberError"] = "ลบบัญชีของตัวเองไม่ได้";
+                return RedirectToAction(nameof(Members));
+            }
             using var transaction = _db.Database.BeginTransaction(IsolationLevel.Serializable);
             var user = (from u in _db.Users
                         where u.UserId == id

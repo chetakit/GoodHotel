@@ -10,7 +10,7 @@
             <dt>ประเภทห้อง</dt><dd>@ThaiText.OrDash(Model.RoomType)</dd>
             <dt>ประเภทงาน</dt><dd>@ThaiText.Status(Model.TaskType)</dd>
             <dt>สถานะ</dt><dd>@ThaiText.Status(Model.Status)</dd>
-            <dt>ทำโดยผู้ใช้ #</dt><dd>@(Model.CompletedByUserId?.ToString() ?? "-")</dd>
+            <dt>ทำโดย</dt><dd>@(await Users.NameAsync(Model.CompletedByUserId))</dd>
             <dt>ทำเสร็จเมื่อ</dt><dd>@ThaiText.Time(Model.CompletedAtUtc)</dd>
         </dl>
         @if (Model.Status == "Completed")

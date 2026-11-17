@@ -6,7 +6,14 @@
     ViewData["Title"] = "สมาชิก";
     const int pageSize = 10;
     const string pageCookie = "AdminMembersPage";
-    var members = Model.OrderBy(member => member.UserId).ToList();
+    // แยกดูได้ว่า ลูกค้า หรือ พนักงาน (Staff/แม่บ้าน/Admin)
+    var roleFilter = Context.Request.Query["role"].ToString();
+    var members = Model
+        .Where(m => roleFilter == "customer" ? m.Role == "Customer"
+                  : roleFilter == "staff" ? m.Role != "Customer"
+                  : true)
+        .OrderBy(member => member.UserId).ToList();
+    var myId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     var totalPages = Math.Max(1, (int)Math.Ceiling(members.Count / (double)pageSize));
     var requestedPage = Context.Request.Query.ContainsKey("page")
         ? Context.Request.Query["page"].ToString()
@@ -25,7 +32,13 @@
 }
 
 <div class="container mt-4">
-    <h2 class="mb-4">สมาชิก</h2>
+    <h2 class="mb-3">สมาชิก</h2>
+
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item"><a class="nav-link @(roleFilter == "" ? "active" : "")" asp-action="Members" asp-route-page="1">ทั้งหมด</a></li>
+        <li class="nav-item"><a class="nav-link @(roleFilter == "customer" ? "active" : "")" asp-action="Members" asp-route-role="customer" asp-route-page="1">ลูกค้า</a></li>
+        <li class="nav-item"><a class="nav-link @(roleFilter == "staff" ? "active" : "")" asp-action="Members" asp-route-role="staff" asp-route-page="1">พนักงาน</a></li>
+    </ul>
 
     @if (TempData["SuccessMessage"] is string successMessage)
     {
@@ -90,6 +103,12 @@
                         แก้ไข
                     </a>
 
+                    @if (item.UserId.ToString() == myId)
+                    {
+                        <span class="text-muted small ms-1">(บัญชีของคุณ)</span>
+                    }
+                    else
+                    {
                     <form asp-controller="Admin"
                         asp-action="DeleteUser"
                         method="post"
@@ -102,6 +121,7 @@
                             ลบ
                         </button>
                     </form>
+                    }
                 </td>
                 </tr>
             }
@@ -124,7 +144,7 @@
                     }
                     else
                     {
-                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage - 1)">ก่อนหน้า</a>
+                        <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-page="@(currentPage - 1)">ก่อนหน้า</a>
                     }
                 </li>
                 @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
@@ -136,7 +156,7 @@
                         }
                         else
                         {
-                            <a class="page-link" asp-action="Members" asp-route-page="@pageNumber">@pageNumber</a>
+                            <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-page="@pageNumber">@pageNumber</a>
                         }
                     </li>
                 }
@@ -147,7 +167,7 @@
                     }
                     else
                     {
-                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage + 1)">ถัดไป</a>
+                        <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-page="@(currentPage + 1)">ถัดไป</a>
                     }
                 </li>
             </ul>

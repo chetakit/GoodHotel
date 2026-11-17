@@ -25,6 +25,7 @@ builder.Services.AddScoped<StayService>();
 builder.Services.AddScoped<BookingCancellationService>();
 builder.Services.AddScoped<RoomStatusService>();
 builder.Services.AddScoped<WalkInService>();
+builder.Services.AddScoped<UserDirectory>();
 builder.Services.AddScoped<PromotionService>();
 builder.Services.AddSingleton(TimeProvider.System);
 

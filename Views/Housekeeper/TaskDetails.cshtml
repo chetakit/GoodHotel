@@ -18,7 +18,7 @@
         </dl>
         @if (task.Status == "Pending" && task.AssignedToUserId == null)
         {
-            <form asp-action="Claim" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">รับงาน</button></form>
+            <form asp-action="ClaimAndStart" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">รับงานและเริ่มทำ</button></form>
         }
         else if (Model.IsMine && task.Status == "Accepted")
         {

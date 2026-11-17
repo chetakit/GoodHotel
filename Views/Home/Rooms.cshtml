@@ -24,9 +24,9 @@
         else if (Model.HasSearched)
         {
             <div class="mb-4 text-muted">
-                ห้องว่างสำหรับ @Model.CheckIn?.ToString("dd MMM yyyy", culture)
-                ถึง @Model.CheckOut?.ToString("dd MMM yyyy", culture)
-                (@Model.Guests guest@(Model.Guests == 1 ? "" : "s"))
+                ห้องว่างสำหรับวันที่ @ThaiText.Date(Model.CheckIn)
+                ถึง @ThaiText.Date(Model.CheckOut)
+                (ผู้เข้าพัก @Model.Guests คน)
             </div>
         }
 
@@ -65,7 +65,7 @@
                                         <span class="text-muted">@room.RoomNumber</span>
                                     </div>
                                     <span class="badge-status @(room.Status == "Available" ? "available" : "booked")">
-                                        @room.Status
+                                        @(room.Status == "Available" ? "ว่าง" : ThaiText.Status(room.Status))
                                     </span>
                                 </div>
                                 <div class="room-price">
@@ -79,14 +79,35 @@
                                 <div class="room-features">
                                     @if (room.Capacity.HasValue)
                                     {
-                                        <span>@room.Capacity.Value Guests</span>
+                                        <span>รับได้ @room.Capacity.Value คน</span>
                                     }
                                     else
                                     {
                                         <span>ไม่ระบุจำนวนผู้เข้าพัก</span>
                                     }
                                 </div>
-                                @if (room.Status == "Available")
+                                @if (room.Status == "Available" && Model.HasSearched && ViewData.ModelState.IsValid)
+                                {
+                                    @* ค้นหาด้วยวันที่มาแล้ว: ไปหน้ายืนยันการจองได้เลย ไม่ต้องเลือกวันซ้ำ *@
+                                    <a class="btn btn-primary hotel-primary-btn w-100"
+                                       asp-action="Booking"
+                                       asp-route-roomId="@room.RoomId"
+                                       asp-route-checkIn="@Model.CheckIn?.ToString("yyyy-MM-dd", culture)"
+                                       asp-route-checkOut="@Model.CheckOut?.ToString("yyyy-MM-dd", culture)"
+                                       asp-route-guests="@Model.Guests">
+                                        จองห้องนี้
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-link w-100 mt-1 js-open-room-calendar"
+                                            data-room-id="@room.RoomId"
+                                            data-room-number="@room.RoomNumber"
+                                            data-room-type="@room.Type"
+                                            data-room-rate="@(room.Rate?.ToString(culture) ?? "")"
+                                            data-room-capacity="@(room.Capacity?.ToString(culture) ?? "")">
+                                        เปลี่ยนวันที่
+                                    </button>
+                                }
+                                else if (room.Status == "Available")
                                 {
                                     <button type="button"
                                             class="btn btn-primary hotel-primary-btn w-100 js-open-room-calendar"

@@ -100,7 +100,7 @@ public sealed class RoomStatusService(GoodHotelDbContext db, RoomAvailabilitySer
                 return Item(room, RoomLiveStatus.Maintenance, "มีรายการแจ้งซ่อมที่ยังไม่เสร็จ");
 
             if (cleaning != null)
-                return Item(room, RoomLiveStatus.Cleaning, $"งานทำความสะอาด: {cleaning.Status}");
+                return Item(room, RoomLiveStatus.Cleaning, $"งานทำความสะอาด: {ThaiText.Status(cleaning.Status)}");
 
             // Admin ตั้งสถานะห้องเองในหน้าจัดการห้อง
             if (room.Status == "Occupied")

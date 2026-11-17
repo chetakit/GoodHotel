@@ -139,7 +139,7 @@
     {
         <p class="small">
             @ThaiText.Time(item.OccurredAtUtc) · ชำระเงิน #@item.PaymentId · @ThaiText.Status(item.EventType)
-            · ผู้ทำรายการ #@item.ActorUserId
+            · ผู้ทำรายการ: @(await Users.NameAsync(item.ActorUserId))
             @if (item.Amount.HasValue) { <span>· ฿@item.Amount.Value.ToString("N2")</span> }
             @if (!string.IsNullOrWhiteSpace(item.Method)) { <span>· @ThaiText.PaymentMethod(item.Method)</span> }
             @if (!string.IsNullOrWhiteSpace(item.Reason)) { <span>· @item.Reason</span> }

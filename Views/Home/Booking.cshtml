@@ -96,9 +96,9 @@
                                 <dt class="col-sm-5">รับได้</dt>
                                 <dd class="col-sm-7">@(Model.Capacity?.ToString() ?? "ไม่ระบุ") คน</dd>
                                 <dt class="col-sm-5">วันเข้าพัก</dt>
-                                <dd class="col-sm-7">@Model.CheckIn?.ToString("yyyy-MM-dd", culture)</dd>
+                                <dd class="col-sm-7">@ThaiText.Date(Model.CheckIn)</dd>
                                 <dt class="col-sm-5">วันออก</dt>
-                                <dd class="col-sm-7">@Model.CheckOut?.ToString("yyyy-MM-dd", culture)</dd>
+                                <dd class="col-sm-7">@ThaiText.Date(Model.CheckOut)</dd>
                                 <dt class="col-sm-5">ผู้เข้าพัก</dt>
                                 <dd class="col-sm-7">@Model.Guests</dd>
                             </dl>

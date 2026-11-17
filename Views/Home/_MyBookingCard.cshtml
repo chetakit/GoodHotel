@@ -18,7 +18,7 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                     <div>
                         <span class="eyebrow text-dark">การจอง #@booking.BookingId</span>
-                        <h3 class="h4 mt-2 mb-1">@(booking.RoomType ?? "Room")</h3>
+                        <h3 class="h4 mt-2 mb-1">@(booking.RoomType ?? "ห้องพัก")</h3>
                         <span class="text-muted">@(booking.RoomNumber ?? "ไม่ระบุ")</span>
                     </div>
                     <span class="badge rounded-pill fs-6 @booking.StayBadgeClass">@booking.StayLabel</span>
@@ -27,11 +27,11 @@
                 <div class="row g-3">
                     <div class="col-6 col-lg-3">
                         <small class="text-muted d-block">วันเข้าพัก</small>
-                        <strong>@(booking.CheckIn?.ToString("dd MMM yyyy", culture) ?? "ไม่ระบุ")</strong>
+                        <strong>@ThaiText.Date(booking.CheckIn)</strong>
                     </div>
                     <div class="col-6 col-lg-3">
                         <small class="text-muted d-block">วันออก</small>
-                        <strong>@(booking.CheckOut?.ToString("dd MMM yyyy", culture) ?? "ไม่ระบุ")</strong>
+                        <strong>@ThaiText.Date(booking.CheckOut)</strong>
                     </div>
                     <div class="col-6 col-lg-3">
                         <small class="text-muted d-block">จำนวนผู้เข้าพัก</small>

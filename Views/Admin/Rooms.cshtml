@@ -61,7 +61,8 @@
                     <th>ห้อง</th>
                     <th>ประเภท</th>
                     <th>รับได้</th>
-                    <th>สถานะ</th>
+                    <th>สถานะตอนนี้</th>
+                    <th title="ค่าที่ Admin ตั้งเอง ใช้ปิดขายห้องหรือตั้งเป็นซ่อมบำรุง">สถานะที่ตั้งไว้</th>
                     <th>ราคา/คืน</th>
                     <th></th>
                 </tr>
@@ -70,13 +71,14 @@
                 @if (!Model.Any())
                 {
                     <tr>
-                        <td colspan="7" class="text-center text-muted">
+                        <td colspan="8" class="text-center text-muted">
                             ยังไม่มีห้องพัก
                         </td>
                     </tr>
                 }
                 else
                 {
+                    var live = (Dictionary<int, RoomStatusItem>)ViewBag.LiveStatus;
                     @foreach (var room in Model)
                     {
                         var statusClass = room.Status?.Trim().ToUpperInvariant() switch
@@ -99,6 +101,13 @@
                             <td>@room.RoomNumber</td>
                             <td>@room.Type</td>
                             <td>@(room.Capacity is int capacity ? $"{capacity} คน" : "")</td>
+                            <td>
+                                @if (live.TryGetValue(room.RoomId, out var now))
+                                {
+                                    <strong>@RoomStatusService.Label(now.Status)</strong>
+                                    @if (!string.IsNullOrEmpty(now.Detail)) { <br /><small class="text-muted">@now.Detail</small> }
+                                }
+                            </td>
                             <td>
                                 <span class="status-pill room-status @statusClass">@ThaiText.Status(room.Status)</span>
                             </td>

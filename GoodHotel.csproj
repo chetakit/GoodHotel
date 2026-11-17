@@ -6,6 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- โฟลเดอร์ Tests เป็นโปรเจคแยก ห้ามนับเป็นไฟล์ของเว็บ
+       (ไม่งั้น bin ของ test จะถูก copy เข้า bin ของเว็บซ้อนกันไปเรื่อยๆ และ dotnet watch ต้องเฝ้าไฟล์หลายหมื่นไฟล์) -->
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Tests\**</DefaultItemExcludes>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(DotNetWatchBuild)' == 'true'">
     <DefaultItemExcludes>$(DefaultItemExcludes);wwwroot\uploads\rooms\**</DefaultItemExcludes>
   </PropertyGroup>

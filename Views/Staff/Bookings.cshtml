@@ -14,11 +14,21 @@
 
         <div class="booking-panel mb-4">
             <form asp-controller="Staff" asp-action="Bookings" method="get" class="row g-3 align-items-end">
-                <div class="col-sm-6 col-lg-4">
-                    <label for="bookingId" class="form-label">เลขที่การจอง</label>
-                    <input id="bookingId" name="bookingId" type="number" min="1"
-                           class="form-control" value="@Context.Request.Query["bookingId"]" />
-                    @Html.ValidationMessage("bookingId", new { @class = "text-danger" })
+                <div class="col-sm-6 col-lg-5">
+                    <label for="q" class="form-label">ค้นหา</label>
+                    <input id="q" name="q" type="search" class="form-control"
+                           placeholder="ชื่อลูกค้า, เบอร์โทร หรือ #เลขที่การจอง"
+                           value="@Context.Request.Query["q"]" />
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label for="when" class="form-label">แสดง</label>
+                    @{ var when = Context.Request.Query["when"].ToString(); }
+                    <select id="when" name="when" class="form-select" onchange="this.form.submit()">
+                        <option value="" selected="@(when == "")">ทั้งหมด</option>
+                        <option value="today" selected="@(when == "today")">เข้า/ออกวันนี้</option>
+                        <option value="staying" selected="@(when == "staying")">กำลังเข้าพัก</option>
+                        <option value="upcoming" selected="@(when == "upcoming")">กำลังจะมาถึง</option>
+                    </select>
                 </div>
                 <div class="col-auto">
                     <button type="submit" class="btn btn-primary">ค้นหา</button>
@@ -65,9 +75,14 @@
                                     <td>@(booking.Guests?.ToString() ?? "-")</td>
                                     <td>@(booking.Amount.HasValue ? $"฿{booking.Amount:N2}" : "-")</td>
                                     <td>
-                                        <span class="badge @(isCancelled ? "text-bg-secondary" : "text-bg-primary")">
-                                            @ThaiText.Status(booking.BookingStatus)
-                                        </span>
+                                        @* รวมสถานะการจองกับสถานะเข้าพักเป็นป้ายเดียว *@
+                                        @{
+                                            var (label, color) = isCancelled ? ("ยกเลิกแล้ว", "text-bg-secondary")
+                                                : booking.StayStatus == "CheckedIn" ? ("เข้าพักอยู่", "text-bg-success")
+                                                : booking.StayStatus == "CheckedOut" ? ("เช็คเอาท์แล้ว", "text-bg-dark")
+                                                : ("รอเช็คอิน", "text-bg-primary");
+                                        }
+                                        <span class="badge @color">@label</span>
                                     </td>
                                     <td>
                                         <span class="badge @(booking.PaymentLabel == PaymentService.PaidLabel ? "text-bg-success" : "text-bg-warning")">
