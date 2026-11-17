@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GoodHotel.Models.ViewModels;
 
+/// <summary>คำขอคำนวณราคาใหม่ในหน้าจอง (เช่น ตอนเปลี่ยนจำนวนเตียงเสริม)</summary>
 public sealed class ApplyPromotionRequestViewModel
 {
     [Range(1, int.MaxValue)]
@@ -20,15 +21,12 @@ public sealed class ApplyPromotionRequestViewModel
 
     [Range(0, 1)]
     public int ExtraBedCount { get; set; }
-
-    [StringLength(64)]
-    public string? PromotionCode { get; set; }
 }
 
 public sealed record ApplyPromotionResponseViewModel(
     bool IsValidRequest,
-    string PromotionStatus,
     string Message,
+    string? PromotionName = null,
     int? NightCount = null,
     decimal? RoomSubtotal = null,
     decimal? DiscountAmount = null,

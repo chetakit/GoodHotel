@@ -143,47 +143,10 @@
             }
             else
             {
-                @foreach (var promotion in Model.Promotions)
+                @foreach (var promotion in Model.Promotions.Take(6))
                 {
                     <div class="col-lg-4 col-md-6">
-                        <div class="promo-card">
-                            <span class="tag">Promotion</span>
-                            <h4>@promotion.PromotionName</h4>
-                            @if (!string.IsNullOrWhiteSpace(promotion.Description))
-                            {
-                                <p class="text-muted mb-3">@promotion.Description</p>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(promotion.Benefit))
-                            {
-                                <p class="mb-2"><strong>Benefit:</strong> @promotion.Benefit</p>
-                            }
-                            @if (promotion.PromotionCode != null)
-                            {
-                                <p class="mb-2">
-                                    <strong>Code:</strong> @promotion.PromotionCode
-                                    <span class="ms-2">
-                                        @if (promotion.DiscountType == "PERCENT")
-                                        {
-                                            <span>@promotion.DiscountValue?.ToString("0.##")%</span>
-                                        }
-                                        else
-                                        {
-                                            <span>฿@promotion.DiscountValue?.ToString("N2")</span>
-                                        }
-                                    </span>
-                                </p>
-                                <small class="text-muted">
-                                    ใช้ได้ถึงวันจอง @promotion.EndDate?.ToString(
-                                        "yyyy-MM-dd",
-                                        System.Globalization.CultureInfo.InvariantCulture)
-                                </small>
-                            }
-                            else if (promotion.IsLegacyPromotion &&
-                                     !string.IsNullOrWhiteSpace(promotion.Condition))
-                            {
-                                <small class="text-muted">Condition: @promotion.Condition</small>
-                            }
-                        </div>
+                        <partial name="_PromotionCard" model="promotion" />
                     </div>
                 }
             }

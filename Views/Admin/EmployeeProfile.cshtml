@@ -6,6 +6,14 @@
 }
 
 <div class="container mt-4">
+    @if (TempData["EmployeeSuccess"] is string success)
+    {
+        <div class="alert alert-success" role="status">@success</div>
+    }
+    @if (TempData["EmployeeError"] is string error)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
     <div class="card">
         <div class="card-header">
             <h4 class="mb-0">Employee Profile</h4>
@@ -29,9 +37,19 @@
 
                 <dt class="col-sm-3">Role</dt>
                 <dd class="col-sm-9">@Model.Role</dd>
+
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9">@(Model.IsActive ? "Active" : "Inactive")</dd>
             </dl>
         </div>
         <div class="card-footer">
+            <form asp-action="SetEmployeeActive" method="post" class="d-inline">
+                <input type="hidden" name="id" value="@Model.UserId" />
+                <input type="hidden" name="isActive" value="@(Model.IsActive ? "false" : "true")" />
+                <button type="submit" class="btn @(Model.IsActive ? "btn-outline-danger" : "btn-outline-success")">
+                    @(Model.IsActive ? "Deactivate" : "Activate")
+                </button>
+            </form>
             <a asp-controller="Admin"
                asp-action="Employees"
                class="btn btn-secondary">

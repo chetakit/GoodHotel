@@ -70,7 +70,7 @@
     };
 
     const getCachedPeriods = () => [...state.months.values()]
-        .flatMap(month => month.bookingPeriods);
+        .flatMap(month => month.blockedPeriods);
 
     const rangeHasConflict = (checkIn, checkOut) =>
         getCachedPeriods().some(period =>
@@ -98,7 +98,7 @@
 
         const data = {
             ...result,
-            bookingPeriods: (result.bookingPeriods || []).map(period => ({
+            blockedPeriods: (result.blockedPeriods || []).map(period => ({
                 checkIn: period.checkIn,
                 checkOut: period.checkOut
             }))
@@ -274,7 +274,7 @@
             if (day.canCheckIn && state.roomCanBeBooked) {
                 state.checkIn = day.date;
                 state.checkOut = "";
-                showPrompt("ช่วงวันที่เดิมมีการจองทับซ้อน เลือกวันเข้าพักใหม่แล้ว");
+                showPrompt("ช่วงวันที่เดิมไม่พร้อมให้จอง เลือกวันเข้าพักใหม่แล้ว");
                 const month = state.months.get(monthKey(
                     state.monthYear,
                     state.monthNumber));
@@ -282,7 +282,7 @@
                 return;
             }
 
-            setError("ช่วงวันที่เลือกมีการจองทับซ้อน กรุณาเลือกวันออกใหม่");
+            setError("ช่วงวันที่เลือกไม่พร้อมให้จอง กรุณาเลือกวันออกใหม่");
             const month = state.months.get(monthKey(
                 state.monthYear,
                 state.monthNumber));
@@ -421,26 +421,24 @@
     });
 })();
 
+// หน้ายืนยันการจอง: เปลี่ยนจำนวนเตียงเสริมแล้วขอราคาใหม่จาก server
+// (server เป็นคนเลือกโปรที่ดีที่สุดให้อัตโนมัติ หน้าเว็บแค่แสดงผล)
 (() => {
     const form = document.getElementById("promotion-preview-form");
     if (!form) {
         return;
     }
 
-    const codeInput = document.getElementById("booking-promotion-code");
     const extraBedInput = document.getElementById("booking-extra-bed-count");
-    const applyButton = document.getElementById("booking-apply-promotion");
     const feedback = document.getElementById("booking-promotion-feedback");
+    const promotionName = document.getElementById("booking-promotion-name");
     const roomSubtotal = document.getElementById("booking-room-subtotal");
     const discount = document.getElementById("booking-discount");
     const extraBedAmount = document.getElementById("booking-extra-bed-amount");
     const totalAmount = document.getElementById("booking-total-amount");
-    const confirmButton = document.querySelector("[data-booking-confirm]");
     const confirmForm = document.getElementById("booking-confirm-form");
     const currency = form.dataset.currency || "";
-    let requestSequence = 0;
-    let activeRequest = null;
-    let quoteTimeout = null;
+    let latestRequest = 0;
 
     const formatMoney = value =>
         `${currency}${Number(value).toLocaleString("th-TH", {
@@ -448,134 +446,56 @@
             maximumFractionDigits: 2
         })}`;
 
-    const clearAmounts = () => {
-        roomSubtotal.textContent = "—";
-        discount.textContent = formatMoney(0);
-        extraBedAmount.textContent = "—";
-        totalAmount.textContent = "—";
-    };
-
-    const updateConfirmAvailability = () => {
-        if (confirmButton) {
-            confirmButton.disabled = false;
-        }
-    };
-
-    const setFeedback = (message, status) => {
+    const showMessage = (message, isSuccess) => {
         feedback.textContent = message || "";
-        feedback.classList.toggle("promotion-feedback-success", status === "Success");
-        feedback.classList.toggle(
-            "promotion-feedback-error",
-            status !== "Success" && status !== "NoCode");
+        feedback.classList.toggle("promotion-feedback-success", isSuccess);
+        feedback.classList.toggle("promotion-feedback-error", !isSuccess);
     };
 
-    const renderQuote = result => {
-        if (!result.isValidRequest ||
-            result.roomSubtotal == null ||
-            result.discountAmount == null ||
-            result.extraBedAmount == null ||
-            result.totalAmount == null) {
-            clearAmounts();
-            setFeedback(result.message || "ข้อมูลไม่ถูกต้อง", result.promotionStatus);
-            return;
-        }
-
+    const render = result => {
         roomSubtotal.textContent = formatMoney(result.roomSubtotal);
-        discount.textContent = formatMoney(result.discountAmount);
+        discount.textContent = `-${formatMoney(result.discountAmount)}`;
         extraBedAmount.textContent = formatMoney(result.extraBedAmount);
         totalAmount.textContent = formatMoney(result.totalAmount);
-        setFeedback(result.message, result.promotionStatus);
+        promotionName.textContent = result.promotionName || "ไม่เข้าเงื่อนไขโปร";
+        showMessage(result.message, true);
     };
 
-    const requestQuote = async applyCode => {
-        const sequence = ++requestSequence;
-        activeRequest?.abort();
-        const controller = new AbortController();
-        activeRequest = controller;
-        applyButton.disabled = true;
-        if (applyCode) {
-            applyButton.textContent = "กำลังตรวจสอบ...";
-        }
-
+    const requestQuote = async () => {
+        const requestId = ++latestRequest;
         const formData = new FormData(form);
-        if (!applyCode) {
-            formData.set("PromotionCode", "");
-        }
-
-        const antiForgeryToken =
-            formData.get("__RequestVerificationToken");
-
         try {
             const response = await fetch(form.dataset.applyUrl, {
                 method: "POST",
-                headers: {
-                    "RequestVerificationToken": antiForgeryToken
-                },
+                headers: { "RequestVerificationToken": formData.get("__RequestVerificationToken") },
                 body: formData,
-                signal: controller.signal,
                 credentials: "same-origin"
             });
             const result = await response.json();
-            if (sequence !== requestSequence) {
-                return;
+            if (requestId !== latestRequest) {
+                return; // มีคำขอใหม่กว่าแล้ว
             }
 
-            renderQuote(result);
-        } catch (error) {
-            if (error.name !== "AbortError" && sequence === requestSequence) {
-                clearAmounts();
-                setFeedback(
-                    "ไม่สามารถตรวจสอบราคาได้ กรุณาลองอีกครั้ง",
-                    "InvalidRequest");
+            if (result.isValidRequest) {
+                render(result);
+            } else {
+                showMessage(result.message, false);
             }
-        } finally {
-            if (sequence === requestSequence) {
-                activeRequest = null;
-                applyButton.disabled = false;
-                applyButton.textContent = "Apply";
+        } catch {
+            if (requestId === latestRequest) {
+                showMessage("ไม่สามารถคำนวณราคาได้ กรุณาลองอีกครั้ง", false);
             }
         }
     };
 
-    const invalidateAppliedPromotion = () => {
-        requestSequence += 1;
-        activeRequest?.abort();
-        activeRequest = null;
-        clearTimeout(quoteTimeout);
-        clearAmounts();
-        setFeedback(
-            "ข้อมูลเปลี่ยนแล้ว กรุณากด Apply ใหม่เพื่อตรวจสอบ Code",
-            "NoCode");
-        updateConfirmAvailability();
-        quoteTimeout = setTimeout(() => requestQuote(false), 250);
-    };
+    form.addEventListener("submit", event => event.preventDefault());
+    extraBedInput.addEventListener("change", requestQuote);
 
-    form.addEventListener("submit", event => {
-        event.preventDefault();
-        clearTimeout(quoteTimeout);
-        requestQuote(true);
-    });
-
-    codeInput.addEventListener("input", invalidateAppliedPromotion);
-    extraBedInput.addEventListener("change", invalidateAppliedPromotion);
-    form.querySelectorAll('[name="CheckIn"], [name="CheckOut"], [name="Guests"]')
-        .forEach(input => {
-            input.addEventListener("input", invalidateAppliedPromotion);
-            input.addEventListener("change", invalidateAppliedPromotion);
-        });
-
+    // ส่งจำนวนเตียงเสริมล่าสุดไปกับฟอร์มยืนยันการจอง
     confirmForm?.addEventListener("submit", () => {
-        const confirmExtraBed = confirmForm.querySelector(
-            '[name="ExtraBedCount"]');
-        const confirmPromotionCode = confirmForm.querySelector(
-            '[name="PromotionCode"]');
+        const confirmExtraBed = confirmForm.querySelector('[name="ExtraBedCount"]');
         if (confirmExtraBed) {
             confirmExtraBed.value = extraBedInput.value;
         }
-        if (confirmPromotionCode) {
-            confirmPromotionCode.value = codeInput.value.trim();
-        }
     });
-
-    updateConfirmAvailability();
 })();

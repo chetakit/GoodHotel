@@ -3,89 +3,225 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Reports";
+
+    string StatusClass(string? status) => status?.Trim().ToLowerInvariant() switch
+    {
+        "paid" or "resolved" or "verified" => "reports-status-success",
+        "pending" or "open" or "submitted" => "reports-status-warning",
+        "accepted" or "inprogress" or "in progress" or "completed" => "reports-status-info",
+        "rejected" or "cancelled" or "canceled" => "reports-status-danger",
+        _ => "reports-status-neutral"
+    };
 }
 
-<div class="row g-4">
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">Booking records</div>
-            <div class="value">@Model.BookingCount</div>
-            <div class="trend">All records</div>
-        </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">Recorded booking amounts</div>
-            <div class="value">@(Model.BookingAmount?.ToString("N2") ?? "N/A")</div>
-            <div class="trend">Sum of Booking.Amount</div>
-        </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">Average stay</div>
-            <div class="value">
-                @(Model.AverageStayNights.HasValue
-                    ? $"{Model.AverageStayNights.Value:N2} nights"
-                    : "N/A")
-            </div>
-            <div class="trend">
-                @Model.BookingsWithValidStayDates bookings with valid check-in/out dates
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">Recorded payment amount</div>
-            <div class="value">@(Model.RecordedPaymentAmount?.ToString("N2") ?? "N/A")</div>
-            <div class="trend">@Model.PaymentCount payment records, all statuses</div>
-        </div>
-    </div>
-</div>
+<style>
+    .reports-page { color: var(--hotel-ink); }
+    .reports-intro { color: var(--hotel-muted); margin: 0 0 1.25rem; }
+    .reports-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+    @@media (min-width: 768px) {
+        .reports-grid { grid-auto-rows: 1fr; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @@media (min-width: 1200px) {
+        .reports-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    .reports-card {
+        background: #fff;
+        border: 1px solid var(--hotel-border);
+        border-radius: 1rem;
+        box-shadow: 0 6px 18px rgba(17, 38, 61, 0.04);
+        height: 100%;
+        padding: 1.4rem;
+    }
+    .reports-card h3, .reports-panel h3 {
+        color: var(--hotel-navy);
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 0;
+    }
+    .reports-value {
+        color: var(--hotel-navy);
+        font-size: clamp(1.6rem, 3vw, 2rem);
+        font-weight: 800;
+        line-height: 1.2;
+        margin: 1rem 0 0.5rem;
+        overflow-wrap: anywhere;
+    }
+    .reports-note { color: #596575; font-size: 0.875rem; line-height: 1.5; margin: 0; }
+    .reports-simulation { color: #795116; font-weight: 700; margin-top: 0.5rem; }
+    .reports-status-list { margin: 0.75rem 0 0; }
+    .reports-status-row {
+        align-items: center;
+        border-top: 1px solid var(--hotel-border);
+        display: flex;
+        gap: 0.75rem;
+        justify-content: space-between;
+        padding: 0.6rem 0;
+    }
+    .reports-status-row dt, .reports-status-row dd { margin: 0; }
+    .reports-status-row dd { color: var(--hotel-navy); font-weight: 700; }
+    .reports-status {
+        border-radius: 999px;
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.35;
+        padding: 0.3rem 0.65rem;
+    }
+    .reports-status-success { background: #e3f3eb; color: #17613f; }
+    .reports-status-warning { background: #fff2d6; color: #805100; }
+    .reports-status-info { background: #e7f0fa; color: #24577c; }
+    .reports-status-danger { background: #fbe9e9; color: #9c3333; }
+    .reports-status-neutral { background: #edf0f3; color: #465361; }
+    .reports-panel { height: auto; margin-top: 1.25rem; }
+    .reports-table { margin-bottom: 0; min-width: 460px; }
+    .reports-table th {
+        color: #596575;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .reports-table td, .reports-table th { padding: 0.9rem 0.75rem; vertical-align: middle; }
+    .reports-table tbody tr:last-child > * { border-bottom: 0; }
+    .reports-empty { color: var(--hotel-muted); padding: 1rem 0 0; }
+</style>
 
-<div class="row g-4 mt-1">
-    <div class="col-lg-8">
-        <div class="report-card">
-            <h4 class="mb-3">Payment amounts by recorded status</h4>
-            <div class="table-responsive">
-                <table class="table align-middle">
+<div class="reports-page">
+    <p class="reports-intro">An all-time overview of bookings, payments and hotel operations.</p>
+
+    <div class="reports-grid">
+            <section class="reports-card" aria-labelledby="report-bookings">
+                <h3 id="report-bookings">Total Bookings</h3>
+                <p class="reports-value">@Model.BookingCount.ToString("N0")</p>
+                <p class="reports-note">ไม่นับที่ยกเลิก (ยกเลิกแล้ว @Model.CancelledBookingCount.ToString("N0") รายการ)</p>
+            </section>
+            <section class="reports-card" aria-labelledby="report-booking-value">
+                <h3 id="report-booking-value">Booking Value</h3>
+                <p class="reports-value">@(Model.BookingAmount?.ToString("N2") ?? "N/A")</p>
+                <p class="reports-note">Sum of recorded booking amounts</p>
+            </section>
+            <section class="reports-card" aria-labelledby="report-revenue">
+                <h3 id="report-revenue">Payment Revenue</h3>
+                <p class="reports-value">@(Model.Revenue?.ToString("N2") ?? "N/A")</p>
+                <p class="reports-note">Confirmed payments less approved refunds</p>
+                <p class="reports-note reports-simulation">Includes DEMO/MOCK amounts; not actual money received.</p>
+            </section>
+            <section class="reports-card" aria-labelledby="report-stay">
+                <h3 id="report-stay">Average Actual Stay</h3>
+                <p class="reports-value">@(Model.AverageActualStayNights.HasValue ? $"{Model.AverageActualStayNights.Value:N2} nights" : "N/A")</p>
+                <p class="reports-note">@Model.CompletedStaysWithValidDates completed stays with actual timestamps, using Asia/Bangkok dates</p>
+            </section>
+            <section class="reports-card" aria-labelledby="report-maintenance">
+                <h3 id="report-maintenance">Maintenance Reports</h3>
+                @if (Model.MaintenanceByStatus.Count == 0)
+                {
+                    <p class="reports-note reports-empty">No maintenance reports found.</p>
+                }
+                else
+                {
+                    <dl class="reports-status-list">
+                        @foreach (var item in Model.MaintenanceByStatus)
+                        {
+                            <div class="reports-status-row">
+                                <dt><span class="reports-status @StatusClass(item.Status)">@(string.IsNullOrWhiteSpace(item.Status) ? "Unspecified" : item.Status)</span></dt>
+                                <dd>@item.Count</dd>
+                            </div>
+                        }
+                    </dl>
+                }
+            </section>
+            <section class="reports-card" aria-labelledby="report-housekeeping">
+                <h3 id="report-housekeeping">Housekeeping Tasks</h3>
+                @if (Model.HousekeepingByStatus.Count == 0)
+                {
+                    <p class="reports-note reports-empty">No housekeeping tasks found.</p>
+                }
+                else
+                {
+                    <dl class="reports-status-list">
+                        @foreach (var item in Model.HousekeepingByStatus)
+                        {
+                            <div class="reports-status-row">
+                                <dt><span class="reports-status @StatusClass(item.Status)">@(string.IsNullOrWhiteSpace(item.Status) ? "Unspecified" : item.Status)</span></dt>
+                                <dd>@item.Count</dd>
+                            </div>
+                        }
+                    </dl>
+                }
+            </section>
+    </div>
+
+    <section class="reports-card reports-panel" aria-labelledby="report-promotions">
+        <h3 id="report-promotions">การใช้โปรโมชั่น</h3>
+        <p class="reports-note mt-2">นับเฉพาะการจองที่ไม่ได้ยกเลิก</p>
+        @if (Model.PromotionUsage.Count == 0)
+        {
+            <p class="reports-note reports-empty">ยังไม่มีการจองที่ใช้โปรโมชั่น</p>
+        }
+        else
+        {
+            <div class="table-responsive mt-3">
+                <table class="table reports-table">
                     <thead>
                         <tr>
-                            <th>Payment status</th>
-                            <th>Records</th>
-                            <th>Recorded amount</th>
+                            <th scope="col">โปรโมชั่น</th>
+                            <th scope="col" class="text-end">จำนวนการจอง</th>
+                            <th scope="col" class="text-end">ยอดจองรวม (บาท)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @if (!Model.PaymentsByStatus.Any())
+                        @foreach (var promotion in Model.PromotionUsage)
                         {
                             <tr>
-                                <td colspan="3" class="text-center text-muted">
-                                    No payment records.
-                                </td>
+                                <td>@promotion.PromotionName</td>
+                                <td class="text-end">@promotion.BookingCount</td>
+                                <td class="text-end">@promotion.BookingAmount.ToString("N2")</td>
                             </tr>
-                        }
-                        else
-                        {
-                            @foreach (var payment in Model.PaymentsByStatus)
-                            {
-                                <tr>
-                                    <td>@(string.IsNullOrWhiteSpace(payment.Status) ? "Unspecified" : payment.Status)</td>
-                                    <td>@payment.Count</td>
-                                    <td>@(payment.Amount?.ToString("N2") ?? "N/A")</td>
-                                </tr>
-                            }
                         }
                     </tbody>
                 </table>
             </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="report-card">
-            <h4 class="mb-3">Report scope</h4>
-            <p class="text-muted mb-0">
-                Payment totals are sums of Payment.Amount grouped by PaymentStatus. The database does not define which status represents collected revenue, so these totals are not presented as recognized revenue.
-            </p>
-        </div>
-    </div>
+        }
+    </section>
+
+    <section class="reports-card reports-panel" aria-labelledby="report-payments">
+        <h3 id="report-payments">Payment amounts by recorded status</h3>
+        <p class="reports-note mt-2">@Model.PaymentCount payment records. Statuses and amounts below reflect stored records, not confirmed revenue.</p>
+        @if (Model.PaymentsByStatus.Count == 0)
+        {
+            <p class="reports-note reports-empty">No payment records found.</p>
+        }
+        else
+        {
+            <div class="table-responsive mt-3">
+                <table class="table reports-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Payment status</th>
+                            <th scope="col" class="text-end">Records</th>
+                            <th scope="col" class="text-end">Recorded amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var payment in Model.PaymentsByStatus)
+                        {
+                            <tr>
+                                <td><span class="reports-status @StatusClass(payment.Status)">@(string.IsNullOrWhiteSpace(payment.Status) ? "Unspecified" : payment.Status)</span></td>
+                                <td class="text-end">@payment.Count</td>
+                                <td class="text-end">@(payment.Amount?.ToString("N2") ?? "N/A")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="reports-card reports-panel" aria-labelledby="report-scope">
+        <h3 id="report-scope">Report scope</h3>
+        <p class="reports-note mt-2">
+            Revenue includes simulated DEMO/MOCK payments and does not represent actual money received.
+            Unreviewed legacy payments are excluded from revenue. Actual stay duration excludes bookings without completed stay timestamps.
+        </p>
+    </section>
 </div>

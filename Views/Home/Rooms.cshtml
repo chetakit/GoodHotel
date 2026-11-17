@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "Rooms";
     var culture = System.Globalization.CultureInfo.InvariantCulture;
+    var hotelToday = (DateOnly)ViewData["HotelToday"]!;
 }
 
 <section class="content-section">
@@ -116,7 +117,7 @@
      class="calendar-modal"
      data-availability-url="@Url.Action("RoomAvailability", "Home")"
      data-booking-url="@Url.Action("Booking", "Home")"
-     data-today="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+     data-today="@hotelToday.ToString("yyyy-MM-dd", culture)"
      role="dialog"
      aria-modal="true"
      aria-labelledby="calendar-title"
@@ -158,7 +159,7 @@
         <div id="calendar-days" class="calendar-days" aria-live="polite"></div>
         <div class="calendar-legend">
             <span><i class="legend-dot available"></i>ว่าง</span>
-            <span><i class="legend-dot occupied"></i>มีการจอง</span>
+            <span><i class="legend-dot occupied"></i>ไม่พร้อมให้จอง</span>
             <span><i class="legend-dot selected"></i>วันที่เลือก</span>
         </div>
 

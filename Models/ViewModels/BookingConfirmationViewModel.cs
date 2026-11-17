@@ -16,7 +16,8 @@ public class BookingConfirmationViewModel : CreateBookingViewModel
 
     public decimal? RoomSubtotal { get; set; }
 
-    public string? PromotionStatusMessage { get; set; }
+    // โปรที่ระบบเลือกให้อัตโนมัติ (null = ไม่เข้าเงื่อนไขโปรไหนเลย)
+    public string? PromotionName { get; set; }
 
     public decimal? DiscountAmount { get; set; }
 
@@ -31,6 +32,12 @@ public class BookingConfirmationViewModel : CreateBookingViewModel
     public bool IsSaved { get; set; }
 
     public int? SavedBookingId { get; set; }
+
+    public string PaymentStatus { get; set; } = "Not submitted";
+
+    public bool IsMockPayment { get; set; }
+
+    public bool CanSubmitPayment { get; set; }
 
     public string? StatusMessage { get; set; }
 }

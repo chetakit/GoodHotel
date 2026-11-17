@@ -1,0 +1,76 @@
+@model GoodHotel.Models.ViewModels.AdminHousekeepingDetailsViewModel
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Housekeeping Task Details";
+}
+<div class="table-panel">
+    <h3>Task #@Model.Task.TaskId</h3>
+    @if (TempData["HousekeepingSuccess"] is string success)
+    {
+        <div class="alert alert-success" role="status">@success</div>
+    }
+    @if (TempData["HousekeepingError"] is string error)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+    <dl>
+        <dt>Room</dt><dd>@(Model.Task.RoomNumber ?? Model.Task.RoomId.ToString())</dd>
+        <dt>Type</dt><dd>@Model.Task.TaskType</dd>
+        <dt>Status</dt><dd>@Model.Task.Status</dd>
+        <dt>Assignee</dt><dd>@(Model.Task.AssignedToUserId.HasValue ? $"#{Model.Task.AssignedToUserId} {Model.Task.AssigneeFirstName} {Model.Task.AssigneeLastName}" : "Unassigned")</dd>
+        <dt>Created (UTC)</dt><dd>@Model.Task.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</dd>
+    </dl>
+    @{
+        var canAssign = Model.Task.Status == "Pending" && !Model.Task.AssignedToUserId.HasValue;
+        var canReassign = (Model.Task.Status == "Accepted" || Model.Task.Status == "InProgress") &&
+            Model.Task.AssignedToUserId.HasValue;
+        var availableHousekeepers = Model.ActiveHousekeepers
+            .Where(user => user.UserId != Model.Task.AssignedToUserId).ToList();
+    }
+    @if (canAssign || canReassign)
+    {
+        @if (availableHousekeepers.Count == 0)
+        {
+            <p class="alert alert-warning">No eligible active Housekeepers are available.</p>
+        }
+        else
+        {
+            <form asp-action="AssignHousekeepingTask" method="post" class="mb-4">
+                <input type="hidden" name="id" value="@Model.Task.TaskId" />
+                <input type="hidden" name="expectedStatus" value="@Model.Task.Status" />
+                <input type="hidden" name="expectedAssigneeId" value="@Model.Task.AssignedToUserId" />
+                <input type="hidden" name="expectedEventId" value="@Model.LatestEventId" />
+                <label for="assigneeId" class="form-label">Active Housekeeper</label>
+                <select id="assigneeId" name="assigneeId" class="form-select mb-3" required>
+                    <option value="">Select a Housekeeper</option>
+                    @foreach (var user in availableHousekeepers)
+                    {
+                        <option value="@user.UserId">#@user.UserId @user.FirstName @user.LastName</option>
+                    }
+                </select>
+                <label for="reason" class="form-label">Reason @(canReassign ? "(required)" : "(optional)")</label>
+                <textarea id="reason" name="reason" class="form-control mb-3" maxlength="2000" required="@canReassign"></textarea>
+                @if (canReassign)
+                {
+                    <p class="text-muted">The new assignee must start this task again.</p>
+                }
+                <button type="submit" class="btn btn-primary">@(canReassign ? "Reassign" : "Assign")</button>
+            </form>
+        }
+    }
+    <h4>Task event history</h4>
+    @if (Model.Events.Count == 0) { <p>No events recorded.</p> }
+    else
+    {
+        <div class="table-responsive"><table class="table">
+            <thead><tr><th>Time (UTC)</th><th>Actor ID</th><th>Event</th><th>Status</th><th>Assignee IDs</th><th>Reason</th></tr></thead>
+            <tbody>
+                @foreach (var item in Model.Events)
+                {
+                    <tr><td>@item.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@item.ActorUserId</td><td>@item.EventType</td><td>@item.PreviousStatus → @item.NewStatus</td><td>@item.PreviousAssignee → @item.NewAssignee</td><td>@item.Reason</td></tr>
+                }
+            </tbody>
+        </table></div>
+    }
+    <a asp-action="HousekeepingAssignments" class="btn btn-outline-primary">Back to tasks</a>
+</div>

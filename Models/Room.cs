@@ -17,6 +17,8 @@ public partial class Room
 
     public string? Status { get; set; }
 
+    public string? PreMaintenanceStatus { get; set; }
+
     public decimal? Rate { get; set; }
 
     public string? ImagePath { get; set; }

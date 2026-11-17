@@ -1,20 +1,24 @@
-
+@model GoodHotel.Models.ViewModels.StaffDashboardViewModel
 @{
     ViewData["Title"] = "Staff Dashboard";
 }
-
-<div class="container mt-5">
-    <h2>Staff Dashboard</h2>
-    <p>ยินดีต้อนรับ พนักงานต้อนรับ</p>
-
-    <div class="card p-4 mt-3">
-        <h5>Reception Staff</h5>
-        <p>ระบบสำหรับพนักงานต้อนรับของ GoodHotel</p>
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Staff Dashboard</h2></div>
+        <p>Today's counts use Asia/Bangkok time.</p>
+        <div class="row g-3">
+            <div class="col-md-4"><div class="card p-3">Total bookings <strong>@Model.TotalBookings</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">Currently checked in <strong>@Model.CheckedInStays</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">Today's check-ins <strong>@Model.TodayCheckIns</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">Today's check-outs <strong>@Model.TodayCheckOuts</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">Tasks awaiting verification <strong>@Model.AwaitingVerification</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">Open maintenance reports <strong>@Model.OpenMaintenanceReports</strong></div></div>
+        </div>
+        <nav class="d-flex flex-wrap gap-2 mt-4">
+            <a asp-action="WalkIn" class="btn btn-primary">+ Walk-in</a>
+            <a asp-action="Bookings" class="btn btn-outline-primary">Bookings</a>
+            <a asp-action="RoomStatus" class="btn btn-outline-primary">Room Status</a>
+            <a asp-action="MaintenanceReports" class="btn btn-outline-primary">Maintenance</a>
+        </nav>
     </div>
-
-    <form asp-controller="Home" asp-action="Logout" method="post">
-        <button type="submit" class="btn btn-danger mt-3">
-            Logout
-        </button>
-    </form>
-</div>
+</section>

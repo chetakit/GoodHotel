@@ -1,3 +1,8 @@
 ﻿@{
-    Layout = "_Layout";
+    var controller = ViewContext.RouteData.Values["Controller"]?.ToString() ?? "";
+    var staffPage = User.IsInRole("Staff") &&
+        new[] { "Staff", "Maintenance", "Payment" }.Contains(controller, StringComparer.OrdinalIgnoreCase);
+    var housekeeperPage = User.IsInRole("Housekeeper") &&
+        new[] { "Housekeeper", "Maintenance" }.Contains(controller, StringComparer.OrdinalIgnoreCase);
+    Layout = staffPage || housekeeperPage ? "_OperationsLayout" : "_Layout";
 }

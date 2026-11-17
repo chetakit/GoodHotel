@@ -1,0 +1,27 @@
+@model IReadOnlyList<GoodHotel.Models.ViewModels.StaffTaskViewModel>
+@{
+    ViewData["Title"] = "Tasks Awaiting Verification";
+}
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Tasks Awaiting Verification</h2></div>
+        @if (TempData["StaffSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+        @if (TempData["StaffError"] is string error) { <div class="alert alert-warning" role="alert">@error</div> }
+        @if (Model.Count == 0) { <p>No tasks are awaiting verification.</p> }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead><tr><th>Task</th><th>Room</th><th>Type</th><th>Completed (UTC)</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var task in Model)
+                        {
+                            <tr><td>#@task.TaskId</td><td>@(task.RoomNumber ?? "Not specified")</td><td>@task.TaskType</td><td>@(task.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "Not specified")</td><td><a asp-action="VerificationDetails" asp-route-id="@task.TaskId" class="btn btn-outline-primary">Details</a></td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        <a asp-action="Index" class="btn btn-outline-primary">Dashboard</a>
+    </div>
+</section>

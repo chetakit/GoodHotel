@@ -1011,3 +1011,98 @@ body.calendar-modal-open {
     background: transparent;
     border: 0;
 }
+
+.operations-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.operations-sidebar-header .sidebar-brand {
+    flex: 1;
+    min-width: 0;
+}
+
+.operations-navigation.show,
+.operations-navigation.collapsing {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.operations-menu-toggle {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.7rem;
+    padding: 0.55rem 0.8rem;
+}
+
+.operations-shell .admin-main {
+    min-width: 0;
+}
+
+.operations-shell .content-section {
+    padding: 0;
+}
+
+.operations-shell .content-section > .container {
+    max-width: none;
+    padding: 0;
+}
+
+.operations-shell .section-heading {
+    margin-bottom: 1.5rem;
+}
+
+.operations-shell .section-heading h2 {
+    font-size: 1.5rem;
+    letter-spacing: normal;
+}
+
+.operations-shell .admin-content .card {
+    height: 100%;
+    border: 1px solid var(--hotel-border);
+    border-radius: 1.2rem;
+    box-shadow: var(--brand-shadow);
+}
+
+.operations-shell .admin-content .card strong {
+    color: var(--hotel-navy);
+    font-size: 1.6rem;
+}
+
+@media (min-width: 992px) {
+    .operations-shell .admin-sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        overflow-y: auto;
+        z-index: 1030;
+    }
+
+    .operations-shell .operations-navigation.collapse {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .operations-shell .admin-main {
+        margin-left: 260px;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .operations-shell .sidebar-nav {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+}
+
+@media (max-width: 575.98px) {
+    .operations-shell .admin-main {
+        padding: 1rem;
+    }
+}

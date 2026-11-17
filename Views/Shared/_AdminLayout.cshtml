@@ -45,26 +45,14 @@
                     <span>Employees</span>
                 </a>
 
-                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "HousekeepingAssignments" ? "active" : "")"
-                   asp-controller="Admin" asp-action="HousekeepingAssignments">
-                    <span>Task Assignment</span>
-                </a>
-
-                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "HousekeepingReassignments" ? "active" : "")"
-                   asp-controller="Admin" asp-action="HousekeepingReassignments">
-                    <span>Task Reassignment</span>
-                </a>
-
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "MaintenanceReports" ? "active" : "")"
                    asp-controller="Admin" asp-action="MaintenanceReports">
                     <span>Maintenance Reports</span>
                 </a>
 
-                <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "MaintenanceResolution" ? "active" : "")"
-                   asp-controller="Admin" asp-action="MaintenanceResolution">
-                    <span>Maintenance Resolution</span>
-                </a>
+                
 
+                <a class="nav-item" asp-controller="Payment" asp-action="Queue"><span>Payments</span></a>
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Reports" ? "active" : "")"
                    asp-controller="Admin" asp-action="Reports">
                     <span>Reports</span>
@@ -144,9 +132,15 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-3">
-                    <button class="btn btn-outline-secondary btn-sm">
-                        Export
-                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Export CSV</button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportBookings">Bookings</a></li>
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportPayments">Payments</a></li>
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportMaintenanceReports">Maintenance reports</a></li>
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportHousekeepingTasks">Housekeeping tasks</a></li>
+                        </ul>
+                    </div>
 
                     @if (ViewContext.RouteData.Values["Controller"]?.ToString() == "Admin"
                          && ViewContext.RouteData.Values["Action"]?.ToString() == "Members")

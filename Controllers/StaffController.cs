@@ -1,278 +1,365 @@
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using GoodHotel.Models;
 using GoodHotel.Models.ViewModels;
+using GoodHotel.Services;
+using System.Security.Claims;
 
 namespace GoodHotel.Controllers
 {
     [Authorize(Roles = "Staff")]
     public class StaffController : Controller
     {
-        [HttpGet]
-        public IActionResult Index()
+        private readonly GoodHotelDbContext _db;
+        private readonly StayService _stays;
+        private readonly HousekeepingService _housekeeping;
+        private readonly RoomStatusService _roomStatus;
+        private readonly RoomAvailabilityService _availability;
+        private readonly WalkInService _walkIn;
+        private readonly BookingCancellationService _cancellation;
+
+        public StaffController(
+            GoodHotelDbContext db,
+            StayService stays,
+            HousekeepingService housekeeping,
+            RoomStatusService roomStatus,
+            RoomAvailabilityService availability,
+            WalkInService walkIn,
+            BookingCancellationService cancellation)
         {
-            return Page(
-                "Staff Dashboard",
-                "Reception overview and daily hotel operations.",
-                new OperationsSectionViewModel
-                {
-                    Title = "Today's overview",
-                    Description = "Metrics will appear when the stay workflow is available.",
-                    Fields = new[]
-                    {
-                        "Total rooms",
-                        "Available rooms",
-                        "Occupied rooms",
-                        "Today's check-ins",
-                        "Today's check-outs",
-                        "Upcoming bookings"
-                    }
-                });
+            _cancellation = cancellation;
+            _db = db;
+            _stays = stays;
+            _housekeeping = housekeeping;
+            _roomStatus = roomStatus;
+            _availability = availability;
+            _walkIn = walkIn;
+        }
+
+        public sealed record BookingListItem(
+            int BookingId,
+            string? FirstName,
+            string? LastName,
+            string? RoomNumber,
+            DateOnly? CheckIn,
+            DateOnly? CheckOut,
+            int? Guests,
+            decimal? Amount,
+            string BookingStatus)
+        {
+            public string PaymentLabel { get; init; } = "";
+        }
+
+        public sealed record BookingDetailsModel(
+            int BookingId,
+            string? FirstName,
+            string? LastName,
+            string? RoomNumber,
+            DateOnly? CheckIn,
+            DateOnly? CheckOut,
+            int? Guests,
+            int? ExtraBed,
+            int? PromotionId,
+            string? PromotionName,
+            decimal? Amount,
+            string? StayStatus,
+            string BookingStatus)
+        {
+            public string PaymentLabel { get; init; } = "";
+        }
+
+        public sealed record GuestDetailsModel(
+            int BookingId,
+            bool HasGuest,
+            string? FirstName,
+            string? LastName,
+            string? Email,
+            string? Phone,
+            DateOnly? BirthDate);
+
+        [HttpGet]
+        public async Task<IActionResult> Index(CancellationToken cancellationToken)
+        {
+            var (start, end) = _stays.HotelDayUtcBounds();
+            var model = new StaffDashboardViewModel(
+                await _db.Bookings.CountAsync(b => b.Status != BookingStatuses.Cancelled, cancellationToken),
+                await _db.BookingStays.CountAsync(s => s.Status == "CheckedIn", cancellationToken),
+                await _db.BookingStays.CountAsync(s => s.CheckedInAtUtc >= start && s.CheckedInAtUtc < end, cancellationToken),
+                await _db.BookingStays.CountAsync(s => s.CheckedOutAtUtc >= start && s.CheckedOutAtUtc < end, cancellationToken),
+                await _db.HousekeepingTasks.CountAsync(t => t.Status == "Completed", cancellationToken),
+                await _db.MaintenanceReports.CountAsync(r => r.Status == "Open", cancellationToken));
+            return View(model);
         }
 
         [HttpGet]
-        public IActionResult Bookings()
+        public async Task<IActionResult> Bookings(
+            int? bookingId,
+            CancellationToken cancellationToken)
         {
-            return Page(
-                "Booking Overview",
-                "Search and review booking details for reception operations.",
-                new OperationsSectionViewModel
+            if (bookingId.HasValue && bookingId.Value <= 0)
+            {
+                ModelState.AddModelError(nameof(bookingId), "Booking ID must be a positive number.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(Array.Empty<BookingListItem>());
+            }
+
+            var query = _db.Bookings.AsNoTracking();
+            if (bookingId.HasValue)
+            {
+                query = query.Where(booking => booking.BookingId == bookingId.Value);
+            }
+
+            var bookings = await query
+                .OrderByDescending(booking => booking.CheckIn)
+                .ThenByDescending(booking => booking.BookingId)
+                .Select(booking => new BookingListItem(
+                    booking.BookingId,
+                    booking.User == null ? null : booking.User.FirstName,
+                    booking.User == null ? null : booking.User.LastName,
+                    booking.Room == null ? null : booking.Room.Room1,
+                    booking.CheckIn,
+                    booking.CheckOut,
+                    booking.Guests,
+                    booking.Amount,
+                    booking.Status))
+                .ToListAsync(cancellationToken);
+
+            // เติมสถานะการจ่ายเงินให้แต่ละแถว (ข้อมูลโปรเจคไม่ใหญ่ จึง query ทีละรายการได้)
+            var withPayment = new List<BookingListItem>();
+            foreach (var booking in bookings)
+            {
+                withPayment.Add(booking with
                 {
-                    Title = "Booking search",
-                    Description = "Search is unavailable until a read-only booking query is connected.",
-                    InputFields = new[]
-                    {
-                        "Booking ID",
-                        "Customer name",
-                        "Room number"
-                    },
-                    ActionLabel = "Search (not implemented)",
-                    DisabledActionMessage = "Search is disabled until a read-only booking query is implemented."
-                },
-                new OperationsSectionViewModel
-                {
-                    Title = "Bookings",
-                    Description = "Booking records are not loaded on this screen.",
-                    EmptyState = "Booking records have not been queried. Search results and record links require backend integration."
+                    PaymentLabel = await PaymentService.PaymentLabelAsync(_db, booking.BookingId, cancellationToken)
                 });
+            }
+
+            return View(withPayment);
         }
 
         [HttpGet]
-        public IActionResult BookingDetails(int id)
+        public async Task<IActionResult> BookingDetails(int id, CancellationToken cancellationToken)
         {
-            if (id <= 0)
+            if (!ModelState.IsValid || id <= 0)
             {
                 return BadRequest();
             }
 
-            return BookingPage(
-                "Booking Details",
-                "Booking data is not loaded. The supplied identifier has not been verified against a booking record.",
-                id,
-                new[]
-                {
-                    new OperationsLinkViewModel
-                    {
-                        Label = "Guest Details",
-                        Controller = "Staff",
-                        Action = nameof(GuestDetails),
-                        RouteValues = new { bookingId = id }
-                    },
-                    new OperationsLinkViewModel
-                    {
-                        Label = "Check-in",
-                        Controller = "Staff",
-                        Action = nameof(CheckIn),
-                        RouteValues = new { bookingId = id }
-                    },
-                    new OperationsLinkViewModel
-                    {
-                        Label = "Check-out",
-                        Controller = "Staff",
-                        Action = nameof(CheckOut),
-                        RouteValues = new { bookingId = id }
-                    }
-                },
-                new OperationsSectionViewModel
-                {
-                    Title = "Booking information",
-                    Description = "No booking data has been loaded.",
-                    EmptyState = "Booking details require backend integration."
-                },
-                new OperationsSectionViewModel
-                {
-                    Title = "Guest information",
-                    Description = "Only guest details required for reception duties will be displayed.",
-                    EmptyState = "Guest details require backend integration."
-                });
+            var booking = await _db.Bookings
+                .AsNoTracking()
+                .Where(item => item.BookingId == id)
+                .Select(item => new BookingDetailsModel(
+                    item.BookingId,
+                    item.User == null ? null : item.User.FirstName,
+                    item.User == null ? null : item.User.LastName,
+                    item.Room == null ? null : item.Room.Room1,
+                    item.CheckIn,
+                    item.CheckOut,
+                    item.Guests,
+                    item.ExtraBed,
+                    item.PromotionId,
+                    item.Promotion == null ? null : item.Promotion.PromotionName,
+                    item.Amount,
+                    _db.BookingStays.Where(s => s.BookingId == item.BookingId)
+                        .Select(s => s.Status).SingleOrDefault(),
+                    item.Status))
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (booking == null)
+            {
+                return NotFound();
+            }
+
+            return View(booking with
+            {
+                PaymentLabel = await PaymentService.PaymentLabelAsync(_db, booking.BookingId, cancellationToken)
+            });
         }
 
         [HttpGet]
-        public IActionResult GuestDetails(int bookingId)
+        public async Task<IActionResult> GuestDetails(int bookingId, CancellationToken cancellationToken)
         {
-            if (bookingId <= 0)
+            if (!ModelState.IsValid || bookingId <= 0)
             {
                 return BadRequest();
             }
 
-            return BookingPage(
-                "Guest Details",
-                "Guest details are not loaded. The supplied identifier has not been verified against a booking record.",
-                bookingId,
-                new[]
+            var guest = await _db.Bookings
+                .AsNoTracking()
+                .Where(item => item.BookingId == bookingId)
+                .Select(item => new GuestDetailsModel(
+                    item.BookingId,
+                    item.User != null,
+                    item.User == null ? null : item.User.FirstName,
+                    item.User == null ? null : item.User.LastName,
+                    item.User == null ? null : item.User.Email,
+                    item.User == null ? null : item.User.Phone,
+                    item.User == null ? null : item.User.BirthDate))
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return guest == null ? NotFound() : View(guest);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CheckIn(int bookingId, string? note, CancellationToken ct)
+        {
+            if (!ModelState.IsValid || bookingId <= 0) return BadRequest();
+            var actorId = await GetActorIdAsync(ct);
+            if (!actorId.HasValue) return Forbid();
+            var error = await _stays.CheckInAsync(bookingId, actorId.Value, note, ct);
+            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "Check-in completed.";
+            return RedirectToAction(nameof(BookingDetails), new { id = bookingId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CancelBooking(int bookingId, CancellationToken ct)
+        {
+            if (bookingId <= 0) return BadRequest();
+            var result = await _cancellation.CancelByStaffAsync(bookingId, ct);
+            TempData[result.Succeeded ? "StaffSuccess" : "StaffError"] = result.Message;
+            return RedirectToAction(nameof(BookingDetails), new { id = bookingId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CheckOut(int bookingId, CancellationToken ct)
+        {
+            if (!ModelState.IsValid || bookingId <= 0) return BadRequest();
+            var actorId = await GetActorIdAsync(ct);
+            if (!actorId.HasValue) return Forbid();
+            var error = await _stays.CheckOutAsync(bookingId, actorId.Value, ct);
+            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "Check-out completed; cleaning task created.";
+            return RedirectToAction(nameof(BookingDetails), new { id = bookingId });
+        }
+
+        // ---------- สถานะห้องพัก ----------
+
+        [HttpGet]
+        public async Task<IActionResult> RoomStatus(CancellationToken ct)
+        {
+            ViewBag.Today = _availability.HotelToday();
+            return View(await _roomStatus.GetRoomBoardAsync(ct));
+        }
+
+        // ---------- ลูกค้า Walk-in ----------
+
+        [HttpGet]
+        public async Task<IActionResult> WalkIn(DateOnly? checkOut, int? guests, CancellationToken ct)
+        {
+            var today = _availability.HotelToday();
+            var form = new WalkInViewModel
+            {
+                CheckOut = checkOut ?? today.AddDays(1),
+                Guests = guests ?? 1
+            };
+            return View(await FillWalkInRoomsAsync(form, ct));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> WalkIn(WalkInViewModel form, CancellationToken ct)
+        {
+            // ค่าในฟอร์ม POST ถูกแปลงตาม culture ของเครื่อง (ภาษาไทย = ปี พ.ศ.) จึงแปลงวันที่ ค.ศ. เอง
+            ModelState.Remove(nameof(form.CheckOut));
+            form.CheckOut = DateOnly.TryParseExact(Request.Form["CheckOut"], "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var checkOut) ? checkOut : null;
+
+            if (form.CheckOut == null)
+            {
+                ModelState.AddModelError(nameof(form.CheckOut), "กรุณาเลือกวันที่ออก");
+            }
+            else if (form.CheckOut <= _availability.HotelToday())
+            {
+                ModelState.AddModelError(nameof(form.CheckOut), "วันที่ออกต้องอยู่หลังวันนี้");
+            }
+
+            var actorId = await GetActorIdAsync(ct);
+            if (!actorId.HasValue) return Forbid();
+
+            if (ModelState.IsValid)
+            {
+                var result = await _walkIn.CreateAsync(form, actorId.Value, ct);
+                if (result.BookingId.HasValue)
                 {
-                    new OperationsLinkViewModel
-                    {
-                        Label = "Booking Details",
-                        Controller = "Staff",
-                        Action = nameof(BookingDetails),
-                        RouteValues = new { id = bookingId }
-                    }
-                },
-                new OperationsSectionViewModel
-                {
-                    Title = "Guest information",
-                    Description = "No customer data is displayed on this preparation screen.",
-                    EmptyState = "Guest information requires backend integration."
-                });
+                    TempData[result.Succeeded ? "StaffSuccess" : "StaffError"] = result.Message;
+                    return RedirectToAction(nameof(BookingDetails), new { id = result.BookingId });
+                }
+
+                ModelState.AddModelError(string.Empty, result.Message);
+            }
+
+            return View(await FillWalkInRoomsAsync(form, ct));
+        }
+
+        /// <summary>ห้องที่ขายได้ตั้งแต่วันนี้ถึงวันออก และรับจำนวนคนได้ (รวมเตียงเสริม)</summary>
+        private async Task<WalkInViewModel> FillWalkInRoomsAsync(WalkInViewModel form, CancellationToken ct)
+        {
+            form.Today = _availability.HotelToday();
+            var guests = form.Guests ?? 1;
+
+            // ความจุ + เตียงเสริม 1 เตียง ต้องรับจำนวนคนได้
+            var freeNow = (await _roomStatus.GetRoomBoardAsync(ct))
+                .Where(r => r.Status == RoomLiveStatus.Available && (r.Capacity ?? 0) + 1 >= guests)
+                .ToList();
+
+            if (form.CheckOut > form.Today && freeNow.Count > 0)
+            {
+                var blocked = await _availability.GetBlockedPeriodsAsync(
+                    freeNow.Select(r => r.RoomId).ToArray(), form.Today, form.CheckOut.Value, ct);
+                var blockedIds = blocked.Select(b => b.RoomId).ToHashSet();
+                freeNow = freeNow.Where(r => !blockedIds.Contains(r.RoomId)).ToList();
+            }
+
+            form.AvailableRooms = freeNow;
+            return form;
         }
 
         [HttpGet]
-        public IActionResult CheckIn(int bookingId)
-        {
-            if (bookingId <= 0)
-            {
-                return BadRequest();
-            }
-
-            return BookingPage(
-                "Check-in",
-                $"Booking #{bookingId}: review and room-readiness data are not loaded.",
-                bookingId,
-                BookingWorkflowLinks(bookingId),
-                new OperationsSectionViewModel
-                {
-                    Title = "Check-in review",
-                    Description = "Room readiness, cleaning tasks, and blocking maintenance must be verified by the future workflow.",
-                    Fields = new[]
-                    {
-                        "Booking and guest summary",
-                        "Room readiness",
-                        "Early check-in confirmation"
-                    },
-                    ActionLabel = "Confirm check-in (not implemented)",
-                    DisabledActionMessage = "Check-in is disabled until stay persistence and readiness checks are implemented."
-                });
-        }
+        public async Task<IActionResult> VerificationTasks(CancellationToken ct) =>
+            View(await _housekeeping.AwaitingVerificationAsync(ct));
 
         [HttpGet]
-        public IActionResult CheckOut(int bookingId)
+        public async Task<IActionResult> VerificationDetails(int id, CancellationToken ct)
         {
-            if (bookingId <= 0)
-            {
-                return BadRequest();
-            }
+            if (!ModelState.IsValid || id <= 0) return BadRequest();
+            var task = await _housekeeping.StaffDetailsAsync(id, ct);
+            return task == null ? NotFound() : View(task);
+        }
 
-            return BookingPage(
-                "Check-out",
-                $"Booking #{bookingId}: active-stay data is not loaded.",
-                bookingId,
-                BookingWorkflowLinks(bookingId),
-                new OperationsSectionViewModel
-                {
-                    Title = "Check-out review",
-                    Description = "A cleaning task must be created atomically when check-out is implemented.",
-                    Fields = new[]
-                    {
-                        "Active stay summary",
-                        "Check-out confirmation",
-                        "Checkout cleaning task"
-                    },
-                    ActionLabel = "Confirm check-out (not implemented)",
-                    DisabledActionMessage = "Check-out and cleaning-task creation are disabled until transactional backend integration is implemented."
-                });
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> VerifyTask(int id, CancellationToken ct)
+        {
+            if (!ModelState.IsValid || id <= 0) return BadRequest();
+            var actorId = await GetActorIdAsync(ct);
+            if (!actorId.HasValue) return Forbid();
+            var verified = await _housekeeping.VerifyAsync(id, actorId.Value, ct);
+            TempData[verified ? "StaffSuccess" : "StaffError"] = verified
+                ? "Task verified."
+                : "Task not found, already changed, or cannot be verified by its assignee or completer.";
+            return RedirectToAction(nameof(VerificationTasks));
         }
 
         [HttpGet]
         public IActionResult MaintenanceReports()
         {
-            return Page(
-                "Maintenance Reports",
-                "Report a room issue if this role is authorized by the final operational policy.",
-                new OperationsSectionViewModel
-                {
-                    Title = "New report",
-                    Description = "Staff report submission remains disabled pending role-policy confirmation.",
-                    Fields = new[]
-                    {
-                        "Room",
-                        "Issue details",
-                        "Blocks room use"
-                    },
-                    ActionLabel = "Submit report (not implemented)",
-                    DisabledActionMessage = "Report submission is disabled until the Staff reporting policy and maintenance persistence are implemented."
-                });
+            return RedirectToAction("Index", "Maintenance");
         }
 
-        private ViewResult Page(
-            string title,
-            string description,
-            params OperationsSectionViewModel[] sections)
+        private async Task<int?> GetActorIdAsync(CancellationToken ct)
         {
-            return BuildPage(title, description, null, null, sections);
-        }
-
-        private ViewResult BookingPage(
-            string title,
-            string description,
-            int bookingId,
-            OperationsLinkViewModel[] links,
-            params OperationsSectionViewModel[] sections)
-        {
-            return BuildPage(title, description, bookingId, links, sections);
-        }
-
-        private ViewResult BuildPage(
-            string title,
-            string description,
-            int? bookingId,
-            OperationsLinkViewModel[]? links,
-            OperationsSectionViewModel[] sections)
-        {
-            return View(
-                "~/Views/Shared/OperationsPage.cshtml",
-                new OperationsPageViewModel
-                {
-                    Title = title,
-                    Description = description,
-                    BackController = "Staff",
-                    BackAction = nameof(Index),
-                    BackLabel = "Staff Dashboard",
-                    Sections = sections,
-                    BookingId = bookingId,
-                    Links = links ?? Array.Empty<OperationsLinkViewModel>()
-                });
-        }
-
-        private static OperationsLinkViewModel[] BookingWorkflowLinks(int bookingId)
-        {
-            return new[]
-            {
-                new OperationsLinkViewModel
-                {
-                    Label = "Booking Details",
-                    Controller = "Staff",
-                    Action = nameof(BookingDetails),
-                    RouteValues = new { id = bookingId }
-                },
-                new OperationsLinkViewModel
-                {
-                    Label = "Guest Details",
-                    Controller = "Staff",
-                    Action = nameof(GuestDetails),
-                    RouteValues = new { bookingId }
-                }
-            };
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) || id <= 0 ||
+                !await _db.Users.AsNoTracking().AnyAsync(u => u.UserId == id, ct))
+                return null;
+            return id;
         }
     }
 }

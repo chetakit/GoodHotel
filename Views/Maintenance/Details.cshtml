@@ -1,0 +1,105 @@
+@model GoodHotel.Models.ViewModels.MaintenanceDetailsViewModel
+
+@{
+    if (User.IsInRole("Admin")) { Layout = "_AdminLayout"; }
+    ViewData["Title"] = "Maintenance Report";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Hotel Operations</span>
+            <h2>Maintenance Report #@Model.ReportId</h2>
+        </div>
+        <div class="alert alert-warning" role="status">
+            Unresolved reports block the room. Existing bookings are not cancelled.
+        </div>
+        @if (TempData["MaintenanceSuccess"] is string success)
+        {
+            <div class="alert alert-success" role="status">@success</div>
+        }
+        @if ((ViewData["MaintenanceError"] ?? TempData["MaintenanceError"]) is string error)
+        {
+            <div class="alert alert-danger" role="alert">@error</div>
+        }
+
+        <div class="booking-panel mb-4">
+            <dl class="row mb-0">
+                <dt class="col-sm-5 col-lg-4">Room</dt>
+                <dd class="col-sm-7 col-lg-8">@(string.IsNullOrWhiteSpace(Model.RoomNumber) ? "Not specified" : Model.RoomNumber)</dd>
+                <dt class="col-sm-5 col-lg-4">Issue details</dt>
+                <dd class="col-sm-7 col-lg-8">@Model.Description</dd>
+                <dt class="col-sm-5 col-lg-4">Status</dt>
+                <dd class="col-sm-7 col-lg-8">@Model.Status</dd>
+                <dt class="col-sm-5 col-lg-4">Reported by user ID</dt>
+                <dd class="col-sm-7 col-lg-8">@Model.ReportedByUserId</dd>
+                <dt class="col-sm-5 col-lg-4">Recorded block setting</dt>
+                <dd class="col-sm-7 col-lg-8">@(Model.BlocksRoom ? "Block configured" : "Not blocked")</dd>
+                <dt class="col-sm-5 col-lg-4">Recorded block from</dt>
+                <dd class="col-sm-7 col-lg-8">@(Model.BlockFrom?.ToString("yyyy-MM-dd", culture) ?? "No start limit")</dd>
+                <dt class="col-sm-5 col-lg-4">Recorded block until (exclusive)</dt>
+                <dd class="col-sm-7 col-lg-8">@(Model.BlockUntil?.ToString("yyyy-MM-dd", culture) ?? "No end limit")</dd>
+                @if (Model.Status == "Resolved")
+                {
+                    <dt class="col-sm-5 col-lg-4">Resolved by user ID</dt>
+                    <dd class="col-sm-7 col-lg-8">@(Model.ResolvedByUserId?.ToString(culture) ?? "Not specified")</dd>
+                    <dt class="col-sm-5 col-lg-4">Resolution note</dt>
+                    <dd class="col-sm-7 col-lg-8">@Model.ResolutionNote</dd>
+                    <dt class="col-sm-5 col-lg-4">Completed at (UTC)</dt>
+                    <dd class="col-sm-7 col-lg-8">@(Model.ResolvedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss", culture) ?? "Not specified")</dd>
+                }
+            </dl>
+        </div>
+
+        @if (User.IsInRole("Admin") && Model.Status == "Open")
+        {
+            <div class="booking-panel mb-4">
+                <h3 class="h5">Repair progress</h3>
+                <form asp-action="StartProgress" method="post">
+                    <input type="hidden" name="id" value="@Model.ReportId" />
+                    <button type="submit" class="btn btn-primary">Start repair</button>
+                </form>
+            </div>
+        }
+        @if (User.IsInRole("Admin") && Model.Status == "In Progress")
+        {
+            <div class="booking-panel">
+                <h3 class="h5">Resolve report</h3>
+                <form asp-action="Resolve" method="post">
+                    <input type="hidden" name="id" value="@Model.ReportId" />
+                    <label for="resolutionNote" class="form-label">Resolution note</label>
+                    <textarea id="resolutionNote" name="resolutionNote" class="form-control mb-3" rows="4" maxlength="2000" required></textarea>
+                    <button type="submit" class="btn btn-primary">Resolve report</button>
+                </form>
+            </div>
+        }
+
+        <div class="booking-panel mt-4">
+            <h3 class="h5">Status history</h3>
+            @if (Model.Events.Count == 0)
+            {
+                <p class="text-muted mb-0">No recorded transitions for this earlier report.</p>
+            }
+            else
+            {
+                <ul class="mb-0">
+                    @foreach (var entry in Model.Events)
+                    {
+                        <li>
+                            @entry.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm:ss", culture) UTC —
+                            @(entry.FromStatus == null ? "Created" : entry.FromStatus) → @entry.ToStatus
+                            (user @entry.ActorUserId)
+                            @if (!string.IsNullOrWhiteSpace(entry.Note))
+                            {
+                                <span> — @entry.Note</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <a asp-action="Index" class="btn btn-outline-primary mt-4">Back to reports</a>
+    </div>
+</section>

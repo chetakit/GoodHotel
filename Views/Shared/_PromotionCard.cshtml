@@ -1,0 +1,11 @@
+@model GoodHotel.Models.ViewModels.PromotionListViewModel
+
+<div class="promo-card h-100">
+    <span class="tag">@Model.DiscountText</span>
+    <h4>@Model.PromotionName</h4>
+    @if (!string.IsNullOrWhiteSpace(Model.Description))
+    {
+        <p class="text-muted mb-3">@Model.Description</p>
+    }
+    <small class="text-muted d-block">เงื่อนไข: @Model.ConditionText</small>
+</div>

@@ -3,6 +3,20 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Employees";
+    var employees = Model.ToList();
+    var roles = new[] { "Staff", "Housekeeper" };
+    var groups = roles.Select(role => new
+    {
+        Role = role,
+        Employees = employees.Where(employee =>
+            string.Equals(employee.Role, role, StringComparison.OrdinalIgnoreCase)).ToList()
+    }).ToList();
+    var otherEmployees = employees.Where(employee =>
+        !roles.Any(role => string.Equals(employee.Role, role, StringComparison.OrdinalIgnoreCase))).ToList();
+    if (otherEmployees.Count > 0)
+    {
+        groups.Add(new { Role = "Other", Employees = otherEmployees });
+    }
 }
 
 <div class="table-panel">
@@ -10,49 +24,57 @@
         <h4 class="mb-0">Employee directory</h4>
     </div>
 
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>User ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Role</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (!Model.Any())
-                {
-                    <tr>
-                        <td colspan="6" class="text-center text-muted">
-                            No employees found.
-                        </td>
-                    </tr>
-                }
-                else
-                {
-                    @foreach (var employee in Model)
-                    {
+    @foreach (var group in groups)
+    {
+        <section class="mt-4">
+            <h5>@group.Role</h5>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
                         <tr>
-                            <td>@employee.UserId</td>
-                            <td>@employee.FirstName @employee.LastName</td>
-                            <td>@employee.Email</td>
-                            <td>@employee.Phone</td>
-                            <td>@employee.Role</td>
-                            <td>
-                                <a asp-controller="Admin"
-                                   asp-action="EmployeeProfile"
-                                   asp-route-id="@employee.UserId"
-                                   class="btn btn-sm btn-outline-secondary">
-                                    Profile
-                                </a>
-                            </td>
+                            <th>User ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Action</th>
                         </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
+                    </thead>
+                    <tbody>
+                        @if (group.Employees.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">
+                                    No @group.Role employees found.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var employee in group.Employees)
+                            {
+                                <tr>
+                                    <td>@employee.UserId</td>
+                                    <td>@employee.FirstName @employee.LastName</td>
+                                    <td>@employee.Email</td>
+                                    <td>@employee.Phone</td>
+                                    <td>@employee.Role</td>
+                                    <td>@(employee.IsActive ? "Active" : "Inactive")</td>
+                                    <td>
+                                        <a asp-controller="Admin"
+                                           asp-action="EmployeeProfile"
+                                           asp-route-id="@employee.UserId"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            Profile
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
 </div>

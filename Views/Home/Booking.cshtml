@@ -47,17 +47,28 @@
                         <strong>฿@Model.TotalAmount?.ToString("N2")</strong>
                     </div>
                 }
-                @if (Model.PromotionCode != null)
+                @if (Model.PromotionName != null)
                 {
                     <div class="summary-line">
                         <span>Promotion</span>
-                        <strong>@Model.PromotionCode</strong>
+                        <strong>@Model.PromotionName</strong>
                     </div>
                 }
-                <p class="text-white-50 mt-3 mb-0">
-                    บันทึกการจองแล้ว การชำระเงินยังไม่ได้ดำเนินการในขั้นตอนนี้
-                </p>
+                <p class="text-white-50 mt-3 mb-0">Payment status: @Model.PaymentStatus</p>
+                @if (Model.IsMockPayment)
+                {
+                    <p class="text-white-50 mb-0">DEMO/MOCK payment; no real money was transferred.</p>
+                }
             </div>
+            @if (Model.CanSubmitPayment && Model.SavedBookingId.HasValue)
+            {
+                <partial name="~/Views/Payment/_PaymentMethodForm.cshtml" model="Model.SavedBookingId.Value" />
+            }
+            else if (Model.SavedBookingId.HasValue)
+            {
+                <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.SavedBookingId"
+                   class="btn btn-outline-primary mt-3">Payment details</a>
+            }
         }
         else
         {
@@ -115,8 +126,11 @@
                                 <strong id="booking-room-subtotal">฿@Model.RoomSubtotal.Value.ToString("N2")</strong>
                             </div>
                             <div class="summary-line">
-                                <span>Promotion Discount</span>
-                                <strong id="booking-discount">฿@((Model.DiscountAmount ?? 0m).ToString("N2"))</strong>
+                                <span>
+                                    Promotion Discount
+                                    <small class="d-block text-white-50" id="booking-promotion-name">@(Model.PromotionName ?? "ไม่เข้าเงื่อนไขโปร")</small>
+                                </span>
+                                <strong id="booking-discount">-฿@((Model.DiscountAmount ?? 0m).ToString("N2"))</strong>
                             </div>
                             <div class="summary-line">
                                 <span>Extra Bed Amount</span>
@@ -164,29 +178,13 @@
                                     </small>
                                 </div>
 
-                                <div class="mt-3">
-                                    <label for="booking-promotion-code" class="form-label text-white">
-                                        Promotion Code
-                                    </label>
-                                    <div class="input-group">
-                                        <input id="booking-promotion-code"
-                                               name="PromotionCode"
-                                               type="text"
-                                               class="form-control"
-                                               maxlength="32"
-                                               autocomplete="off"
-                                               value="@Model.PromotionCode"
-                                               placeholder="กรอก Code" />
-                                        <button id="booking-apply-promotion"
-                                                type="submit"
-                                                class="btn btn-light">
-                                            Apply
-                                        </button>
-                                    </div>
-                                    <div id="booking-promotion-feedback"
-                                         class="small mt-2"
-                                         role="status"
-                                         aria-live="polite">@Model.PromotionStatusMessage</div>
+                                <div id="booking-promotion-feedback"
+                                     class="small mt-3 @(Model.PromotionName != null ? "promotion-feedback-success" : "text-white-50")"
+                                     role="status"
+                                     aria-live="polite">
+                                    @(Model.PromotionName != null
+                                        ? $"ได้รับโปรโมชั่น \"{Model.PromotionName}\" อัตโนมัติ"
+                                        : "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชั่น")
                                 </div>
                             </form>
 
@@ -206,7 +204,6 @@
                                     <input asp-for="CheckOut" type="hidden" />
                                     <input asp-for="Guests" type="hidden" />
                                     <input asp-for="ExtraBedCount" type="hidden" />
-                                    <input asp-for="PromotionCode" type="hidden" />
                                     <button type="submit"
                                             class="btn btn-light w-100 mt-3"
                                             data-booking-confirm>

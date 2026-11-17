@@ -16,6 +16,9 @@
         @if (isEdit)
         {
             <input asp-for="RoomId" type="hidden" />
+            <input asp-for="OriginalStatus" type="hidden" />
+            <input asp-for="OriginalPreMaintenanceStatus" type="hidden" />
+            <input asp-for="OriginalMaintenanceEventId" type="hidden" />
         }
 
         <div asp-validation-summary="All" class="text-danger"></div>
@@ -60,6 +63,23 @@
                     <span asp-validation-for="Status" class="text-danger"></span>
                 </div>
             </div>
+            @if (Model.RequiresMaintenanceReview)
+            {
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        Review bookings, stays and housekeeping restrictions before changing this room's status.
+                        @if (!string.IsNullOrEmpty(Model.OriginalPreMaintenanceStatus))
+                        {
+                            <span>Previously recorded status: @Model.OriginalPreMaintenanceStatus.</span>
+                        }
+                        <div class="form-check mt-2">
+                            <input asp-for="ConfirmMaintenanceReview" class="form-check-input" />
+                            <label asp-for="ConfirmMaintenanceReview" class="form-check-label">I have reviewed the room restrictions.</label>
+                        </div>
+                        <span asp-validation-for="ConfirmMaintenanceReview" class="text-danger"></span>
+                    </div>
+                </div>
+            }
             <div class="col-12">
                 <div class="mb-3">
                     <label asp-for="Image" class="form-label">Room Image</label>

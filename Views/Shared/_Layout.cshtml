@@ -51,40 +51,6 @@
                                    asp-controller="Home" asp-action="Rooms">Booking</a>
                             </li>
                         }
-                        else if (User.IsInRole("Staff"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Staff" asp-action="Index">Staff Dashboard</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Staff" asp-action="Bookings">Bookings</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Staff" asp-action="MaintenanceReports">Maintenance</a>
-                            </li>
-                        }
-                        else if (User.IsInRole("Housekeeper"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Housekeeper" asp-action="Index">Dashboard</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Housekeeper" asp-action="Tasks">Cleaning Tasks</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Housekeeper" asp-action="MaintenanceReports">Maintenance</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Housekeeper" asp-action="MaintenanceHistory">History</a>
-                            </li>
-                        }
                     </ul>
 
                     <div class="d-flex align-items-center gap-2">
@@ -133,30 +99,23 @@
                                             </a>
                                         </li>
                                     }
-                                    else if (User.IsInRole("Staff"))
+                                    else if (User.IsInRole("Staff") || User.IsInRole("Housekeeper"))
                                     {
                                         <li>
                                             <a class="dropdown-item py-2"
-                                               asp-controller="Staff"
+                                               asp-controller="@(User.IsInRole("Staff") ? "Staff" : "Housekeeper")"
                                                asp-action="Index">
-                                                Staff Dashboard
+                                                Dashboard
                                             </a>
                                         </li>
                                     }
-                                    else if (User.IsInRole("Housekeeper"))
+                                    @if (User.IsInRole("Customer") || User.IsInRole("Admin") ||
+                                         User.IsInRole("Staff") || User.IsInRole("Housekeeper"))
                                     {
                                         <li>
-                                            <a class="dropdown-item py-2"
-                                               asp-controller="Housekeeper"
-                                               asp-action="Index">
-                                                Housekeeper Dashboard
-                                            </a>
+                                            <hr class="dropdown-divider" />
                                         </li>
                                     }
-
-                                    <li>
-                                        <hr class="dropdown-divider" />
-                                    </li>
 
                                     <li>
                                         <form asp-controller="Home"

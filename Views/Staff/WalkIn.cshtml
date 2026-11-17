@@ -1,0 +1,105 @@
+@model GoodHotel.Models.ViewModels.WalkInViewModel
+
+@{
+    ViewData["Title"] = "Walk-in";
+    // <input type="date"> ต้องการปี ค.ศ. เสมอ จึงใช้ InvariantCulture (เครื่องที่ตั้งภาษาไทยจะได้ปี พ.ศ.)
+    var iso = System.Globalization.CultureInfo.InvariantCulture;
+    var minCheckOut = Model.Today.AddDays(1).ToString("yyyy-MM-dd", iso);
+    var checkOutValue = Model.CheckOut?.ToString("yyyy-MM-dd", iso);
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Front Desk</span>
+            <h2>รับลูกค้า Walk-in</h2>
+            <p class="text-muted">เข้าพักวันนี้ (@Model.Today.ToString("dd/MM/yyyy", iso)) · รับเงินสดและเช็คอินให้ทันที</p>
+        </div>
+
+        <div asp-validation-summary="ModelOnly" class="alert alert-warning" role="alert"></div>
+
+        @* ขั้นที่ 1: เลือกวันออก / จำนวนคน เพื่อกรองห้องว่าง *@
+        <form asp-action="WalkIn" method="get" class="booking-panel mb-4 row g-3 align-items-end">
+            <div class="col-sm-5 col-lg-3">
+                <label class="form-label" for="filterCheckOut">วันที่ออก</label>
+                <input id="filterCheckOut" name="checkOut" type="date" class="form-control"
+                       min="@minCheckOut" value="@checkOutValue" />
+            </div>
+            <div class="col-sm-4 col-lg-2">
+                <label class="form-label" for="filterGuests">จำนวนผู้เข้าพัก</label>
+                <input id="filterGuests" name="guests" type="number" min="1" max="20" class="form-control"
+                       value="@Model.Guests" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-primary">ค้นหาห้องว่าง</button>
+            </div>
+        </form>
+
+        @* ขั้นที่ 2: เลือกห้อง + กรอกข้อมูลลูกค้า *@
+        <form asp-action="WalkIn" method="post">
+            <input type="hidden" name="CheckOut" value="@checkOutValue" />
+            <input type="hidden" asp-for="Guests" />
+
+            <h3 class="h5">1. เลือกห้อง (ว่าง @Model.AvailableRooms.Count ห้อง)</h3>
+            <span asp-validation-for="RoomId" class="text-danger d-block mb-2"></span>
+            @if (Model.AvailableRooms.Count == 0)
+            {
+                <div class="alert alert-light border">ไม่มีห้องว่างตามเงื่อนไขนี้ ลองเปลี่ยนวันที่ออกหรือจำนวนคน</div>
+            }
+            <div class="row g-3 mb-4">
+                @foreach (var room in Model.AvailableRooms)
+                {
+                    <div class="col-sm-6 col-lg-3">
+                        <label class="card h-100 p-3" style="cursor:pointer">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="RoomId" value="@room.RoomId"
+                                       checked="@(Model.RoomId == room.RoomId)" />
+                                <strong>@room.RoomNumber</strong>
+                            </div>
+                            <small class="text-muted">@room.RoomType · รับได้ @room.Capacity คน</small>
+                        </label>
+                    </div>
+                }
+            </div>
+
+            <h3 class="h5">2. ข้อมูลลูกค้า</h3>
+            <div class="booking-panel row g-3">
+                <div class="col-md-6">
+                    <label asp-for="FirstName" class="form-label">ชื่อ</label>
+                    <input asp-for="FirstName" class="form-control" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="LastName" class="form-label">นามสกุล</label>
+                    <input asp-for="LastName" class="form-control" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Phone" class="form-label">เบอร์โทร</label>
+                    <input asp-for="Phone" class="form-control" placeholder="0812345678" />
+                    <small class="text-muted">ถ้าเบอร์นี้เคยเป็นลูกค้าแล้ว ระบบจะใช้บัญชีเดิม</small>
+                    <span asp-validation-for="Phone" class="text-danger d-block"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Email" class="form-label">อีเมล (ไม่บังคับ)</label>
+                    <input asp-for="Email" class="form-control" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input asp-for="ExtraBed" class="form-check-input" />
+                        <label asp-for="ExtraBed" class="form-check-label">เสริมเตียง 1 เตียง (+฿500/คืน)</label>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg mt-4" disabled="@(Model.AvailableRooms.Count == 0)">
+                ยืนยัน · รับเงินสด · เช็คอิน
+            </button>
+        </form>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

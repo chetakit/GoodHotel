@@ -17,8 +17,7 @@ public enum BookingSaveStatus
     RoomUnavailable,
     CapacityExceeded,
     InvalidRate,
-    LockTimeout,
-    InvalidPromotion
+    LockTimeout
 }
 
 public sealed record BookingSaveResult(
@@ -28,7 +27,7 @@ public sealed record BookingSaveResult(
     string? Message = null,
     int ExtraBedCount = 0,
     int? PromotionId = null,
-    string? PromotionCode = null,
+    string? PromotionName = null,
     decimal? RoomSubtotal = null,
     decimal? DiscountAmount = null,
     decimal? ExtraBedAmount = null);
@@ -40,26 +39,25 @@ public sealed class BookingService
 
     private readonly GoodHotelDbContext _db;
     private readonly ILogger<BookingService> _logger;
-    private readonly PromotionValidationService _promotionValidation;
-    private readonly PromotionMetadataService _promotionMetadata;
-    private readonly TimeProvider _timeProvider;
+    private readonly PromotionService _promotions;
+    private readonly RoomAvailabilityService _availability;
 
     public BookingService(
         GoodHotelDbContext db,
         ILogger<BookingService> logger,
-        PromotionValidationService promotionValidation,
-        PromotionMetadataService promotionMetadata,
-        TimeProvider timeProvider)
+        PromotionService promotions,
+        RoomAvailabilityService availability)
     {
         _db = db;
         _logger = logger;
-        _promotionValidation = promotionValidation;
-        _promotionMetadata = promotionMetadata;
-        _timeProvider = timeProvider;
+        _promotions = promotions;
+        _availability = availability;
     }
 
+    /// <param name="customerId">ลูกค้าที่กำลังจอง (null = ยังไม่ login) ใช้ตรวจโปรที่ขึ้นกับประวัติลูกค้า</param>
     public async Task<BookingConfirmationViewModel> PrepareConfirmationAsync(
         CreateBookingViewModel request,
+        int? customerId,
         CancellationToken cancellationToken = default)
     {
         var model = CopyRequest(request);
@@ -111,15 +109,15 @@ public sealed class BookingService
             return model;
         }
 
-        var hasOverlap = await HasOverlappingBookingAsync(
+        var available = await _availability.IsAvailableAsync(
             room.RoomId,
             request.CheckIn!.Value,
             request.CheckOut!.Value,
             cancellationToken);
 
-        if (hasOverlap)
+        if (!available)
         {
-            model.StatusMessage = "ห้องพักถูกจองแล้วในช่วงวันที่เลือก";
+            model.StatusMessage = "ห้องพักไม่พร้อมให้จองในช่วงวันที่เลือก";
             return model;
         }
 
@@ -127,41 +125,16 @@ public sealed class BookingService
         var nights = model.NightCount.GetValueOrDefault();
         model.RoomSubtotal = subtotal;
         model.ExtraBedCount = request.ExtraBedCount;
-        model.PromotionCode = request.PromotionCode?.Trim();
-        model.DiscountAmount = 0;
-        try
-        {
-            var bedAmount = checked(
-                500m * request.ExtraBedCount * nights);
-            model.ExtraBedAmount = bedAmount;
-            model.TotalAmount = checked(
-                subtotal + bedAmount);
-        }
-        catch (OverflowException)
-        {
-            model.StatusMessage = "ยอดรวมเกินขอบเขตที่ระบบรองรับ";
-            return model;
-        }
 
-        if (!string.IsNullOrWhiteSpace(request.PromotionCode))
-        {
-            var validation = await _promotionValidation.ValidateAsync(
-                request.PromotionCode,
-                subtotal,
-                cancellationToken);
-            model.PromotionStatusMessage = validation.Message;
-            if (!validation.Succeeded)
-            {
-                model.StatusMessage = validation.Message;
-                return model;
-            }
-
-            model.PromotionId = validation.PromotionId;
-            var discountAmount = validation.DiscountAmount.GetValueOrDefault();
-            model.DiscountAmount = discountAmount;
-            model.TotalAmount = checked(
-                subtotal - discountAmount + model.ExtraBedAmount.GetValueOrDefault());
-        }
+        // ระบบเลือกโปรที่ดีที่สุดให้อัตโนมัติ
+        var promotion = await _promotions.FindBestAsync(
+            new PromotionContext(customerId, request.CheckIn!.Value, request.CheckOut!.Value, subtotal),
+            cancellationToken);
+        model.PromotionId = promotion?.PromotionId;
+        model.PromotionName = promotion?.Name;
+        model.DiscountAmount = promotion?.DiscountAmount ?? 0m;
+        model.ExtraBedAmount = 500m * request.ExtraBedCount * nights;
+        model.TotalAmount = subtotal - model.DiscountAmount + model.ExtraBedAmount;
 
         if (model.TotalAmount > 99999999.99m)
         {
@@ -230,9 +203,9 @@ public sealed class BookingService
                     Message: "ไม่พบบัญชีลูกค้าที่กำลังใช้งาน"));
             }
 
-            var roomExists = await LockRoomAsync(
-                connection,
-                dbTransaction,
+            var roomExists = await RoomAvailabilityService.LockRoomAsync(
+                _db,
+                activeTransaction,
                 request.RoomId,
                 cancellationToken);
 
@@ -246,6 +219,7 @@ public sealed class BookingService
             var existingRequest = await _db.Bookings
                 .AsNoTracking()
                 .Where(booking =>
+                    booking.Status != BookingStatuses.Cancelled &&
                     booking.UserId == userId &&
                     booking.RoomId == request.RoomId &&
                     booking.CheckIn == request.CheckIn &&
@@ -258,47 +232,23 @@ public sealed class BookingService
                     booking.BookingId,
                     booking.Amount,
                     booking.PromotionId,
-                    PromotionCondition = booking.Promotion == null
-                        ? null
-                        : booking.Promotion.Condition
+                    PromotionName = booking.Promotion == null ? null : booking.Promotion.PromotionName
                 })
-                .ToListAsync(cancellationToken);
+                .FirstOrDefaultAsync(cancellationToken);
 
-            var requestedCode = string.IsNullOrWhiteSpace(request.PromotionCode)
-                ? null
-                : _promotionMetadata.NormalizeCode(request.PromotionCode);
-            var matchingExistingRequest = existingRequest.FirstOrDefault(existing =>
-            {
-                if (requestedCode == null)
-                {
-                    return existing.PromotionId == null;
-                }
-
-                if (existing.PromotionCondition == null)
-                {
-                    return false;
-                }
-
-                var existingPromotion = _promotionMetadata.Parse(
-                    existing.PromotionCondition);
-                return string.Equals(
-                    existingPromotion.Metadata?.Code,
-                    requestedCode,
-                    StringComparison.OrdinalIgnoreCase);
-            });
-
-            if (matchingExistingRequest != null)
+            // กดยืนยันซ้ำ (เช่น refresh หน้า) ให้คืนการจองเดิม ไม่สร้างใหม่
+            if (existingRequest != null)
             {
                 await activeTransaction.CommitAsync(cancellationToken);
                 transactionCompleted = true;
                 return new BookingSaveResult(
                     BookingSaveStatus.AlreadyExists,
-                    matchingExistingRequest.BookingId,
-                    matchingExistingRequest.Amount,
+                    existingRequest.BookingId,
+                    existingRequest.Amount,
                     "รายการจองนี้ถูกบันทึกไว้แล้ว",
                     request.ExtraBedCount,
-                    matchingExistingRequest.PromotionId,
-                    requestedCode);
+                    existingRequest.PromotionId,
+                    existingRequest.PromotionName);
             }
 
             var room = await _db.Rooms
@@ -336,7 +286,7 @@ public sealed class BookingService
                     Message: "ไม่สามารถยืนยันราคาให้ห้องนี้ได้"));
             }
 
-            if (await HasOverlappingBookingAsync(
+            if (!await _availability.IsAvailableAsync(
                     room.RoomId,
                     request.CheckIn!.Value,
                     request.CheckOut!.Value,
@@ -344,7 +294,7 @@ public sealed class BookingService
             {
                 return await RollbackWithResultAsync(new BookingSaveResult(
                     BookingSaveStatus.RoomUnavailable,
-                    Message: "ห้องพักถูกจองแล้วในช่วงวันที่เลือก"));
+                    Message: "ห้องพักไม่พร้อมให้จองในช่วงวันที่เลือก"));
             }
 
             var nightCount =
@@ -369,27 +319,12 @@ public sealed class BookingService
                     Message: "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
             }
 
-            var promotionId = (int?)null;
-            var normalizedCode = string.IsNullOrWhiteSpace(request.PromotionCode)
-                ? null
-                : _promotionMetadata.NormalizeCode(request.PromotionCode);
-            var discountAmount = 0m;
-            if (normalizedCode != null)
-            {
-                var promotion = await _promotionValidation.ValidateAsync(
-                    normalizedCode,
-                    roomSubtotal,
-                    cancellationToken);
-                if (!promotion.Succeeded)
-                {
-                    return await RollbackWithResultAsync(new BookingSaveResult(
-                        BookingSaveStatus.InvalidPromotion,
-                        Message: $"{promotion.Message} กรุณากลับไปตรวจสอบ Promotion Code อีกครั้ง."));
-                }
-
-                promotionId = promotion.PromotionId;
-                discountAmount = promotion.DiscountAmount!.Value;
-            }
+            // คำนวณโปรใหม่ตอนบันทึกจริง (ไม่เชื่อค่าจากหน้าเว็บ)
+            var promotion = await _promotions.FindBestAsync(
+                new PromotionContext(userId, request.CheckIn.Value, request.CheckOut.Value, roomSubtotal),
+                cancellationToken);
+            var promotionId = promotion?.PromotionId;
+            var discountAmount = promotion?.DiscountAmount ?? 0m;
 
             decimal extraBedAmount;
             decimal amount;
@@ -462,7 +397,7 @@ public sealed class BookingService
                 "บันทึกการจองสำเร็จ",
                 request.ExtraBedCount,
                 promotionId,
-                normalizedCode,
+                promotion?.Name,
                 roomSubtotal,
                 discountAmount,
                 extraBedAmount);
@@ -542,22 +477,6 @@ public sealed class BookingService
         }
     }
 
-    private async Task<bool> LockRoomAsync(
-        DbConnection connection,
-        DbTransaction transaction,
-        int roomId,
-        CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText =
-            "SELECT `RoomId` FROM `rooms` WHERE `RoomId` = @roomId FOR UPDATE";
-        AddParameter(command, "@roomId", roomId);
-
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-        return result != null && result != DBNull.Value;
-    }
-
     private async Task<int?> GetNamedLockAsync(
         DbConnection connection,
         DbTransaction transaction,
@@ -627,24 +546,6 @@ public sealed class BookingService
         }
     }
 
-    private async Task<bool> HasOverlappingBookingAsync(
-        int roomId,
-        DateOnly checkIn,
-        DateOnly checkOut,
-        CancellationToken cancellationToken)
-    {
-        return await _db.Bookings
-            .AsNoTracking()
-            .AnyAsync(
-                booking =>
-                    booking.RoomId == roomId &&
-                    booking.CheckIn.HasValue &&
-                    booking.CheckOut.HasValue &&
-                    booking.CheckIn.Value < checkOut &&
-                    booking.CheckOut.Value > checkIn,
-                cancellationToken);
-    }
-
     private static void AddParameter(
         DbCommand command,
         string name,
@@ -668,8 +569,7 @@ public sealed class BookingService
             return "กรุณาระบุวันที่เข้าพักและวันที่ออก";
         }
 
-        if (request.CheckIn.Value <
-            DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime))
+        if (request.CheckIn.Value < _availability.HotelToday())
         {
             return "วันที่เข้าพักต้องไม่เป็นวันที่ย้อนหลัง";
         }
@@ -689,11 +589,6 @@ public sealed class BookingService
             return "จำนวนเตียงเสริมต้องเป็น 0 หรือ 1";
         }
 
-        if (request.PromotionCode?.Length > 64)
-        {
-            return "Promotion Code ยาวเกินกำหนด";
-        }
-
         return null;
     }
 
@@ -706,8 +601,7 @@ public sealed class BookingService
             CheckIn = request.CheckIn,
             CheckOut = request.CheckOut,
             Guests = request.Guests,
-            ExtraBedCount = request.ExtraBedCount,
-            PromotionCode = request.PromotionCode
+            ExtraBedCount = request.ExtraBedCount
         };
     }
 

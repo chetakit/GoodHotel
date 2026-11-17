@@ -4,6 +4,24 @@
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Members";
+    const int pageSize = 10;
+    const string pageCookie = "AdminMembersPage";
+    var members = Model.OrderBy(member => member.UserId).ToList();
+    var totalPages = Math.Max(1, (int)Math.Ceiling(members.Count / (double)pageSize));
+    var requestedPage = Context.Request.Query.ContainsKey("page")
+        ? Context.Request.Query["page"].ToString()
+        : Context.Request.Cookies[pageCookie];
+    var currentPage = int.TryParse(requestedPage, out var page)
+        ? Math.Clamp(page, 1, totalPages)
+        : 1;
+    Context.Response.Cookies.Append(pageCookie, currentPage.ToString(), new Microsoft.AspNetCore.Http.CookieOptions
+    {
+        HttpOnly = true,
+        IsEssential = true,
+        SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax,
+        Secure = Context.Request.IsHttps,
+        Path = Url.Action("Members", "Admin") ?? "/Admin/Members"
+    });
 }
 
 <div class="container mt-4">
@@ -12,6 +30,10 @@
     @if (TempData["SuccessMessage"] is string successMessage)
     {
         <div class="alert alert-success" role="alert">@successMessage</div>
+    }
+    @if (TempData["MemberError"] is string memberError)
+    {
+        <div class="alert alert-danger" role="alert">@memberError</div>
     }
 
     @if (Context.Request.Query["status"] == "EditSuccess")
@@ -52,7 +74,7 @@
         </thead>
 
         <tbody>
-            @foreach (var item in Model)
+            @foreach (var item in members.Skip((currentPage - 1) * pageSize).Take(pageSize))
             {
                 <tr>
                     <td>@item.UserId</td>
@@ -87,8 +109,48 @@
 
         <tfoot>
             <tr>
-                <th colspan="6">รวม @Model.Count() คน</th>
+                <th colspan="6">รวม @members.Count คน</th>
             </tr>
         </tfoot>
     </table>
+    @if (totalPages > 1)
+    {
+        <nav aria-label="Member pages" class="mt-4">
+            <ul class="pagination flex-wrap mb-0">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    @if (currentPage == 1)
+                    {
+                        <span class="page-link">Previous</span>
+                    }
+                    else
+                    {
+                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage - 1)">Previous</a>
+                    }
+                </li>
+                @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+                {
+                    <li class="page-item @(pageNumber == currentPage ? "active" : "")">
+                        @if (pageNumber == currentPage)
+                        {
+                            <span class="page-link" aria-current="page">@pageNumber</span>
+                        }
+                        else
+                        {
+                            <a class="page-link" asp-action="Members" asp-route-page="@pageNumber">@pageNumber</a>
+                        }
+                    </li>
+                }
+                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                    @if (currentPage == totalPages)
+                    {
+                        <span class="page-link">Next</span>
+                    }
+                    else
+                    {
+                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage + 1)">Next</a>
+                    }
+                </li>
+            </ul>
+        </nav>
+    }
 </div>

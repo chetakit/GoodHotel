@@ -1,0 +1,93 @@
+@model IReadOnlyList<GoodHotel.Controllers.StaffController.BookingListItem>
+
+@{
+    ViewData["Title"] = "Booking Overview";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Hotel Operations</span>
+            <h2>Booking Overview</h2>
+            <p class="text-muted">Search and review bookings for reception operations.</p>
+        </div>
+
+        <div class="booking-panel mb-4">
+            <form asp-controller="Staff" asp-action="Bookings" method="get" class="row g-3 align-items-end">
+                <div class="col-sm-6 col-lg-4">
+                    <label for="bookingId" class="form-label">Booking ID</label>
+                    <input id="bookingId" name="bookingId" type="number" min="1"
+                           class="form-control" value="@Context.Request.Query["bookingId"]" />
+                    @Html.ValidationMessage("bookingId", new { @class = "text-danger" })
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <a asp-controller="Staff" asp-action="Bookings" class="btn btn-outline-primary">Clear</a>
+                </div>
+            </form>
+        </div>
+
+        @if (ViewData.ModelState.IsValid)
+        {
+            @if (Model.Count == 0)
+            {
+                <div class="alert alert-light border" role="status">No bookings found.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Booking ID</th>
+                                <th>Customer</th>
+                                <th>Room</th>
+                                <th>Check-in</th>
+                                <th>Check-out</th>
+                                <th>Guests</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Payment</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var booking in Model)
+                            {
+                                var customerName = $"{booking.FirstName} {booking.LastName}".Trim();
+                                <tr>
+                                    <td>@booking.BookingId</td>
+                                    <td>@(string.IsNullOrWhiteSpace(customerName) ? "Not specified" : customerName)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(booking.RoomNumber) ? "Not specified" : booking.RoomNumber)</td>
+                                    <td>@(booking.CheckIn?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</td>
+                                    <td>@(booking.CheckOut?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</td>
+                                    <td>@(booking.Guests?.ToString(culture) ?? "Not specified")</td>
+                                    <td>@(booking.Amount?.ToString("N2", culture) ?? "Not specified")</td>
+                                    <td>
+                                        <span class="badge @(booking.BookingStatus == GoodHotel.Models.BookingStatuses.Cancelled ? "text-bg-secondary" : "text-bg-primary")">
+                                            @booking.BookingStatus
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @(booking.PaymentLabel == GoodHotel.Services.PaymentService.PaidLabel ? "text-bg-success" : "text-bg-warning")">
+                                            @booking.PaymentLabel
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a asp-controller="Staff" asp-action="BookingDetails"
+                                           asp-route-id="@booking.BookingId" class="btn btn-sm btn-outline-primary">
+                                            Details
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+
+        <a asp-controller="Staff" asp-action="Index" class="btn btn-outline-primary mt-4">Staff Dashboard</a>
+    </div>
+</section>

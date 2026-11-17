@@ -21,5 +21,7 @@ public partial class User
 
     public string? Role { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 }

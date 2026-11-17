@@ -1,0 +1,73 @@
+@model GoodHotel.Models.ViewModels.PaymentQueueViewModel
+@{
+    if (User.IsInRole("Admin")) { Layout = "_AdminLayout"; }
+    ViewData["Title"] = "Payment History";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+}
+<section class="content-section"><div class="container">
+    <h2>Payment history</h2>
+    <p>DEMO/MOCK payments are simulations; no real money is transferred.</p>
+    <form asp-action="Queue" method="get" class="row g-2 mb-4">
+        <div class="col-md-4">
+            <label for="search" class="form-label">Booking ID, payment ID or customer</label>
+            <input id="search" name="search" value="@Model.Search" maxlength="100" class="form-control" />
+        </div>
+        <div class="col-md-3">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" name="status" class="form-select">
+                <option value="">All statuses</option>
+                @foreach (var value in new[] { "Pending", "Submitted", "Paid", "Refunded", "Rejected", "Requires reconciliation", "Excluded" })
+                {
+                    <option value="@value" selected="@(Model.Status == value)">@value</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="method" class="form-label">Method (exact; use Cash for cash)</label>
+            <input id="method" name="method" value="@Model.Method" maxlength="50" class="form-control" />
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Filter</button>
+        </div>
+    </form>
+    @if (Model.Payments.Count == 0) { <p>No payment records found.</p> }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead><tr><th>Booking ID</th><th>Customer</th><th>Method</th><th>Amount</th><th>Status</th><th>Transaction date</th><th>Action</th></tr></thead>
+                <tbody>
+                @foreach (var item in Model.Payments)
+                {
+                    <tr>
+                        <td>@(item.Payment.BookingId?.ToString(culture) ?? "Not specified")</td>
+                        <td>@(string.IsNullOrWhiteSpace(item.Customer) ? "Not specified" : item.Customer)</td>
+                        <td>@(item.Payment.Method == "Cash" ? "Cash at Hotel" : item.Payment.Method ?? "Unknown")</td>
+                        <td>@(item.Payment.Amount?.ToString("N2", culture) ?? "Unknown")</td>
+                        <td>@item.Payment.DisplayStatus</td>
+                        <td>@(item.TransactionAtUtc.HasValue ? item.TransactionAtUtc.Value.ToString("yyyy-MM-dd HH:mm", culture) + " UTC" : item.PaymentDate?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</td>
+                        <td>
+                            @if (item.Payment.BookingId.HasValue)
+                            {
+                                <a asp-action="Details" asp-route-id="@item.Payment.BookingId">Details / Manage</a>
+                            }
+                            else
+                            {
+                                <span>Missing booking</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    <h3>Refund requests</h3>
+    @if (Model.Refunds.Count == 0) { <p>No refund requests.</p> }
+    @foreach (var refund in Model.Refunds)
+    {
+        <p>Refund #@refund.RefundId · Payment #@refund.PaymentId · @refund.Amount
+            @if (refund.BookingId.HasValue) { <a asp-action="Details" asp-route-id="@refund.BookingId">Review booking #@refund.BookingId</a> }
+        </p>
+    }
+</div></section>

@@ -1,0 +1,38 @@
+@model IReadOnlyList<GoodHotel.Models.ViewModels.AdminHousekeepingTaskItem>
+@{
+    Layout = "_AdminLayout";
+    ViewData["Title"] = "Housekeeping Tasks";
+}
+<div class="table-panel">
+    <h3>Housekeeping Tasks</h3>
+    <p class="text-muted">Open a task to assign or reassign it to an active Housekeeper.</p>
+    <form asp-action="HousekeepingAssignments" method="get" class="row g-2 mb-3">
+        <div class="col-md-3">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" name="status" class="form-select">
+                <option value="">All statuses</option>
+                @foreach (var value in new[] { "Pending", "Accepted", "InProgress", "Completed", "Verified" })
+                {
+                    <option value="@value" selected="@(Context.Request.Query["status"] == value)">@value</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3"><label for="roomId" class="form-label">Room ID</label><input id="roomId" name="roomId" type="number" min="1" value="@Context.Request.Query["roomId"]" class="form-control" /></div>
+        <div class="col-md-3"><label for="assigneeId" class="form-label">Assignee user ID</label><input id="assigneeId" name="assigneeId" type="number" min="1" value="@Context.Request.Query["assigneeId"]" class="form-control" /></div>
+        <div class="col-md-3 align-self-end"><button class="btn btn-primary" type="submit">Filter</button> <a asp-action="HousekeepingAssignments" class="btn btn-outline-secondary">Clear</a></div>
+    </form>
+    <a asp-action="ExportHousekeepingTasks" asp-route-status="@Context.Request.Query["status"]" asp-route-roomId="@Context.Request.Query["roomId"]" asp-route-assigneeId="@Context.Request.Query["assigneeId"]" class="btn btn-outline-primary mb-3">Export filtered CSV</a>
+    @if (Model.Count == 0) { <p>No tasks found.</p> }
+    else
+    {
+        <div class="table-responsive"><table class="table align-middle">
+            <thead><tr><th>Task</th><th>Room</th><th>Type</th><th>Status</th><th>Assignee</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var task in Model)
+                {
+                    <tr><td>#@task.TaskId</td><td>@(task.RoomNumber ?? task.RoomId.ToString())</td><td>@task.TaskType</td><td>@task.Status</td><td>@(task.AssignedToUserId.HasValue ? $"#{task.AssignedToUserId} {task.AssigneeFirstName} {task.AssigneeLastName}" : "Unassigned")</td><td><a asp-action="HousekeepingDetails" asp-route-id="@task.TaskId" class="btn btn-outline-primary btn-sm">Details</a></td></tr>
+                }
+            </tbody>
+        </table></div>
+    }
+</div>

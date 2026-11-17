@@ -23,6 +23,11 @@ public partial class Booking
 
     public decimal? Amount { get; set; }
 
+    // "Booked" หรือ "Cancelled" (ดูค่าคงที่ใน BookingStatuses)
+    public string Status { get; set; } = BookingStatuses.Booked;
+
+    public DateTime? CancelledAtUtc { get; set; }
+
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual Promotion? Promotion { get; set; }
@@ -30,4 +35,10 @@ public partial class Booking
     public virtual Room? Room { get; set; }
 
     public virtual User? User { get; set; }
+}
+
+public static class BookingStatuses
+{
+    public const string Booked = "Booked";
+    public const string Cancelled = "Cancelled";
 }

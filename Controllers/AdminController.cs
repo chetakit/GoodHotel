@@ -6,6 +6,10 @@ using Microsoft.EntityFrameworkCore;
 using GoodHotel.Models;
 using GoodHotel.Models.ViewModels;
 using GoodHotel.Services;
+using System.Globalization;
+using System.Security.Claims;
+using System.Text;
+using System.Data;
 
 namespace GoodHotel.Controllers
 {
@@ -24,44 +28,58 @@ namespace GoodHotel.Controllers
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly ILogger<AdminController> _logger;
         private readonly IWebHostEnvironment _environment;
-        private readonly PromotionMetadataService _promotionMetadata;
-        private readonly PromotionManagementService _promotionManagement;
+        private readonly HousekeepingService _housekeeping;
+        private readonly RoomAvailabilityService _availability;
+        private readonly RoomStatusService _roomStatus;
 
         public AdminController(
             GoodHotelDbContext db,
             IPasswordHasher<User> passwordHasher,
             ILogger<AdminController> logger,
             IWebHostEnvironment environment,
-            PromotionMetadataService promotionMetadata,
-            PromotionManagementService promotionManagement)
+            HousekeepingService housekeeping,
+            RoomAvailabilityService availability,
+            RoomStatusService roomStatus)
         {
+            _roomStatus = roomStatus;
             _db = db;
             _passwordHasher = passwordHasher;
             _logger = logger;
             _environment = environment;
-            _promotionMetadata = promotionMetadata;
-            _promotionManagement = promotionManagement;
+            _housekeeping = housekeeping;
+            _availability = availability;
         }
 
-        public IActionResult Dashboard()
+        public async Task<IActionResult> Dashboard(CancellationToken ct)
         {
+            // สถานะห้องจริง (ดูจากการเข้าพัก/งานทำความสะอาด/งานซ่อม) ให้ตรงกับหน้า Room Status ของ Staff
+            var roomBoard = await _roomStatus.GetRoomBoardAsync(ct);
+            var liveRoomCounts = roomBoard
+                .GroupBy(room => room.Status)
+                .OrderBy(group => group.Key)
+                .Select(group => new RoomStatusCountViewModel
+                {
+                    Status = RoomStatusService.Label(group.Key),
+                    Count = group.Count()
+                })
+                .ToList();
+
+            var confirmedPayments = PaymentService.ConfirmedForRevenue(_db.Payments);
             var model = new AdminDashboardViewModel
             {
                 RoomCount = _db.Rooms.Count(),
                 UserCount = _db.Users.Count(),
-                BookingCount = _db.Bookings.Count(),
-                RecordedPaymentAmount = _db.Payments.Sum(payment => payment.Amount),
-                RoomStatusCounts = _db.Rooms
-                    .GroupBy(room => room.Status)
-                    .Select(group => new RoomStatusCountViewModel
-                    {
-                        Status = group.Key,
-                        Count = group.Count()
-                    })
-                    .OrderBy(item => item.Status)
-                    .ToList(),
+                BookingCount = _db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
+                Revenue = (confirmedPayments.Sum(p => p.Amount) ?? 0m) -
+                    (_db.PaymentRefunds.Where(r => r.Status == "Approved" &&
+                        confirmedPayments.Any(payment => payment.PaymentId == r.PaymentId))
+                        .Sum(r => (decimal?)r.Amount) ?? 0m),
+                OpenMaintenanceCount = _db.MaintenanceReports.Count(r => r.Status == "Open"),
+                PendingHousekeepingCount = _db.HousekeepingTasks.Count(t => t.Status == "Pending"),
+                AwaitingVerificationCount = _db.HousekeepingTasks.Count(t => t.Status == "Completed"),
+                RoomStatusCounts = liveRoomCounts,
                 BookingsByCheckInDate = _db.Bookings
-                    .Where(booking => booking.CheckIn.HasValue)
+                    .Where(booking => booking.CheckIn.HasValue && booking.Status != BookingStatuses.Cancelled)
                     .OrderByDescending(booking => booking.CheckIn)
                     .ThenByDescending(booking => booking.BookingId)
                     .Take(5)
@@ -219,6 +237,14 @@ namespace GoodHotel.Controllers
                 Description = room.Description,
                 Capacity = room.Capacity,
                 Status = room.Status,
+                OriginalStatus = room.Status,
+                OriginalPreMaintenanceStatus = room.PreMaintenanceStatus,
+                OriginalMaintenanceEventId = _db.MaintenanceReportEvents
+                    .Where(item => item.Report.RoomId == room.RoomId)
+                    .Max(item => (int?)item.EventId) ?? 0,
+                RequiresMaintenanceReview = room.Status == "Maintenance" &&
+                    !_db.MaintenanceReports.Any(report =>
+                        report.RoomId == room.RoomId && report.Status != MaintenanceReport.Resolved),
                 Rate = room.Rate,
                 ImagePath = RoomImageStorage.GetDisplayPath(
                     _environment.WebRootPath,
@@ -246,6 +272,9 @@ namespace GoodHotel.Controllers
             }
 
             var previousImagePath = room.ImagePath;
+            data.RequiresMaintenanceReview = room.Status == "Maintenance" &&
+                !_db.MaintenanceReports.Any(report =>
+                    report.RoomId == room.RoomId && report.Status != MaintenanceReport.Resolved);
             data.ImagePath = RoomImageStorage.GetDisplayPath(
                 _environment.WebRootPath,
                 previousImagePath);
@@ -285,11 +314,60 @@ namespace GoodHotel.Controllers
                         HttpContext.RequestAborted);
                 }
 
+                await using var transaction = await _db.Database.BeginTransactionAsync(
+                    IsolationLevel.ReadCommitted, HttpContext.RequestAborted);
+                if (!await RoomAvailabilityService.LockRoomAsync(_db, transaction, data.RoomId.Value, HttpContext.RequestAborted))
+                {
+                    DeleteNewUpload(uploadedImagePath);
+                    return NotFound();
+                }
+                await _db.Entry(room).ReloadAsync(HttpContext.RequestAborted);
+                previousImagePath = room.ImagePath;
+                data.ImagePath = RoomImageStorage.GetDisplayPath(_environment.WebRootPath, previousImagePath);
+                var latestEventId = await _db.MaintenanceReportEvents
+                    .Where(item => item.Report.RoomId == room.RoomId)
+                    .MaxAsync(item => (int?)item.EventId, HttpContext.RequestAborted) ?? 0;
+                if (data.HasStaleRoomStatus(room.Status, room.PreMaintenanceStatus, latestEventId))
+                {
+                    DeleteNewUpload(uploadedImagePath);
+                    ModelState.AddModelError(string.Empty,
+                        "The room status changed since this form was opened. Reload the page and review it before saving.");
+                    return View("RoomForm", data);
+                }
+                var hasUnresolved = await _db.MaintenanceReports.AnyAsync(
+                    report => report.RoomId == data.RoomId && report.Status != MaintenanceReport.Resolved,
+                    HttpContext.RequestAborted);
+                if (data.Status != "Maintenance" && hasUnresolved)
+                {
+                    DeleteNewUpload(uploadedImagePath);
+                    ModelState.AddModelError(nameof(data.Status),
+                        "The room must remain in Maintenance while reports are unresolved.");
+                    return View("RoomForm", data);
+                }
+                data.RequiresMaintenanceReview = room.Status == "Maintenance" && !hasUnresolved;
+                if (data.RequiresMaintenanceReview && data.Status != "Maintenance" && !data.ConfirmMaintenanceReview)
+                {
+                    DeleteNewUpload(uploadedImagePath);
+                    ModelState.AddModelError(nameof(data.ConfirmMaintenanceReview),
+                        "Review the room restrictions before restoring its status.");
+                    return View("RoomForm", data);
+                }
+                if (((room.Status == "Maintenance" && data.Status != "Maintenance") ||
+                     (room.Status != "Available" && data.Status == "Available")) &&
+                    await _availability.HasCurrentRestrictionsAsync(room.RoomId, HttpContext.RequestAborted))
+                {
+                    DeleteNewUpload(uploadedImagePath);
+                    ModelState.AddModelError(nameof(data.Status),
+                        "The room has a current stay, booking or cleaning restriction. Review it after the restriction clears.");
+                    return View("RoomForm", data);
+                }
+
                 room.Room1 = data.RoomNumber;
                 room.Type = data.Type;
                 room.Description = data.Description;
                 room.Capacity = data.Capacity;
                 room.Status = data.Status;
+                if (data.Status != "Maintenance") room.PreMaintenanceStatus = null;
                 room.Rate = data.Rate;
                 if (uploadedImagePath != null)
                 {
@@ -297,6 +375,7 @@ namespace GoodHotel.Controllers
                 }
 
                 await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                await transaction.CommitAsync(HttpContext.RequestAborted);
             }
             catch (InvalidDataException exception)
             {
@@ -477,38 +556,17 @@ namespace GoodHotel.Controllers
             }
         }
 
-        public async Task<IActionResult> Promotion(
-            CancellationToken cancellationToken)
+        // ---------- Promotions ----------
+
+        public async Task<IActionResult> Promotion(CancellationToken ct)
         {
-            var entities = await _db.Promotions
-                .AsNoTracking()
-                .OrderBy(promotion => promotion.PromotionId)
-                .ToListAsync(cancellationToken);
-
-            var promotions = entities.Select(promotion =>
-            {
-                var parsed = _promotionMetadata.Parse(promotion.Condition);
-                return new PromotionListViewModel
-                {
-                    PromotionId = promotion.PromotionId,
-                    PromotionName = promotion.PromotionName,
-                    Description = promotion.Description,
-                    Condition = parsed.IsLegacy || parsed.Error != null
-                        ? promotion.Condition
-                        : null,
-                    Benefit = promotion.Benefit,
-                    PromotionCode = parsed.Metadata?.Code,
-                    DiscountType = parsed.Metadata?.DiscountType,
-                    DiscountValue = parsed.Metadata?.DiscountValue,
-                    StartDate = parsed.Metadata?.StartDate,
-                    EndDate = parsed.Metadata?.EndDate,
-                    IsActive = parsed.Metadata?.IsActive,
-                    IsLegacyPromotion = parsed.IsLegacy,
-                    MetadataError = parsed.Error
-                };
-            }).ToList();
-
-            return View(promotions);
+            // โปรที่ตั้งเงื่อนไขแล้วขึ้นก่อน → เปิดอยู่ก่อนปิด → ตามลำดับที่สร้าง
+            var promotions = await _db.Promotions.AsNoTracking()
+                .OrderBy(p => p.RuleType == null)
+                .ThenByDescending(p => p.IsActive)
+                .ThenBy(p => p.PromotionId)
+                .ToListAsync(ct);
+            return View(promotions.Select(PromotionListViewModel.From).ToList());
         }
 
         public IActionResult AddPromotion()
@@ -518,241 +576,178 @@ namespace GoodHotel.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddPromotion(
-            PromotionFormViewModel data,
-            CancellationToken cancellationToken)
+        public async Task<IActionResult> AddPromotion(PromotionFormViewModel form, CancellationToken ct)
         {
-            ValidatePromotionForm(data);
-
+            ValidatePromotionForm(form);
             if (!ModelState.IsValid)
             {
-                return View("PromotionForm", data);
+                return View("PromotionForm", form);
             }
 
-            var result = await _promotionManagement.SaveAsync(data, cancellationToken);
-            if (result.Status != PromotionWriteStatus.Saved)
-            {
-                ModelState.AddModelError(string.Empty, result.Message ?? "Could not save promotion.");
-                return View("PromotionForm", data);
-            }
+            var lastId = await _db.Promotions.MaxAsync(p => (int?)p.PromotionId, ct) ?? 0;
+            var promotion = new Promotion { PromotionId = lastId + 1 };
+            CopyFormToPromotion(form, promotion);
+            _db.Promotions.Add(promotion);
+            await _db.SaveChangesAsync(ct);
 
-            TempData["PromotionSuccessMessage"] = "Promotion added successfully.";
+            TempData["PromotionSuccessMessage"] = $"เพิ่มโปร \"{promotion.PromotionName}\" แล้ว";
             return RedirectToAction(nameof(Promotion));
         }
 
-        public async Task<IActionResult> EditPromotion(
-            int id,
-            CancellationToken cancellationToken)
+        public async Task<IActionResult> EditPromotion(int id, CancellationToken ct)
         {
-            var promotion = await _db.Promotions
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    item => item.PromotionId == id,
-                    cancellationToken);
-            return promotion == null
-                ? NotFound()
-                : View("PromotionForm", CreatePromotionForm(promotion));
+            var promotion = await _db.Promotions.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.PromotionId == id, ct);
+            return promotion == null ? NotFound() : View("PromotionForm", CreatePromotionForm(promotion));
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditPromotion(
-            PromotionFormViewModel data,
-            CancellationToken cancellationToken)
+        public async Task<IActionResult> EditPromotion(PromotionFormViewModel form, CancellationToken ct)
         {
-            if (data.PromotionId is null or <= 0)
-            {
-                return NotFound();
-            }
-
-            ValidatePromotionForm(data);
-
-            if (!ModelState.IsValid)
-            {
-                await PopulateLegacyConditionAsync(data, cancellationToken);
-                return View("PromotionForm", data);
-            }
-
-            var result = await _promotionManagement.SaveAsync(data, cancellationToken);
-            if (result.Status == PromotionWriteStatus.NotFound)
-            {
-                return NotFound();
-            }
-            if (result.Status != PromotionWriteStatus.Saved)
-            {
-                ModelState.AddModelError(string.Empty, result.Message ?? "Could not update promotion.");
-                await PopulateLegacyConditionAsync(data, cancellationToken);
-                return View("PromotionForm", data);
-            }
-
-            TempData["PromotionSuccessMessage"] = "Promotion updated successfully.";
-            return RedirectToAction(nameof(Promotion));
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult DeletePromotion(int id)
-        {
-            var promotion = _db.Promotions
-                .FirstOrDefault(item => item.PromotionId == id);
-
+            var promotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionId == form.PromotionId, ct);
             if (promotion == null)
             {
-                TempData["PromotionErrorMessage"] =
-                    "The selected promotion was not found.";
+                return NotFound();
+            }
+
+            ValidatePromotionForm(form);
+            if (!ModelState.IsValid)
+            {
+                return View("PromotionForm", form);
+            }
+
+            CopyFormToPromotion(form, promotion);
+            await _db.SaveChangesAsync(ct);
+
+            TempData["PromotionSuccessMessage"] = $"บันทึกโปร \"{promotion.PromotionName}\" แล้ว";
+            return RedirectToAction(nameof(Promotion));
+        }
+
+        /// <summary>เปิด/ปิดโปรแบบกดปุ่มเดียว</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TogglePromotion(int id, CancellationToken ct)
+        {
+            var promotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionId == id, ct);
+            if (promotion == null)
+            {
+                return NotFound();
+            }
+
+            promotion.IsActive = !promotion.IsActive;
+            await _db.SaveChangesAsync(ct);
+
+            var action = promotion.IsActive ? "เปิด" : "ปิด";
+            TempData["PromotionSuccessMessage"] = $"{action}โปร \"{promotion.PromotionName}\" แล้ว";
+            return RedirectToAction(nameof(Promotion));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeletePromotion(int id, CancellationToken ct)
+        {
+            var promotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionId == id, ct);
+            if (promotion == null)
+            {
+                TempData["PromotionErrorMessage"] = "ไม่พบโปรโมชั่นนี้";
                 return RedirectToAction(nameof(Promotion));
             }
 
-            if (_db.Bookings.Any(booking => booking.PromotionId == id))
+            // โปรที่เคยถูกใช้กับการจองแล้วลบไม่ได้ (ประวัติการจองจะเสีย) ให้ปิดแทน
+            if (await _db.Bookings.AnyAsync(b => b.PromotionId == id, ct))
             {
-                TempData["PromotionErrorMessage"] =
-                    "This promotion cannot be deleted because it has booking records.";
+                TempData["PromotionErrorMessage"] = "โปรนี้เคยถูกใช้กับการจองแล้ว ลบไม่ได้ ให้กดปิดแทน";
                 return RedirectToAction(nameof(Promotion));
             }
 
             _db.Promotions.Remove(promotion);
+            await _db.SaveChangesAsync(ct);
 
-            try
-            {
-                _db.SaveChanges();
-            }
-            catch (DbUpdateException exception)
-            {
-                _logger.LogWarning(
-                    exception,
-                    "Could not delete promotion {PromotionId}; it may have a related booking.",
-                    id);
-                TempData["PromotionErrorMessage"] =
-                    "This promotion could not be deleted because it is referenced by a booking.";
-                return RedirectToAction(nameof(Promotion));
-            }
-
-            TempData["PromotionSuccessMessage"] = "Promotion deleted successfully.";
+            TempData["PromotionSuccessMessage"] = "ลบโปรแล้ว";
             return RedirectToAction(nameof(Promotion));
         }
 
-        private void ValidatePromotionForm(PromotionFormViewModel data)
+        private void ValidatePromotionForm(PromotionFormViewModel form)
         {
-            if (string.IsNullOrWhiteSpace(data.PromotionName))
+            if (form.RuleType == null || !PromotionRules.All.ContainsKey(form.RuleType))
             {
-                ModelState.AddModelError(
-                    nameof(data.PromotionName),
-                    "Promotion name is required.");
+                ModelState.AddModelError(nameof(form.RuleType), "กรุณาเลือกประเภทโปร");
+            }
+            else if (PromotionRules.NeedsValue(form.RuleType) && form.RuleValue is not > 0)
+            {
+                ModelState.AddModelError(nameof(form.RuleValue), "โปรประเภทนี้ต้องกรอกตัวเลขเงื่อนไข (มากกว่า 0)");
             }
 
-            if (data.UseDiscountCode)
+            if (form.DiscountType is not (PromotionRules.Percent or PromotionRules.Fixed))
             {
-                if (!_promotionMetadata.TryParseDate(data.StartDate, out var startDate))
-                {
-                    ModelState.AddModelError(
-                        nameof(data.StartDate),
-                        "กรุณาระบุวันเริ่มต้นในรูปแบบวันที่ที่ถูกต้อง");
-                }
-
-                if (!_promotionMetadata.TryParseDate(data.EndDate, out var endDate))
-                {
-                    ModelState.AddModelError(
-                        nameof(data.EndDate),
-                        "กรุณาระบุวันสิ้นสุดในรูปแบบวันที่ที่ถูกต้อง");
-                }
-
-                if (data.DiscountValue == null)
-                {
-                    ModelState.AddModelError(
-                        nameof(data.DiscountValue),
-                        "กรุณาระบุมูลค่าส่วนลด");
-                }
-                else if (_promotionMetadata.TryParseDate(data.StartDate, out startDate) &&
-                         _promotionMetadata.TryParseDate(data.EndDate, out endDate))
-                {
-                    var error = _promotionMetadata.Validate(
-                        new PromotionMetadata(
-                            data.PromotionCode ?? string.Empty,
-                            data.DiscountType ?? string.Empty,
-                            data.DiscountValue.Value,
-                            startDate,
-                            endDate,
-                            data.IsActive),
-                        out _);
-                    if (error != null)
-                    {
-                        ModelState.AddModelError(string.Empty, error);
-                    }
-                }
+                ModelState.AddModelError(nameof(form.DiscountType), "กรุณาเลือกลดเป็น % หรือบาท");
+            }
+            else if (form.DiscountType == PromotionRules.Percent && form.DiscountValue > 100)
+            {
+                ModelState.AddModelError(nameof(form.DiscountValue), "ลดเป็น % ได้ไม่เกิน 100");
             }
 
-            if (data.Benefit?.Length > 255)
+            var start = ParseFormDate(form.StartDate, nameof(form.StartDate));
+            var end = ParseFormDate(form.EndDate, nameof(form.EndDate));
+            if (start.HasValue && end.HasValue && end < start)
             {
-                ModelState.AddModelError(
-                    nameof(data.Benefit),
-                    "Benefit ต้องมีความยาวไม่เกิน 255 ตัวอักษร");
+                ModelState.AddModelError(nameof(form.EndDate), "วันสิ้นสุดต้องไม่อยู่ก่อนวันเริ่ม");
             }
         }
 
-        private PromotionFormViewModel CreatePromotionForm(Promotion promotion)
+        private DateOnly? ParseFormDate(string? value, string field)
         {
-            var form = new PromotionFormViewModel
+            if (string.IsNullOrWhiteSpace(value))
             {
-                PromotionId = promotion.PromotionId,
-                PromotionName = promotion.PromotionName,
-                Description = promotion.Description,
-                Benefit = promotion.Benefit
-            };
-            var parsed = _promotionMetadata.Parse(promotion.Condition);
-            if (parsed.IsLegacy)
-            {
-                form.UseDiscountCode = false;
-                form.IsLegacyPromotion = true;
-                form.LegacyCondition = promotion.Condition;
-            }
-            else if (parsed.Metadata != null)
-            {
-                form.UseDiscountCode = true;
-                form.PromotionCode = parsed.Metadata.Code;
-                form.DiscountType = parsed.Metadata.DiscountType;
-                form.DiscountValue = parsed.Metadata.DiscountValue;
-                form.StartDate = parsed.Metadata.StartDate.ToString(
-                    "yyyy-MM-dd",
-                    System.Globalization.CultureInfo.InvariantCulture);
-                form.EndDate = parsed.Metadata.EndDate.ToString(
-                    "yyyy-MM-dd",
-                    System.Globalization.CultureInfo.InvariantCulture);
-                form.IsActive = parsed.Metadata.IsActive;
-            }
-            else
-            {
-                form.UseDiscountCode = false;
-                form.MetadataError = parsed.Error;
+                return null;
             }
 
-            return form;
+            var date = ParseIsoDate(value);
+            if (date == null)
+            {
+                ModelState.AddModelError(field, "รูปแบบวันที่ไม่ถูกต้อง");
+            }
+
+            return date;
         }
 
-        private async Task PopulateLegacyConditionAsync(
-            PromotionFormViewModel form,
-            CancellationToken cancellationToken)
+        private static void CopyFormToPromotion(PromotionFormViewModel form, Promotion promotion)
         {
-            var promotion = await _db.Promotions
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    item => item.PromotionId == form.PromotionId,
-                    cancellationToken);
-            if (promotion == null)
-            {
-                return;
-            }
-
-            var parsed = _promotionMetadata.Parse(promotion.Condition);
-            if (parsed.IsLegacy)
-            {
-                form.IsLegacyPromotion = true;
-                form.LegacyCondition = promotion.Condition;
-            }
-            else if (parsed.Error != null)
-            {
-                form.MetadataError = parsed.Error;
-            }
+            promotion.PromotionName = form.PromotionName!.Trim();
+            promotion.Description = form.Description?.Trim();
+            promotion.RuleType = form.RuleType;
+            promotion.RuleValue = PromotionRules.NeedsValue(form.RuleType) ? form.RuleValue : null;
+            promotion.DiscountType = form.DiscountType;
+            promotion.DiscountValue = form.DiscountValue;
+            promotion.MaxDiscount = form.DiscountType == PromotionRules.Percent && form.MaxDiscount > 0 ? form.MaxDiscount : null;
+            promotion.MinSpend = form.MinSpend > 0 ? form.MinSpend : null;
+            promotion.StartDate = ParseIsoDate(form.StartDate);
+            promotion.EndDate = ParseIsoDate(form.EndDate);
+            promotion.IsActive = form.IsActive;
         }
+
+        // ใช้ InvariantCulture เพราะเครื่องตั้งภาษาไทยจะตีความปีเป็น พ.ศ.
+        private static DateOnly? ParseIsoDate(string? value) =>
+            DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                ? date
+                : null;
+
+        private static PromotionFormViewModel CreatePromotionForm(Promotion promotion) => new()
+        {
+            PromotionId = promotion.PromotionId,
+            PromotionName = promotion.PromotionName,
+            Description = promotion.Description,
+            RuleType = promotion.RuleType,
+            RuleValue = promotion.RuleValue,
+            DiscountType = promotion.DiscountType ?? PromotionRules.Percent,
+            DiscountValue = promotion.DiscountValue,
+            MaxDiscount = promotion.MaxDiscount,
+            MinSpend = promotion.MinSpend,
+            StartDate = promotion.StartDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            EndDate = promotion.EndDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            IsActive = promotion.IsActive
+        };
 
         public IActionResult Members()
         {
@@ -773,6 +768,7 @@ namespace GoodHotel.Controllers
 
         public IActionResult EditUser(int id)
         {
+            if (id <= 0) return BadRequest();
             var user = _db.Users
                 .Where(user => user.UserId == id)
                 .Select(user => new EditUserViewModel
@@ -798,12 +794,30 @@ namespace GoodHotel.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult EditUser(EditUserViewModel data)
         {
+            if (data.UserId <= 0) return BadRequest();
             var user = (from u in _db.Users
                         where u.UserId == data.UserId
                         select u).FirstOrDefault();
 
             if (user != null)
             {
+                if (string.IsNullOrWhiteSpace(data.FirstName))
+                    ModelState.AddModelError(nameof(data.FirstName), "กรุณากรอกชื่อ");
+                if (string.IsNullOrWhiteSpace(data.LastName))
+                    ModelState.AddModelError(nameof(data.LastName), "กรุณากรอกนามสกุล");
+                if (string.IsNullOrWhiteSpace(data.Email))
+                    ModelState.AddModelError(nameof(data.Email), "กรุณากรอกอีเมล");
+                else
+                {
+                    data.Email = data.Email.Trim();
+                    if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(data.Email))
+                        ModelState.AddModelError(nameof(data.Email), "กรุณากรอกอีเมลให้ถูกต้อง");
+                    else if (_db.Users.Any(u => u.UserId != data.UserId && u.Email == data.Email))
+                        ModelState.AddModelError(nameof(data.Email), "อีเมลนี้ถูกใช้งานแล้ว");
+                }
+                if (data.Role != "Customer" && data.Role != "Staff" &&
+                    data.Role != "Housekeeper" && data.Role != "Admin")
+                    ModelState.AddModelError(nameof(data.Role), "กรุณาเลือก Role ที่ถูกต้อง");
                 if (string.IsNullOrWhiteSpace(data.Phone))
                 {
                     ModelState.AddModelError(
@@ -838,8 +852,8 @@ namespace GoodHotel.Controllers
                     return View(data);
                 }
 
-                user.FirstName = data.FirstName;
-                user.LastName = data.LastName;
+                user.FirstName = data.FirstName!.Trim();
+                user.LastName = data.LastName!.Trim();
                 user.Email = data.Email;
                 user.Phone = new string(
                     data.Phone!.Where(char.IsDigit).ToArray());
@@ -862,14 +876,37 @@ namespace GoodHotel.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult DeleteUser(int id)
         {
+            if (id <= 0) return BadRequest();
+            using var transaction = _db.Database.BeginTransaction(IsolationLevel.Serializable);
             var user = (from u in _db.Users
                         where u.UserId == id
                         select u).FirstOrDefault();
 
             if (user != null)
             {
+                if (_db.Bookings.Any(b => b.UserId == id) ||
+                    _db.BookingStays.Any(s => s.CheckedInByUserId == id || s.CheckedOutByUserId == id) ||
+                    _db.MaintenanceReports.Any(r => r.ReportedByUserId == id || r.ResolvedByUserId == id) ||
+                    _db.MaintenanceReportEvents.Any(e => e.ActorUserId == id) ||
+                    _db.HousekeepingTasks.Any(t => t.AssignedToUserId == id || t.CreatedByUserId == id ||
+                        t.CompletedByUserId == id || t.VerifiedByUserId == id) ||
+                    _db.HousekeepingTaskEvents.Any(e => e.ActorUserId == id || e.PreviousAssignee == id || e.NewAssignee == id))
+                {
+                    TempData["MemberError"] = "ไม่สามารถลบบัญชีที่มีประวัติการจอง การเข้าพัก งาน หรือรายงานซ่อม";
+                    return RedirectToAction(nameof(Members));
+                }
                 _db.Remove(user);
-                _db.SaveChanges();
+                try
+                {
+                    _db.SaveChanges();
+                    transaction.Commit();
+                }
+                catch (DbUpdateException exception)
+                {
+                    _logger.LogWarning(exception, "Could not delete user {UserId}; related records may exist.", id);
+                    TempData["MemberError"] = "ไม่สามารถลบบัญชีได้ เนื่องจากมีข้อมูลที่เกี่ยวข้องหรือเกิดข้อผิดพลาดในการบันทึก";
+                    return RedirectToAction(nameof(Members));
+                }
 
                 return RedirectToAction(
                     "Members",
@@ -963,6 +1000,7 @@ namespace GoodHotel.Controllers
             data.Email = data.Email!.Trim();
             data.Phone = new string(
                 data.Phone!.Where(char.IsDigit).ToArray());
+            data.IsActive = true;
 
             var lastUser = _db.Users
                 .OrderByDescending(u => u.UserId)
@@ -998,7 +1036,8 @@ namespace GoodHotel.Controllers
                     LastName = user.LastName,
                     Email = user.Email,
                     Phone = user.Phone,
-                    Role = user.Role
+                    Role = user.Role,
+                    IsActive = user.IsActive
                 })
                 .ToList();
 
@@ -1019,7 +1058,8 @@ namespace GoodHotel.Controllers
                     Email = user.Email,
                     Phone = user.Phone,
                     BirthDate = user.BirthDate,
-                    Role = user.Role
+                    Role = user.Role,
+                    IsActive = user.IsActive
                 })
                 .FirstOrDefault();
 
@@ -1031,97 +1071,92 @@ namespace GoodHotel.Controllers
             return View(employee);
         }
 
-        [HttpGet]
-        public IActionResult HousekeepingAssignments(int? taskId = null)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetEmployeeActive(
+            int id, bool? isActive, CancellationToken ct)
         {
-            if (taskId is <= 0)
+            if (!ModelState.IsValid || id <= 0 || !isActive.HasValue) return BadRequest();
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+            if (!await HousekeepingService.LockUserAsync(_db, id, ct)) return NotFound();
+
+            var user = await _db.Users.SingleOrDefaultAsync(u => u.UserId == id, ct);
+            if (user == null || (user.Role != "Staff" && user.Role != "Housekeeper")) return NotFound();
+
+            if (!isActive.Value && user.IsActive &&
+                await _db.HousekeepingTasks.AnyAsync(t => t.AssignedToUserId == id &&
+                    (t.Status == "Accepted" || t.Status == "InProgress"), ct))
             {
-                return BadRequest();
+                TempData["EmployeeError"] =
+                    "Cannot deactivate this employee until outstanding Accepted or InProgress tasks are completed or reassigned.";
+                return RedirectToAction(nameof(EmployeeProfile), new { id });
             }
 
-            return OperationsContextPage(
-                taskId.HasValue ? "Assign Housekeeping Task" : "Housekeeping Task Assignment",
-                taskId.HasValue
-                    ? $"Task #{taskId.Value}: assignment data has not been verified."
-                    : "Review unassigned housekeeping work. Task records are not loaded.",
-                taskId,
-                null,
-                new OperationsSectionViewModel
-                {
-                    Title = "Assign task",
-                    Description = "Assignment is unavailable until housekeeping persistence is implemented.",
-                    Fields = new[]
-                    {
-                        "Task",
-                        "Housekeeper"
-                    },
-                    ActionLabel = "Assign task (not implemented)",
-                    DisabledActionMessage = "Assignment is disabled until task persistence and authorization checks are implemented.",
-                    EmptyState = taskId.HasValue
-                        ? null
-                        : "Task records have not been queried. Whether unassigned tasks exist is not known."
-                });
+            user.IsActive = isActive.Value;
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            TempData["EmployeeSuccess"] = isActive.Value ? "Employee activated." : "Employee deactivated.";
+            return RedirectToAction(nameof(EmployeeProfile), new { id });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> HousekeepingAssignments(
+            int? taskId, string? status, int? roomId, int? assigneeId, CancellationToken ct)
+        {
+            if (!ValidTaskFilters(status, roomId, assigneeId) || taskId is <= 0) return BadRequest();
+            if (taskId.HasValue) return RedirectToAction(nameof(HousekeepingDetails), new { id = taskId.Value });
+            return View(await _housekeeping.AdminTasks(status, roomId, assigneeId).ToListAsync(ct));
         }
 
         [HttpGet]
         public IActionResult HousekeepingReassignments(int? taskId = null)
         {
-            if (taskId is <= 0)
-            {
-                return BadRequest();
-            }
-
-            return OperationsContextPage(
-                taskId.HasValue ? "Reassign Housekeeping Task" : "Housekeeping Task Reassignment",
-                taskId.HasValue
-                    ? $"Task #{taskId.Value}: assignment data has not been verified."
-                    : "Review assigned housekeeping work. Task records are not loaded.",
-                taskId,
-                null,
-                new OperationsSectionViewModel
-                {
-                    Title = "Reassign task",
-                    Description = "Reassignment is unavailable until housekeeping persistence is implemented.",
-                    Fields = new[]
-                    {
-                        "Task",
-                        "Current housekeeper",
-                        "New housekeeper"
-                    },
-                    ActionLabel = "Reassign task (not implemented)",
-                    DisabledActionMessage = "Reassignment is disabled until task persistence and authorization checks are implemented.",
-                    EmptyState = taskId.HasValue
-                        ? null
-                        : "Task records have not been queried. Whether assigned tasks exist is not known."
-                });
+            if (!ModelState.IsValid || taskId is <= 0) return BadRequest();
+            return taskId.HasValue
+                ? RedirectToAction(nameof(HousekeepingDetails), new { id = taskId.Value })
+                : RedirectToAction(nameof(HousekeepingAssignments));
         }
+
+        [HttpGet]
+        public async Task<IActionResult> HousekeepingDetails(int id, CancellationToken ct)
+        {
+            if (!ModelState.IsValid || id <= 0) return BadRequest();
+            var task = await _housekeeping.AdminDetailsAsync(id, ct);
+            return task == null ? NotFound() : View(task);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AssignHousekeepingTask(
+            int id, int assigneeId, string? expectedStatus, int? expectedAssigneeId,
+            int? expectedEventId, string? reason, CancellationToken ct)
+        {
+            if (!ModelState.IsValid || id <= 0 || assigneeId <= 0 || expectedAssigneeId is <= 0 ||
+                !expectedEventId.HasValue || expectedEventId < 0 ||
+                expectedStatus is not ("Pending" or "Accepted" or "InProgress"))
+                return BadRequest();
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), NumberStyles.None,
+                    CultureInfo.InvariantCulture, out var actorId) || actorId <= 0)
+                return Forbid();
+
+            var error = await _housekeeping.AssignAsync(id, assigneeId, actorId,
+                expectedStatus, expectedAssigneeId, expectedEventId.Value, reason, ct);
+            if (error == null)
+                TempData["HousekeepingSuccess"] = "Housekeeping assignment saved.";
+            else
+                TempData["HousekeepingError"] = error;
+            return RedirectToAction(nameof(HousekeepingDetails), new { id });
+        }
+
+        private bool ValidTaskFilters(string? status, int? roomId, int? assigneeId) =>
+            ModelState.IsValid && roomId is not <= 0 && assigneeId is not <= 0 &&
+            (string.IsNullOrEmpty(status) || status is "Pending" or "Accepted" or "InProgress" or "Completed" or "Verified");
 
         [HttpGet]
         public IActionResult MaintenanceReports()
         {
-            return OperationsPage(
-                "Maintenance Reports",
-                "Review room issues and approve report resolution.",
-                new OperationsSectionViewModel
-                {
-                    Title = "Open reports",
-                    Description = "Maintenance reports are not loaded.",
-                    Fields = new[]
-                    {
-                        "Room",
-                        "Issue details",
-                        "Room blocked",
-                        "Reported by",
-                        "Reported at"
-                    },
-                    EmptyState = "Maintenance reports have not been queried. Whether open reports exist is not known."
-                },
-                new OperationsSectionViewModel
-                {
-                    Title = "Report history",
-                    Description = "Resolved report history is not loaded.",
-                    EmptyState = "Maintenance history has not been queried."
-                });
+            return RedirectToAction("Index", "Maintenance");
         }
 
         [HttpGet]
@@ -1132,50 +1167,29 @@ namespace GoodHotel.Controllers
                 return BadRequest();
             }
 
-            return OperationsContextPage(
-                reportId.HasValue ? "Resolve Maintenance Report" : "Maintenance Resolution",
-                reportId.HasValue
-                    ? $"Report #{reportId.Value}: report data has not been verified."
-                    : "Review blocking maintenance reports before approving resolution.",
-                null,
-                reportId,
-                new OperationsSectionViewModel
-                {
-                    Title = "Resolution review",
-                    Description = "Only Admin can approve release of a room block.",
-                    Fields = new[]
-                    {
-                        "Room",
-                        "Issue details",
-                        "Blocking status",
-                        "Reported by",
-                        "Resolution notes"
-                    },
-                    ActionLabel = "Resolve report (not implemented)",
-                    DisabledActionMessage = "Resolution is disabled until maintenance persistence and server-side authorization are implemented.",
-                    EmptyState = reportId.HasValue
-                        ? null
-                        : "Maintenance reports have not been queried. Whether blocking reports exist is not known."
-                });
+            return reportId.HasValue
+                ? RedirectToAction("Details", "Maintenance", new { id = reportId.Value })
+                : RedirectToAction("Index", "Maintenance");
         }
 
         public IActionResult Reports()
         {
-            var stayDates = _db.Bookings
-                .Where(booking =>
-                    booking.CheckIn.HasValue &&
-                    booking.CheckOut.HasValue &&
-                    booking.CheckOut > booking.CheckIn)
-                .Select(booking => new
+            var confirmedPayments = PaymentService.ConfirmedForRevenue(_db.Payments);
+            var stayDates = _db.BookingStays
+                .Where(stay => stay.Status == "CheckedOut" && stay.CheckedOutAtUtc.HasValue &&
+                    stay.CheckedOutAtUtc >= stay.CheckedInAtUtc)
+                .Select(stay => new
                 {
-                    booking.CheckIn,
-                    booking.CheckOut
+                    stay.CheckedInAtUtc,
+                    stay.CheckedOutAtUtc
                 })
                 .ToList();
 
+            var hotelTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Bangkok");
             var stayNights = stayDates
-                .Select(stay => stay.CheckOut!.Value.DayNumber -
-                                stay.CheckIn!.Value.DayNumber)
+                .Select(stay =>
+                    (TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(stay.CheckedOutAtUtc!.Value, DateTimeKind.Utc), hotelTimeZone).Date -
+                     TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(stay.CheckedInAtUtc, DateTimeKind.Utc), hotelTimeZone).Date).Days)
                 .ToList();
 
             var paymentStatusSummaries = _db.Payments
@@ -1191,48 +1205,125 @@ namespace GoodHotel.Controllers
 
             var model = new AdminReportsViewModel
             {
-                BookingCount = _db.Bookings.Count(),
-                BookingAmount = _db.Bookings.Sum(booking => booking.Amount),
-                BookingsWithValidStayDates = stayNights.Count,
-                AverageStayNights = stayNights.Count == 0
+                BookingCount = _db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
+                CancelledBookingCount = _db.Bookings.Count(b => b.Status == BookingStatuses.Cancelled),
+                PromotionUsage = _db.Bookings
+                    .Where(b => b.Status != BookingStatuses.Cancelled && b.Promotion != null)
+                    .GroupBy(b => b.Promotion!.PromotionName)
+                    .Select(g => new PromotionUsageViewModel(
+                        g.Key ?? "-", g.Count(), g.Sum(b => b.Amount) ?? 0m))
+                    .ToList()
+                    .OrderByDescending(p => p.BookingCount)
+                    .ToList(),
+                BookingAmount = _db.Bookings
+                    .Where(booking => booking.Status != BookingStatuses.Cancelled)
+                    .Sum(booking => booking.Amount),
+                CompletedStaysWithValidDates = stayNights.Count,
+                AverageActualStayNights = stayNights.Count == 0
                     ? null
                     : (decimal)stayNights.Average(),
                 PaymentCount = _db.Payments.Count(),
-                RecordedPaymentAmount = _db.Payments.Sum(payment => payment.Amount),
-                PaymentsByStatus = paymentStatusSummaries
+                Revenue = (confirmedPayments.Sum(p => p.Amount) ?? 0m) -
+                    (_db.PaymentRefunds.Where(r => r.Status == "Approved" &&
+                        confirmedPayments.Any(payment => payment.PaymentId == r.PaymentId))
+                        .Sum(r => (decimal?)r.Amount) ?? 0m),
+                PaymentsByStatus = paymentStatusSummaries,
+                HousekeepingByStatus = _db.HousekeepingTasks.GroupBy(t => t.Status)
+                    .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToList(),
+                MaintenanceByStatus = _db.MaintenanceReports.GroupBy(r => r.Status)
+                    .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToList()
             };
 
             return View(model);
         }
 
-        private ViewResult OperationsPage(
-            string title,
-            string description,
-            params OperationsSectionViewModel[] sections)
+        [HttpGet]
+        public async Task<IActionResult> ExportBookings(CancellationToken ct)
         {
-            return OperationsContextPage(title, description, null, null, sections);
+            var rows = await _db.Bookings.AsNoTracking().OrderBy(b => b.BookingId)
+                .Select(b => new
+                {
+                    b.BookingId, b.UserId, b.RoomId, b.CheckIn, b.CheckOut, b.Guests, b.Amount, b.Status,
+                    Promotion = b.Promotion == null ? null : b.Promotion.PromotionName
+                })
+                .ToListAsync(ct);
+            return Csv("bookings.csv",
+                new[] { "BookingId", "UserId", "RoomId", "CheckIn", "CheckOut", "Guests", "Amount", "Status", "Promotion" },
+                rows.Select(b => new[] { Format(b.BookingId), Format(b.UserId), Format(b.RoomId),
+                    Format(b.CheckIn), Format(b.CheckOut), Format(b.Guests), Format(b.Amount),
+                    Format(b.Status), Format(b.Promotion) }));
         }
 
-        private ViewResult OperationsContextPage(
-            string title,
-            string description,
-            int? taskId = null,
-            int? reportId = null,
-            params OperationsSectionViewModel[] sections)
+        [HttpGet]
+        public async Task<IActionResult> ExportPayments(CancellationToken ct)
         {
-            return View(
-                "~/Views/Shared/OperationsPage.cshtml",
-                new OperationsPageViewModel
-                {
-                    Title = title,
-                    Description = description,
-                    BackController = "Admin",
-                    BackAction = nameof(Dashboard),
-                    BackLabel = "Admin Dashboard",
-                    Sections = sections,
-                    TaskId = taskId,
-                    ReportId = reportId
-                });
+            var rows = await _db.Payments.AsNoTracking().OrderBy(p => p.PaymentId)
+                .Select(p => new { p.PaymentId, p.BookingId, p.PaymentDate, p.PaymentMethod, p.PaymentStatus, p.Amount,
+                    p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition })
+                .ToListAsync(ct);
+            return Csv("payments.csv", new[] { "PaymentId", "BookingId", "PaymentDate", "PaymentMethod", "PaymentStatus", "Amount", "VerifiedAtUtc", "LegacyDisposition" },
+                rows.Select(p => new[] { Format(p.PaymentId), Format(p.BookingId), Format(p.PaymentDate),
+                    p.PaymentMethod, p.PaymentStatus, Format(p.Amount), Format(p.VerifiedAtUtc),
+                    p.SubmittedAtUtc == null ? p.LegacyDisposition ?? "Requires reconciliation" : null }));
         }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportMaintenanceReports(CancellationToken ct)
+        {
+            var rows = await _db.MaintenanceReports.AsNoTracking().OrderBy(r => r.ReportId)
+                .Select(r => new { r.ReportId, r.RoomId, r.Description, r.Status, r.BlocksRoom,
+                    r.BlockFrom, r.BlockUntil, r.ReportedAtUtc, r.ReportedByUserId, r.ResolvedAtUtc,
+                    r.ResolvedByUserId, r.ResolutionNote }).ToListAsync(ct);
+            return Csv("maintenance-reports.csv",
+                new[] { "ReportId", "RoomId", "Description", "Status", "BlocksRoom", "BlockFrom", "BlockUntilExclusive",
+                    "ReportedAtUtc", "ReportedByUserId", "ResolvedAtUtc", "ResolvedByUserId", "ResolutionNote" },
+                rows.Select(r => new[] { Format(r.ReportId), Format(r.RoomId), r.Description, r.Status,
+                    Format(r.BlocksRoom), Format(r.BlockFrom), Format(r.BlockUntil), Format(r.ReportedAtUtc),
+                    Format(r.ReportedByUserId), Format(r.ResolvedAtUtc), Format(r.ResolvedByUserId), r.ResolutionNote }));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportHousekeepingTasks(string? status, int? roomId, int? assigneeId, CancellationToken ct)
+        {
+            if (!ValidTaskFilters(status, roomId, assigneeId)) return BadRequest();
+            var rows = await _housekeeping.AdminTasks(status, roomId, assigneeId).ToListAsync(ct);
+            return Csv("housekeeping-tasks.csv",
+                new[] { "TaskId", "RoomId", "RoomNumber", "TaskType", "Status", "AssignedToUserId", "CreatedAtUtc" },
+                rows.Select(t => new[] { Format(t.TaskId), Format(t.RoomId), t.RoomNumber, t.TaskType,
+                    t.Status, Format(t.AssignedToUserId), Format(t.CreatedAtUtc) }));
+        }
+
+        private FileContentResult Csv(string filename, string[] headers, IEnumerable<string?[]> rows)
+        {
+            var builder = new StringBuilder();
+            void AppendRow(IEnumerable<string?> values) =>
+                builder.AppendJoin(",", values.Select(EscapeCsv)).Append("\r\n");
+            AppendRow(headers);
+            foreach (var row in rows) AppendRow(row);
+            var encoding = new UTF8Encoding(true);
+            var content = encoding.GetPreamble().Concat(encoding.GetBytes(builder.ToString())).ToArray();
+            return File(content, "text/csv; charset=utf-8", filename);
+        }
+
+        private static string EscapeCsv(string? value)
+        {
+            value ??= string.Empty;
+            var trimmed = value.TrimStart();
+            if (value.StartsWith('\t') || value.StartsWith('\r') || value.StartsWith('\n') ||
+                (trimmed.Length > 0 && "=+-@".Contains(trimmed[0])))
+                value = "'" + value;
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        }
+
+        private static string? Format(object? value) => value switch
+        {
+            null => null,
+            bool boolean => boolean ? "true" : "false",
+            DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            DateTime dateTime => dateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => throw new ArgumentException("Unsupported CSV value.", nameof(value))
+        };
+
     }
 }

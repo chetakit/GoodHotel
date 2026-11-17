@@ -1,0 +1,78 @@
+@model GoodHotel.Models.ViewModels.MyBookingViewModel
+
+@{
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    var booking = Model;
+}
+
+<article class="room-card">
+    <div class="row g-0">
+        <div class="col-md-4 col-lg-3">
+            <img class="room-image w-100 h-100"
+                 src="@booking.ImagePath"
+                 alt="@booking.RoomType room @booking.RoomNumber"
+                 onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+        </div>
+        <div class="col-md-8 col-lg-9">
+            <div class="room-body h-100 d-flex flex-column">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                    <div>
+                        <span class="eyebrow text-dark">Booking #@booking.BookingId</span>
+                        <h3 class="h4 mt-2 mb-1">@(booking.RoomType ?? "Room")</h3>
+                        <span class="text-muted">Room @(booking.RoomNumber ?? "ไม่ระบุ")</span>
+                    </div>
+                    <span class="badge rounded-pill fs-6 @booking.StayBadgeClass">@booking.StayLabel</span>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6 col-lg-3">
+                        <small class="text-muted d-block">Check-in</small>
+                        <strong>@(booking.CheckIn?.ToString("dd MMM yyyy", culture) ?? "ไม่ระบุ")</strong>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <small class="text-muted d-block">Check-out</small>
+                        <strong>@(booking.CheckOut?.ToString("dd MMM yyyy", culture) ?? "ไม่ระบุ")</strong>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <small class="text-muted d-block">จำนวนผู้เข้าพัก</small>
+                        <strong>@(booking.Guests?.ToString() ?? "ไม่ระบุ")</strong>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <small class="text-muted d-block">จำนวนคืน</small>
+                        <strong>@(booking.NightCount?.ToString() ?? "ไม่ระบุ")</strong>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-3">
+                    <div class="room-price">
+                        <span>@(booking.Amount.HasValue ? "฿" + booking.Amount.Value.ToString("N2", culture) : "ไม่ระบุยอดรวม")</span>
+                        <small>ยอดรวม</small>
+                    </div>
+                    <p class="mt-2 mb-1">Payment: @booking.PaymentStatus</p>
+                    @if (booking.IsMockPayment)
+                    {
+                        <p>DEMO/MOCK payment; no real money was transferred.</p>
+                    }
+                    @if (booking.BookingStatus != GoodHotel.Models.BookingStatuses.Cancelled)
+                    {
+                        <p>Outstanding: @(booking.OutstandingAmount?.ToString("N2", culture) ?? "Requires review")</p>
+                    }
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <a asp-controller="Payment" asp-action="Details" asp-route-id="@booking.BookingId"
+                           class="btn btn-outline-primary">Payment details</a>
+
+                        @if (booking.CanCancel)
+                        {
+                            <form asp-controller="Home" asp-action="CancelBooking" method="post"
+                                  onsubmit="return confirm('ยืนยันยกเลิกการจอง #@booking.BookingId ?');">
+                                <input type="hidden" name="bookingId" value="@booking.BookingId" />
+                                <button type="submit" class="btn btn-outline-danger">ยกเลิกการจอง</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</article>

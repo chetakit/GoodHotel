@@ -8,7 +8,11 @@ public class AdminDashboardViewModel
 
     public int BookingCount { get; set; }
 
-    public decimal? RecordedPaymentAmount { get; set; }
+    public decimal? Revenue { get; set; }
+
+    public int OpenMaintenanceCount { get; set; }
+    public int PendingHousekeepingCount { get; set; }
+    public int AwaitingVerificationCount { get; set; }
 
     public List<DashboardBookingViewModel> BookingsByCheckInDate { get; set; } = new();
 

@@ -1,0 +1,34 @@
+@model GoodHotel.Models.ViewModels.HousekeepingDetailsViewModel
+@{
+    ViewData["Title"] = "Task Details";
+    var task = Model.Task;
+}
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Task #@task.TaskId</h2></div>
+        <dl>
+            <dt>Room</dt><dd>@(task.RoomNumber ?? "Not specified")</dd>
+            <dt>Room type</dt><dd>@(task.RoomType ?? "Not specified")</dd>
+            <dt>Task type</dt><dd>@task.TaskType</dd>
+            <dt>Status</dt><dd>@task.Status</dd>
+            <dt>Created (UTC)</dt><dd>@task.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</dd>
+            <dt>Accepted (UTC)</dt><dd>@(task.AcceptedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd>
+            <dt>Started (UTC)</dt><dd>@(task.StartedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd>
+            <dt>Completed (UTC)</dt><dd>@(task.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd>
+        </dl>
+        @if (task.Status == "Pending" && task.AssignedToUserId == null)
+        {
+            <form asp-action="Claim" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">Claim</button></form>
+        }
+        else if (Model.IsMine && task.Status == "Accepted")
+        {
+            <form asp-action="Start" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">Start</button></form>
+        }
+        else if (Model.IsMine && task.Status == "InProgress")
+        {
+            <form asp-action="Complete" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">Complete</button></form>
+        }
+        <a asp-action="Tasks" class="btn btn-outline-primary mt-3">Back to tasks</a>
+        <a asp-action="History" class="btn btn-outline-secondary mt-3">Task history</a>
+    </div>
+</section>

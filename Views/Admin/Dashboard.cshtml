@@ -24,16 +24,22 @@
         <div class="stat-card">
             <div class="label">Bookings</div>
             <div class="value">@Model.BookingCount</div>
-            <div class="trend">Total booking records</div>
+            <div class="trend">ไม่นับการจองที่ยกเลิก</div>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
         <div class="stat-card">
-            <div class="label">Recorded payment amount</div>
-            <div class="value">@(Model.RecordedPaymentAmount?.ToString("N2") ?? "N/A")</div>
-            <div class="trend">Includes all payment statuses</div>
+            <div class="label">Revenue</div>
+            <div class="value">@(Model.Revenue?.ToString("N2") ?? "N/A")</div>
+            <div class="trend">Confirmed payments less approved refunds; includes DEMO/MOCK amounts, not actual revenue</div>
         </div>
     </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-md-4"><div class="stat-card"><div class="label">Pending housekeeping</div><div class="value">@Model.PendingHousekeepingCount</div></div></div>
+    <div class="col-md-4"><div class="stat-card"><div class="label">Awaiting verification</div><div class="value">@Model.AwaitingVerificationCount</div></div></div>
+    <div class="col-md-4"><div class="stat-card"><div class="label">Open maintenance reports</div><div class="value">@Model.OpenMaintenanceCount</div></div></div>
 </div>
 
 <div class="row g-4">
@@ -84,7 +90,7 @@
 
     <div class="col-xl-4">
         <div class="booking-summary">
-            <h4 class="mb-3">Rooms by recorded status</h4>
+            <h4 class="mb-3">สถานะห้องตอนนี้</h4>
             @if (!Model.RoomStatusCounts.Any())
             {
                 <p class="text-muted mb-0">No room records.</p>
@@ -106,6 +112,6 @@
 <div class="report-card mt-4">
     <h4 class="mb-2">Payment amount note</h4>
     <p class="text-muted mb-0">
-        The amount above is the sum of payment records in the database. It includes every recorded payment status and is not classified as collected revenue.
+        This total includes DEMO/MOCK transactions and does not represent actual money received. Unreviewed legacy records are excluded.
     </p>
 </div>

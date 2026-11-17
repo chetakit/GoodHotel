@@ -1,0 +1,17 @@
+@model int
+
+<form asp-controller="Payment" asp-action="Submit" method="post" class="booking-panel mt-3">
+    <input type="hidden" name="bookingId" value="@Model" />
+    <input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
+    <p>DEMO/MOCK methods simulate payment only. No real money is transferred.</p>
+    <label for="payment-method" class="form-label">Payment method</label>
+    <select id="payment-method" name="method" class="form-select" required>
+        <option value="">Select a method</option>
+        <option value="Bank Transfer (Mock)">Bank Transfer (Mock)</option>
+        <option value="PromptPay (Mock)">PromptPay (Mock)</option>
+        <option value="PayPal (Mock)">PayPal (Mock)</option>
+        <option value="Cash">Cash at Hotel</option>
+    </select>
+    <p class="small text-muted mt-2">Cash remains pending until Staff or Admin confirms receipt.</p>
+    <button type="submit" class="btn btn-primary">Confirm Payment</button>
+</form>

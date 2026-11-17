@@ -1,20 +1,33 @@
-
+@model GoodHotel.Models.ViewModels.HousekeepingDashboardViewModel
 @{
     ViewData["Title"] = "Housekeeper Dashboard";
 }
-
-<div class="container mt-5">
-    <h2>Housekeeper Dashboard</h2>
-    <p>ยินดีต้อนรับ พนักงานแม่บ้าน</p>
-
-    <div class="card p-4 mt-3">
-        <h5>Housekeeping</h5>
-        <p>ระบบสำหรับพนักงานดูแลความสะอาดห้องพัก GoodHotel</p>
+<section class="content-section">
+    <div class="container">
+        <div class="section-heading">
+            <span class="eyebrow text-dark">Hotel Operations</span>
+            <h2>Housekeeper Dashboard</h2>
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-md-3"><div class="card p-3">Available tasks <strong>@Model.AvailableCount</strong></div></div>
+            <div class="col-md-3"><div class="card p-3">My accepted tasks <strong>@Model.AcceptedCount</strong></div></div>
+            <div class="col-md-3"><div class="card p-3">My in-progress tasks <strong>@Model.InProgressCount</strong></div></div>
+            <div class="col-md-3"><div class="card p-3">Completed today (UTC) <strong>@Model.CompletedTodayCount</strong></div></div>
+        </div>
+        <h3>My recent tasks</h3>
+        @if (Model.RecentTasks.Count == 0)
+        {
+            <p>No assigned tasks found.</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var task in Model.RecentTasks)
+                {
+                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">Task #@task.TaskId</a> — Room @(task.RoomNumber ?? "Not specified") — @task.Status</li>
+                }
+            </ul>
+        }
+        <a asp-action="Tasks" class="btn btn-primary">Cleaning Tasks</a>
     </div>
-
-    <form asp-controller="Home" asp-action="Logout" method="post">
-        <button type="submit" class="btn btn-danger mt-3">
-            Logout
-        </button>
-    </form>
-</div>
+</section>

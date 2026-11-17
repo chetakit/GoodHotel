@@ -19,7 +19,4 @@ public class CreateBookingViewModel
 
     [Range(0, 1, ErrorMessage = "จำนวนเตียงเสริมต้องเป็น 0 หรือ 1")]
     public int ExtraBedCount { get; set; }
-
-    [StringLength(64)]
-    public string? PromotionCode { get; set; }
 }

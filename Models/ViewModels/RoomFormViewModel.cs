@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace GoodHotel.Models.ViewModels;
 
@@ -25,6 +26,23 @@ public class RoomFormViewModel
     [Required]
     [StringLength(20)]
     public string? Status { get; set; } = "Available";
+
+    public string? OriginalStatus { get; set; }
+
+    public string? OriginalPreMaintenanceStatus { get; set; }
+
+    public int? OriginalMaintenanceEventId { get; set; }
+
+    public bool HasStaleRoomStatus(string? status, string? preMaintenanceStatus, int latestEventId) =>
+        !OriginalMaintenanceEventId.HasValue ||
+        !string.Equals(OriginalStatus ?? "", status ?? "", StringComparison.Ordinal) ||
+        !string.Equals(OriginalPreMaintenanceStatus ?? "", preMaintenanceStatus ?? "", StringComparison.Ordinal) ||
+        OriginalMaintenanceEventId.Value != latestEventId;
+
+    [BindNever]
+    public bool RequiresMaintenanceReview { get; set; }
+
+    public bool ConfirmMaintenanceReview { get; set; }
 
     [Required]
     [Range(typeof(decimal), "0.01", "99999999.99")]

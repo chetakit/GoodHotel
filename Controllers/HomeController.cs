@@ -21,9 +21,8 @@ public class HomeController : Controller
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly IWebHostEnvironment _environment;
     private readonly BookingService _bookingService;
-    private readonly PromotionMetadataService _promotionMetadata;
-    private readonly PromotionValidationService _promotionValidation;
-    private readonly TimeProvider _timeProvider;
+    private readonly RoomAvailabilityService _availability;
+    private readonly BookingCancellationService _cancellation;
 
     public HomeController(
         GoodHotelDbContext db,
@@ -31,18 +30,16 @@ public class HomeController : Controller
         IPasswordHasher<User> passwordHasher,
         IWebHostEnvironment environment,
         BookingService bookingService,
-        PromotionMetadataService promotionMetadata,
-        PromotionValidationService promotionValidation,
-        TimeProvider timeProvider)
+        RoomAvailabilityService availability,
+        BookingCancellationService cancellation)
     {
+        _cancellation = cancellation;
         _db = db;
         _logger = logger;
         _passwordHasher = passwordHasher;
         _environment = environment;
         _bookingService = bookingService;
-        _promotionMetadata = promotionMetadata;
-        _promotionValidation = promotionValidation;
-        _timeProvider = timeProvider;
+        _availability = availability;
     }
 
     public async Task<IActionResult> Index()
@@ -70,47 +67,24 @@ public class HomeController : Controller
                 room.ImagePath);
         }
 
-        var promotionEntities = await _db.Promotions
-            .AsNoTracking()
-            .OrderBy(promotion => promotion.PromotionId)
-            .ToListAsync();
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        var promotions = promotionEntities
-            .Select(promotion =>
-            {
-                var parsed = _promotionMetadata.Parse(promotion.Condition);
-                var metadata = parsed.Metadata;
-                return new PromotionListViewModel
-                {
-                    PromotionId = promotion.PromotionId,
-                    PromotionName = promotion.PromotionName,
-                    Description = promotion.Description,
-                    Condition = parsed.IsLegacy ? promotion.Condition : null,
-                    Benefit = promotion.Benefit,
-                    PromotionCode = metadata?.Code,
-                    DiscountType = metadata?.DiscountType,
-                    DiscountValue = metadata?.DiscountValue,
-                    StartDate = metadata?.StartDate,
-                    EndDate = metadata?.EndDate,
-                    IsActive = metadata?.IsActive,
-                    IsLegacyPromotion = parsed.IsLegacy,
-                    MetadataError = parsed.Error
-                };
-            })
-            .Where(promotion =>
-                promotion.IsLegacyPromotion ||
-                (promotion.IsActive == true &&
-                 promotion.StartDate <= today &&
-                 promotion.EndDate >= today))
-            .ToList();
-
         var model = new HomeViewModel
         {
             FeaturedRooms = featuredRooms,
-            Promotions = promotions
+            Promotions = await LoadOpenPromotionsAsync()
         };
 
         return View(model);
+    }
+
+    /// <summary>โปรที่เปิดอยู่และยังไม่หมดเขต สำหรับแสดงให้ลูกค้าเห็น</summary>
+    private async Task<List<PromotionListViewModel>> LoadOpenPromotionsAsync()
+    {
+        var today = _availability.HotelToday();
+        var promotions = await _db.Promotions.AsNoTracking()
+            .Where(p => p.IsActive && p.RuleType != null && (p.EndDate == null || p.EndDate >= today))
+            .OrderBy(p => p.PromotionId)
+            .ToListAsync();
+        return promotions.Select(PromotionListViewModel.From).ToList();
     }
 
     public IActionResult UserList()
@@ -122,6 +96,7 @@ public class HomeController : Controller
     [HttpGet]
     public async Task<IActionResult> Rooms(AvailabilitySearchViewModel search)
     {
+        ViewData["HotelToday"] = _availability.HotelToday();
         search.HasSearched = false;
         search.HasSearchCriteria =
             Request.Query.ContainsKey(nameof(search.CheckIn)) ||
@@ -138,7 +113,7 @@ public class HomeController : Controller
                     nameof(search.CheckIn),
                     "กรุณาเลือกวันที่เข้าพัก");
             }
-            else if (search.CheckIn.Value < DateOnly.FromDateTime(DateTime.Today))
+            else if (search.CheckIn.Value < _availability.HotelToday())
             {
                 ModelState.AddModelError(
                     nameof(search.CheckIn),
@@ -168,20 +143,12 @@ public class HomeController : Controller
 
             if (ModelState.IsValid)
             {
-                var checkIn = search.CheckIn!.Value;
-                var checkOut = search.CheckOut!.Value;
                 var guests = search.Guests!.Value;
 
                 roomsQuery = roomsQuery
                     .Where(room =>
-                        room.Status == "Available" &&
                         room.Capacity.HasValue &&
-                        room.Capacity.Value >= guests &&
-                        !room.Bookings.Any(booking =>
-                            booking.CheckIn.HasValue &&
-                            booking.CheckOut.HasValue &&
-                            booking.CheckIn.Value < checkOut &&
-                            booking.CheckOut.Value > checkIn));
+                        room.Capacity.Value >= guests);
 
                 search.HasSearched = true;
             }
@@ -201,6 +168,15 @@ public class HomeController : Controller
                 Description = room.Description
             })
             .ToListAsync();
+
+        if (search.HasSearched)
+        {
+            var blocked = await _availability.GetBlockedPeriodsAsync(
+                search.Rooms.Select(room => room.RoomId).ToArray(),
+                search.CheckIn!.Value, search.CheckOut!.Value, HttpContext.RequestAborted);
+            var blockedIds = blocked.Select(period => period.RoomId).ToHashSet();
+            search.Rooms = search.Rooms.Where(room => !blockedIds.Contains(room.RoomId)).ToList();
+        }
 
         foreach (var room in search.Rooms)
         {
@@ -228,7 +204,7 @@ public class HomeController : Controller
         }
 
         var monthStart = new DateOnly(year.Value, month.Value, 1);
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = _availability.HotelToday();
 
         DateOnly monthEnd;
         try
@@ -262,6 +238,7 @@ public class HomeController : Controller
         var bookingPeriods = await _db.Bookings
             .AsNoTracking()
             .Where(booking =>
+                booking.Status != BookingStatuses.Cancelled &&
                 booking.RoomId == room.RoomId &&
                 booking.CheckIn.HasValue &&
                 booking.CheckOut.HasValue &&
@@ -274,16 +251,20 @@ public class HomeController : Controller
             })
             .ToListAsync(cancellationToken);
 
+        var blockedPeriods = (await _availability.GetBlockedPeriodsAsync(
+            new[] { room.RoomId }, monthStart, monthEnd, cancellationToken))
+            .Select(period => new
+            {
+                CheckIn = !period.Start.HasValue || period.Start < monthStart ? monthStart : period.Start.Value,
+                CheckOut = !period.End.HasValue || period.End > monthEnd ? monthEnd : period.End.Value
+            }).ToList();
+
         var days = new List<object>(DateTime.DaysInMonth(
             monthStart.Year,
             monthStart.Month));
         for (var date = monthStart; date < monthEnd; date = date.AddDays(1))
         {
-            var occupied = !string.Equals(
-                               room.Status,
-                               "Available",
-                               StringComparison.OrdinalIgnoreCase) ||
-                           bookingPeriods.Any(period =>
+            var occupied = blockedPeriods.Any(period =>
                                period.CheckIn <= date &&
                                period.CheckOut > date);
             days.Add(new
@@ -316,13 +297,18 @@ public class HomeController : Controller
                     "yyyy-MM-dd",
                     System.Globalization.CultureInfo.InvariantCulture)
             }),
+            BlockedPeriods = blockedPeriods.Select(period => new
+            {
+                CheckIn = period.CheckIn.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                CheckOut = period.CheckOut.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+            }),
             Days = days
         });
     }
 
-    public IActionResult Promotion()
+    public async Task<IActionResult> Promotion()
     {
-        return View();
+        return View(await LoadOpenPromotionsAsync());
     }
 
     [HttpGet]
@@ -355,12 +341,52 @@ public class HomeController : Controller
                 CheckIn = booking.CheckIn,
                 CheckOut = booking.CheckOut,
                 Guests = booking.Guests,
-                Amount = booking.Amount
+                Amount = booking.Amount,
+                BookingStatus = booking.Status,
+                StayStatus = _db.BookingStays
+                    .Where(stay => stay.BookingId == booking.BookingId)
+                    .Select(stay => stay.Status)
+                    .FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
 
+        var today = _availability.HotelToday();
         foreach (var booking in bookings)
         {
+            booking.CanCancel = BookingCancellationService.CanCancel(
+                booking.BookingStatus, booking.CheckIn, booking.StayStatus != null, today);
+            booking.IsHistory = booking.BookingStatus == BookingStatuses.Cancelled ||
+                                booking.StayStatus == "CheckedOut" ||
+                                (booking.StayStatus == null && booking.CheckOut <= today);
+        }
+
+        var paymentRows = await _db.Payments.AsNoTracking()
+            .Where(p => p.Booking != null && p.Booking.UserId == userId)
+            .Select(p => new { p.BookingId, p.PaymentId, p.PaymentMethod, p.PaymentStatus, p.Amount,
+                p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition })
+            .ToListAsync(cancellationToken);
+        var refunds = await _db.PaymentRefunds.AsNoTracking()
+            .Where(r => r.Payment.Booking != null && r.Payment.Booking.UserId == userId && r.Status == "Approved")
+            .Select(r => new { r.Payment.BookingId, r.PaymentId, r.Amount }).ToListAsync(cancellationToken);
+
+        foreach (var booking in bookings)
+        {
+            var records = paymentRows.Where(p => p.BookingId == booking.BookingId).ToList();
+            var needsReview = records.Any(p => p.SubmittedAtUtc == null && p.VerifiedAtUtc == null &&
+                p.LegacyDisposition == null);
+            var confirmedPayment = records.Where(p => p.VerifiedAtUtc != null)
+                .OrderBy(p => p.PaymentId).FirstOrDefault();
+            var paid = confirmedPayment?.Amount ?? 0m;
+            var refunded = refunds.Where(r => r.BookingId == booking.BookingId &&
+                r.PaymentId == confirmedPayment?.PaymentId).Sum(r => r.Amount);
+            booking.OutstandingAmount = needsReview || !booking.Amount.HasValue
+                ? null : booking.Amount.Value - paid + refunded;
+            booking.IsMockPayment = confirmedPayment != null && PaymentService.IsMockMethod(confirmedPayment.PaymentMethod);
+            booking.PaymentStatus = needsReview ? "Requires reconciliation" :
+                confirmedPayment != null ? (paid > 0 && refunded >= paid ? "Refunded" : "Paid") :
+                records.Where(p => p.SubmittedAtUtc != null || p.VerifiedAtUtc != null)
+                    .OrderByDescending(p => p.VerifiedAtUtc != null)
+                    .ThenByDescending(p => p.PaymentId).Select(p => p.PaymentStatus).FirstOrDefault() ?? "Not submitted";
             booking.ImagePath = RoomImageStorage.GetDisplayPath(
                 _environment.WebRootPath,
                 booking.ImagePath);
@@ -374,6 +400,21 @@ public class HomeController : Controller
         }
 
         return View(bookings);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Customer")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelBooking(int bookingId, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
+        {
+            return Forbid();
+        }
+
+        var result = await _cancellation.CancelAsync(bookingId, userId, cancellationToken);
+        TempData[result.Succeeded ? "BookingSuccess" : "BookingError"] = result.Message;
+        return RedirectToAction(nameof(MyBookings));
     }
 
     [HttpGet]
@@ -400,6 +441,7 @@ public class HomeController : Controller
         };
         var model = await _bookingService.PrepareConfirmationAsync(
             request,
+            CurrentCustomerId(),
             cancellationToken);
         return View(model);
     }
@@ -415,147 +457,47 @@ public class HomeController : Controller
             !TryParseBookingDate(request.CheckIn, out var checkIn) ||
             !TryParseBookingDate(request.CheckOut, out var checkOut))
         {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "InvalidRequest",
-                "ข้อมูลการเข้าพักไม่ถูกต้อง"));
+            return BadRequest(new ApplyPromotionResponseViewModel(false, "ข้อมูลการเข้าพักไม่ถูกต้อง"));
         }
 
-        var today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
-        if (checkIn < today || checkOut <= checkIn)
-        {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "InvalidRequest",
-                "กรุณาตรวจสอบวันที่เข้าพักและวันที่ออก"));
-        }
-
-        var room = await _db.Rooms
-            .AsNoTracking()
-            .Where(item => item.RoomId == request.RoomId)
-            .Select(item => new
+        // ใช้ logic เดียวกับหน้ายืนยันการจอง: ตรวจห้อง + คำนวณราคา + เลือกโปรที่ดีที่สุด
+        var quote = await _bookingService.PrepareConfirmationAsync(
+            new CreateBookingViewModel
             {
-                item.RoomId,
-                item.Status,
-                item.Rate,
-                item.Capacity
-            })
-            .SingleOrDefaultAsync(cancellationToken);
+                RoomId = request.RoomId,
+                CheckIn = checkIn,
+                CheckOut = checkOut,
+                Guests = request.Guests,
+                ExtraBedCount = request.ExtraBedCount
+            },
+            CurrentCustomerId(),
+            cancellationToken);
 
-        if (room == null ||
-            room.Status != "Available" ||
-            !room.Capacity.HasValue ||
-            (long)request.Guests >
-                (long)room.Capacity.Value + request.ExtraBedCount ||
-            !room.Rate.HasValue ||
-            room.Rate.Value <= 0)
+        if (!quote.CanConfirm)
         {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "InvalidRequest",
-                room == null
-                    ? "ไม่พบห้องพักที่เลือก"
-                    : room.Status != "Available"
-                        ? "ห้องพักนี้ไม่พร้อมให้จอง"
-                        : room.Capacity.HasValue &&
-                      (long)request.Guests >
-                          (long)room.Capacity.Value + request.ExtraBedCount
-                        ? "จำนวนผู้เข้าพักเกินความจุของห้องรวมเตียงเสริม"
-                        : "ไม่สามารถยืนยันราคาให้ห้องนี้ได้"));
-        }
-
-        var hasOverlap = await _db.Bookings
-            .AsNoTracking()
-            .AnyAsync(
-                booking =>
-                    booking.RoomId == room.RoomId &&
-                    booking.CheckIn.HasValue &&
-                    booking.CheckOut.HasValue &&
-                    booking.CheckIn.Value < checkOut &&
-                    booking.CheckOut.Value > checkIn,
-                cancellationToken);
-
-        if (hasOverlap)
-        {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "RoomUnavailable",
-                "ห้องพักถูกจองแล้วในช่วงวันที่เลือก"));
-        }
-
-        var nightCount = checkOut.DayNumber - checkIn.DayNumber;
-        decimal roomSubtotal;
-        decimal extraBedAmount;
-        try
-        {
-            roomSubtotal = checked(room.Rate.Value * nightCount);
-            extraBedAmount = checked(500m * request.ExtraBedCount * nightCount);
-        }
-        catch (OverflowException)
-        {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "InvalidRequest",
-                "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
-        }
-
-        if (roomSubtotal <= 0 || roomSubtotal > 99999999.99m)
-        {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "InvalidRequest",
-                "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
-        }
-
-        var promotionCode = request.PromotionCode?.Trim();
-        var discountAmount = 0m;
-        var promotionStatus = "NoCode";
-        var message = "ยังไม่ได้ใช้ Promotion Code";
-
-        if (!string.IsNullOrEmpty(promotionCode))
-        {
-            var validation = await _promotionValidation.ValidateAsync(
-                promotionCode,
-                roomSubtotal,
-                cancellationToken);
-            promotionStatus = validation.Status.ToString();
-            message = validation.Message;
-            if (validation.Succeeded)
-            {
-                discountAmount = validation.DiscountAmount!.Value;
-            }
-        }
-        decimal totalAmount;
-        try
-        {
-            totalAmount = checked(roomSubtotal - discountAmount + extraBedAmount);
-        }
-        catch (OverflowException)
-        {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "InvalidRequest",
-                "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
-        }
-
-        if (totalAmount > 99999999.99m)
-        {
-            return BadRequest(new ApplyPromotionResponseViewModel(
-                false,
-                "InvalidRequest",
-                "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
+            return BadRequest(new ApplyPromotionResponseViewModel(false, quote.StatusMessage ?? "ข้อมูลไม่ถูกต้อง"));
         }
 
         return Json(new ApplyPromotionResponseViewModel(
             true,
-            promotionStatus,
-            message,
-            nightCount,
-            roomSubtotal,
-            discountAmount,
-            extraBedAmount,
-            totalAmount));
+            PromotionMessage(quote.PromotionName),
+            quote.PromotionName,
+            quote.NightCount,
+            quote.RoomSubtotal,
+            quote.DiscountAmount,
+            quote.ExtraBedAmount,
+            quote.TotalAmount));
     }
+
+    private static string PromotionMessage(string? promotionName) =>
+        promotionName == null
+            ? "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชั่น"
+            : $"ได้รับโปรโมชั่น \"{promotionName}\" อัตโนมัติ";
+
+    private int? CurrentCustomerId() =>
+        User.IsInRole("Customer") && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0
+            ? id
+            : null;
 
     [HttpPost]
     [Authorize(Roles = "Customer")]
@@ -566,7 +508,6 @@ public class HomeController : Controller
         [FromForm] string? checkOut,
         [FromForm] int? guests,
         [FromForm] int extraBedCount,
-        [FromForm] string? promotionCode,
         CancellationToken cancellationToken)
     {
         var parsedCheckIn = TryParseBookingDate(
@@ -582,8 +523,7 @@ public class HomeController : Controller
             CheckIn = parsedCheckIn ? checkInDate : null,
             CheckOut = parsedCheckOut ? checkOutDate : null,
             Guests = guests,
-            ExtraBedCount = extraBedCount,
-            PromotionCode = promotionCode
+            ExtraBedCount = extraBedCount
         };
 
         if (!parsedCheckIn)
@@ -627,6 +567,7 @@ public class HomeController : Controller
         {
             var invalidModel = await _bookingService.PrepareConfirmationAsync(
                 request,
+                userId,
                 cancellationToken);
             return View(invalidModel);
         }
@@ -639,10 +580,36 @@ public class HomeController : Controller
         if (result.Status is BookingSaveStatus.Created or
             BookingSaveStatus.AlreadyExists)
         {
+            var paymentRows = await _db.Payments.AsNoTracking()
+                .Where(payment => payment.BookingId == result.BookingId)
+                .Select(payment => new
+                {
+                    payment.PaymentId, payment.PaymentMethod, payment.PaymentStatus, payment.Amount, payment.SubmittedAtUtc,
+                    payment.VerifiedAtUtc, payment.LegacyDisposition,
+                    Refunded = payment.Refunds.Where(refund => refund.Status == "Approved")
+                        .Sum(refund => (decimal?)refund.Amount) ?? 0m
+                }).ToListAsync(cancellationToken);
+            var needsReview = paymentRows.Any(payment => payment.SubmittedAtUtc == null &&
+                payment.VerifiedAtUtc == null && payment.LegacyDisposition == null);
+            var confirmed = paymentRows.Where(payment => payment.VerifiedAtUtc != null)
+                .OrderBy(payment => payment.PaymentId).FirstOrDefault();
+            var pending = paymentRows.Any(payment => payment.SubmittedAtUtc != null &&
+                payment.VerifiedAtUtc == null && (payment.PaymentStatus == "Pending" || payment.PaymentStatus == "Submitted"));
+            var paymentStatus = needsReview ? "Requires reconciliation" :
+                confirmed != null
+                    ? (confirmed.Amount > 0 && confirmed.Refunded >= confirmed.Amount
+                        ? "Refunded" : "Paid")
+                    : paymentRows.Where(payment => payment.SubmittedAtUtc != null)
+                        .OrderByDescending(payment => payment.PaymentId)
+                        .Select(payment => payment.PaymentStatus).FirstOrDefault() ?? "Not submitted";
             return View(new BookingConfirmationViewModel
             {
                 IsSaved = true,
                 SavedBookingId = result.BookingId,
+                PaymentStatus = paymentStatus,
+                IsMockPayment = confirmed != null && PaymentService.IsMockMethod(confirmed.PaymentMethod),
+                CanSubmitPayment = result.BookingId.HasValue && result.Amount > 0 &&
+                    !needsReview && confirmed == null && !pending,
                 EstimatedAmount = result.Amount,
                 RoomSubtotal = result.RoomSubtotal,
                 DiscountAmount = result.DiscountAmount,
@@ -650,16 +617,14 @@ public class HomeController : Controller
                 TotalAmount = result.Amount,
                 ExtraBedCount = result.ExtraBedCount,
                 PromotionId = result.PromotionId,
-                PromotionCode = result.PromotionCode,
-                StatusMessage = result.Message,
-                PromotionStatusMessage = result.PromotionCode == null
-                    ? null
-                    : "ใช้ Promotion Code สำเร็จ"
+                PromotionName = result.PromotionName,
+                StatusMessage = result.Message
             });
         }
 
         var model = await _bookingService.PrepareConfirmationAsync(
             request,
+            userId,
             cancellationToken);
         model.StatusMessage = result.Message;
         return View(model);
@@ -775,7 +740,7 @@ public class HomeController : Controller
 
         var user = _db.Users.FirstOrDefault(u => u.Email == email);
 
-        if (user == null || string.IsNullOrEmpty(user.Password))
+        if (user == null || !user.IsActive || string.IsNullOrEmpty(user.Password))
         {
             ViewBag.Status = "Email หรือ Password ไม่ถูกต้อง";
             return View(data);
