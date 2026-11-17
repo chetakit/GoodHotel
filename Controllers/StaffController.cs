@@ -100,7 +100,7 @@ namespace GoodHotel.Controllers
         {
             if (bookingId.HasValue && bookingId.Value <= 0)
             {
-                ModelState.AddModelError(nameof(bookingId), "Booking ID must be a positive number.");
+                ModelState.AddModelError(nameof(bookingId), "เลขที่การจองต้องเป็นจำนวนบวก");
             }
 
             if (!ModelState.IsValid)
@@ -213,7 +213,7 @@ namespace GoodHotel.Controllers
             var actorId = await GetActorIdAsync(ct);
             if (!actorId.HasValue) return Forbid();
             var error = await _stays.CheckInAsync(bookingId, actorId.Value, note, ct);
-            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "Check-in completed.";
+            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "เช็คอินเรียบร้อย";
             return RedirectToAction(nameof(BookingDetails), new { id = bookingId });
         }
 
@@ -235,7 +235,7 @@ namespace GoodHotel.Controllers
             var actorId = await GetActorIdAsync(ct);
             if (!actorId.HasValue) return Forbid();
             var error = await _stays.CheckOutAsync(bookingId, actorId.Value, ct);
-            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "Check-out completed; cleaning task created.";
+            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "เช็คเอาท์เรียบร้อย ส่งงานทำความสะอาดให้แม่บ้านแล้ว";
             return RedirectToAction(nameof(BookingDetails), new { id = bookingId });
         }
 
@@ -343,8 +343,8 @@ namespace GoodHotel.Controllers
             if (!actorId.HasValue) return Forbid();
             var verified = await _housekeeping.VerifyAsync(id, actorId.Value, ct);
             TempData[verified ? "StaffSuccess" : "StaffError"] = verified
-                ? "Task verified."
-                : "Task not found, already changed, or cannot be verified by its assignee or completer.";
+                ? "ตรวจผ่านแล้ว ห้องกลับมาว่างให้จองได้"
+                : "ตรวจงานนี้ไม่ได้ (งานถูกเปลี่ยนไปแล้ว หรือคุณเป็นคนทำงานนี้เอง)";
             return RedirectToAction(nameof(VerificationTasks));
         }
 

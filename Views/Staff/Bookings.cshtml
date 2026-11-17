@@ -1,29 +1,28 @@
 @model IReadOnlyList<GoodHotel.Controllers.StaffController.BookingListItem>
 
 @{
-    ViewData["Title"] = "Booking Overview";
-    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    ViewData["Title"] = "รายการจอง";
 }
 
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Hotel Operations</span>
-            <h2>Booking Overview</h2>
-            <p class="text-muted">Search and review bookings for reception operations.</p>
+            <span class="eyebrow text-dark">Front Desk</span>
+            <h2>รายการจอง</h2>
+            <p class="text-muted">ค้นหาและตรวจสอบการจองของลูกค้า</p>
         </div>
 
         <div class="booking-panel mb-4">
             <form asp-controller="Staff" asp-action="Bookings" method="get" class="row g-3 align-items-end">
                 <div class="col-sm-6 col-lg-4">
-                    <label for="bookingId" class="form-label">Booking ID</label>
+                    <label for="bookingId" class="form-label">เลขที่การจอง</label>
                     <input id="bookingId" name="bookingId" type="number" min="1"
                            class="form-control" value="@Context.Request.Query["bookingId"]" />
                     @Html.ValidationMessage("bookingId", new { @class = "text-danger" })
                 </div>
                 <div class="col-auto">
-                    <button type="submit" class="btn btn-primary">Search</button>
-                    <a asp-controller="Staff" asp-action="Bookings" class="btn btn-outline-primary">Clear</a>
+                    <button type="submit" class="btn btn-primary">ค้นหา</button>
+                    <a asp-controller="Staff" asp-action="Bookings" class="btn btn-outline-primary">ล้าง</a>
                 </div>
             </form>
         </div>
@@ -32,7 +31,7 @@
         {
             @if (Model.Count == 0)
             {
-                <div class="alert alert-light border" role="status">No bookings found.</div>
+                <div class="alert alert-light border" role="status">ไม่พบการจอง</div>
             }
             else
             {
@@ -40,45 +39,44 @@
                     <table class="table align-middle">
                         <thead>
                             <tr>
-                                <th>Booking ID</th>
-                                <th>Customer</th>
-                                <th>Room</th>
-                                <th>Check-in</th>
-                                <th>Check-out</th>
-                                <th>Guests</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th>Payment</th>
-                                <th>Action</th>
+                                <th>เลขที่</th>
+                                <th>ลูกค้า</th>
+                                <th>ห้อง</th>
+                                <th>วันเข้าพัก</th>
+                                <th>วันออก</th>
+                                <th>ผู้เข้าพัก</th>
+                                <th>ยอดรวม</th>
+                                <th>สถานะ</th>
+                                <th>การชำระเงิน</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var booking in Model)
                             {
                                 var customerName = $"{booking.FirstName} {booking.LastName}".Trim();
+                                var isCancelled = booking.BookingStatus == BookingStatuses.Cancelled;
                                 <tr>
-                                    <td>@booking.BookingId</td>
-                                    <td>@(string.IsNullOrWhiteSpace(customerName) ? "Not specified" : customerName)</td>
-                                    <td>@(string.IsNullOrWhiteSpace(booking.RoomNumber) ? "Not specified" : booking.RoomNumber)</td>
-                                    <td>@(booking.CheckIn?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</td>
-                                    <td>@(booking.CheckOut?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</td>
-                                    <td>@(booking.Guests?.ToString(culture) ?? "Not specified")</td>
-                                    <td>@(booking.Amount?.ToString("N2", culture) ?? "Not specified")</td>
+                                    <td>#@booking.BookingId</td>
+                                    <td>@ThaiText.OrDash(customerName)</td>
+                                    <td>@ThaiText.OrDash(booking.RoomNumber)</td>
+                                    <td>@ThaiText.Date(booking.CheckIn)</td>
+                                    <td>@ThaiText.Date(booking.CheckOut)</td>
+                                    <td>@(booking.Guests?.ToString() ?? "-")</td>
+                                    <td>@(booking.Amount.HasValue ? $"฿{booking.Amount:N2}" : "-")</td>
                                     <td>
-                                        <span class="badge @(booking.BookingStatus == GoodHotel.Models.BookingStatuses.Cancelled ? "text-bg-secondary" : "text-bg-primary")">
-                                            @booking.BookingStatus
+                                        <span class="badge @(isCancelled ? "text-bg-secondary" : "text-bg-primary")">
+                                            @ThaiText.Status(booking.BookingStatus)
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge @(booking.PaymentLabel == GoodHotel.Services.PaymentService.PaidLabel ? "text-bg-success" : "text-bg-warning")">
+                                        <span class="badge @(booking.PaymentLabel == PaymentService.PaidLabel ? "text-bg-success" : "text-bg-warning")">
                                             @booking.PaymentLabel
                                         </span>
                                     </td>
                                     <td>
                                         <a asp-controller="Staff" asp-action="BookingDetails"
-                                           asp-route-id="@booking.BookingId" class="btn btn-sm btn-outline-primary">
-                                            Details
-                                        </a>
+                                           asp-route-id="@booking.BookingId" class="btn btn-sm btn-outline-primary">ดูรายละเอียด</a>
                                     </td>
                                 </tr>
                             }
@@ -88,6 +86,6 @@
             }
         }
 
-        <a asp-controller="Staff" asp-action="Index" class="btn btn-outline-primary mt-4">Staff Dashboard</a>
+        <a asp-controller="Staff" asp-action="Index" class="btn btn-outline-primary mt-4">กลับแดชบอร์ด</a>
     </div>
 </section>

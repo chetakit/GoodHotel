@@ -2,7 +2,7 @@
 
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Employees";
+    ViewData["Title"] = "พนักงาน";
     var employees = Model.ToList();
     var roles = new[] { "Staff", "Housekeeper" };
     var groups = roles.Select(role => new
@@ -15,30 +15,30 @@
         !roles.Any(role => string.Equals(employee.Role, role, StringComparison.OrdinalIgnoreCase))).ToList();
     if (otherEmployees.Count > 0)
     {
-        groups.Add(new { Role = "Other", Employees = otherEmployees });
+        groups.Add(new { Role = "อื่นๆ", Employees = otherEmployees });
     }
 }
 
 <div class="table-panel">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Employee directory</h4>
+        <h4 class="mb-0">รายชื่อพนักงาน</h4>
     </div>
 
     @foreach (var group in groups)
     {
         <section class="mt-4">
-            <h5>@group.Role</h5>
+            <h5>@ThaiText.Status(group.Role)</h5>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th>User ID</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Role</th>
-                            <th>Status</th>
-                            <th>Action</th>
+                            <th>รหัส</th>
+                            <th>ชื่อ</th>
+                            <th>อีเมล</th>
+                            <th>เบอร์โทร</th>
+                            <th>บทบาท</th>
+                            <th>สถานะ</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -46,7 +46,7 @@
                         {
                             <tr>
                                 <td colspan="7" class="text-center text-muted">
-                                    No @group.Role employees found.
+                                    ไม่มีพนักงานตำแหน่งนี้
                                 </td>
                             </tr>
                         }
@@ -59,14 +59,14 @@
                                     <td>@employee.FirstName @employee.LastName</td>
                                     <td>@employee.Email</td>
                                     <td>@employee.Phone</td>
-                                    <td>@employee.Role</td>
-                                    <td>@(employee.IsActive ? "Active" : "Inactive")</td>
+                                    <td>@ThaiText.Status(employee.Role)</td>
+                                    <td>@(employee.IsActive ? "ใช้งานอยู่" : "ปิดการใช้งาน")</td>
                                     <td>
                                         <a asp-controller="Admin"
                                            asp-action="EmployeeProfile"
                                            asp-route-id="@employee.UserId"
                                            class="btn btn-sm btn-outline-secondary">
-                                            Profile
+                                            ดูข้อมูล
                                         </a>
                                     </td>
                                 </tr>

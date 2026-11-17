@@ -1,34 +1,34 @@
 @model GoodHotel.Models.ViewModels.HousekeepingDetailsViewModel
 @{
-    ViewData["Title"] = "Task Details";
+    ViewData["Title"] = "รายละเอียดงาน";
     var task = Model.Task;
 }
 <section class="content-section">
     <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Task #@task.TaskId</h2></div>
+        <div class="section-heading"><span class="eyebrow text-dark">Housekeeping</span><h2>งาน #@task.TaskId</h2></div>
         <dl>
-            <dt>Room</dt><dd>@(task.RoomNumber ?? "Not specified")</dd>
-            <dt>Room type</dt><dd>@(task.RoomType ?? "Not specified")</dd>
-            <dt>Task type</dt><dd>@task.TaskType</dd>
-            <dt>Status</dt><dd>@task.Status</dd>
-            <dt>Created (UTC)</dt><dd>@task.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</dd>
-            <dt>Accepted (UTC)</dt><dd>@(task.AcceptedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd>
-            <dt>Started (UTC)</dt><dd>@(task.StartedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd>
-            <dt>Completed (UTC)</dt><dd>@(task.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</dd>
+            <dt>ห้อง</dt><dd>@ThaiText.OrDash(task.RoomNumber)</dd>
+            <dt>ประเภทห้อง</dt><dd>@ThaiText.OrDash(task.RoomType)</dd>
+            <dt>ประเภทงาน</dt><dd>@ThaiText.Status(task.TaskType)</dd>
+            <dt>สถานะ</dt><dd>@ThaiText.Status(task.Status)</dd>
+            <dt>สร้างงานเมื่อ</dt><dd>@ThaiText.Time(task.CreatedAtUtc)</dd>
+            <dt>รับงานเมื่อ</dt><dd>@ThaiText.Time(task.AcceptedAtUtc)</dd>
+            <dt>เริ่มทำเมื่อ</dt><dd>@ThaiText.Time(task.StartedAtUtc)</dd>
+            <dt>ทำเสร็จเมื่อ</dt><dd>@ThaiText.Time(task.CompletedAtUtc)</dd>
         </dl>
         @if (task.Status == "Pending" && task.AssignedToUserId == null)
         {
-            <form asp-action="Claim" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">Claim</button></form>
+            <form asp-action="Claim" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">รับงาน</button></form>
         }
         else if (Model.IsMine && task.Status == "Accepted")
         {
-            <form asp-action="Start" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">Start</button></form>
+            <form asp-action="Start" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">เริ่มทำ</button></form>
         }
         else if (Model.IsMine && task.Status == "InProgress")
         {
-            <form asp-action="Complete" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">Complete</button></form>
+            <form asp-action="Complete" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">ทำเสร็จแล้ว</button></form>
         }
-        <a asp-action="Tasks" class="btn btn-outline-primary mt-3">Back to tasks</a>
-        <a asp-action="History" class="btn btn-outline-secondary mt-3">Task history</a>
+        <a asp-action="Tasks" class="btn btn-outline-primary mt-3">กลับไปรายการงาน</a>
+        <a asp-action="History" class="btn btn-outline-secondary mt-3">ประวัติงาน</a>
     </div>
 </section>

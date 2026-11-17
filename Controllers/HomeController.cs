@@ -742,7 +742,7 @@ public class HomeController : Controller
 
         if (user == null || !user.IsActive || string.IsNullOrEmpty(user.Password))
         {
-            ViewBag.Status = "Email หรือ Password ไม่ถูกต้อง";
+            ViewBag.Status = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
             return View(data);
         }
 
@@ -768,7 +768,7 @@ public class HomeController : Controller
             // ตรวจสอบรหัสผ่านเก่า
             if (user.Password != data.Password)
             {
-                ViewBag.Status = "Email หรือ Password ไม่ถูกต้อง";
+                ViewBag.Status = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
                 return View(data);
             }
 

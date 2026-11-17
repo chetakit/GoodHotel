@@ -1,7 +1,7 @@
 ﻿@model GoodHotel.Models.ViewModels.HomeViewModel
 
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "หน้าแรก";
 }
 
 <section class="page-hero">
@@ -10,11 +10,11 @@
             <div class="col-lg-7">
                 <div class="hero-content">
                     <span class="eyebrow">Boutique Hotel Experience</span>
-                    <h1>Stay beautifully at Good Hotel</h1>
+                    <h1>พักผ่อนอย่างมีสไตล์ที่ Good Hotel</h1>
                     <p class="hero-subtitle">พักผ่อนในสภาพแวดล้อมที่ผ่อนคลาย พร้อมบริการระดับพรีเมียม เสียงเพลงอ่อน ๆ ของเมืองและห้องพักที่ออกแบบเพื่อความสบายทุกช่วงเวลา</p>
                     <div class="hero-actions">
                         <a asp-controller="Home" asp-action="Rooms" class="btn btn-primary hotel-primary-btn">ค้นหาห้องพัก</a>
-                        <a asp-controller="Home" asp-action="Rooms" class="btn btn-outline-light">Book a stay</a>
+                        <a asp-controller="Home" asp-action="Rooms" class="btn btn-outline-light">จองห้องพัก</a>
                     </div>
                 </div>
             </div>
@@ -52,7 +52,7 @@
                                    required />
                         </div>
                         <div class="col-12">
-                            <button type="submit" class="btn btn-primary hotel-primary-btn w-100">Check availability</button>
+                            <button type="submit" class="btn btn-primary hotel-primary-btn w-100">ค้นหาห้องว่าง</button>
                         </div>
                     </form>
                 </div>
@@ -92,13 +92,13 @@
                                 <div class="room-meta">
                                     <div>
                                         <h4 class="mb-1">@room.Type</h4>
-                                        <span class="text-muted">Room @room.RoomNumber</span>
+                                        <span class="text-muted">@room.RoomNumber</span>
                                     </div>
                                     <span class="badge-status available">@room.Status</span>
                                 </div>
                                 <div class="room-price">
                                     @(room.Rate.HasValue ? $"฿{room.Rate.Value:N2}" : "ราคาไม่ระบุ")
-                                    <small>/night</small>
+                                    <small>/คืน</small>
                                 </div>
                                 <div class="room-features">
                                     @if (room.Capacity.HasValue)
@@ -113,7 +113,7 @@
                                 <a asp-controller="Home"
                                    asp-action="Rooms"
                                    class="btn btn-primary hotel-primary-btn w-100">
-                                    Book Now
+                                    จองเลย
                                 </a>
                             </div>
                         </article>
@@ -128,7 +128,7 @@
     <div class="container">
         <div class="section-heading">
             <span class="eyebrow text-dark">Exclusive Offers</span>
-            <h2>Promotion สำหรับการเข้าพักในช่วงเวลาพิเศษ</h2>
+            <h2>โปรโมชั่นสำหรับการเข้าพัก</h2>
         </div>
 
         <div class="row g-4">
@@ -165,7 +165,7 @@
             <div class="col-lg-4 col-md-6">
                 <div class="feature-box">
                     <div class="feature-icon">✦</div>
-                    <h4>Prime location</h4>
+                    <h4>ทำเลดี</h4>
                     <p class="text-muted">ตั้งอยู่ใจกลางเมือง ใกล้แหล่งท่องเที่ยว ศูนย์การค้า และสถานที่สำคัญสำหรับการเดินทาง</p>
                 </div>
             </div>
@@ -173,7 +173,7 @@
             <div class="col-lg-4 col-md-6">
                 <div class="feature-box">
                     <div class="feature-icon">◎</div>
-                    <h4>Curated comfort</h4>
+                    <h4>ห้องพักสบาย</h4>
                     <p class="text-muted">ออกแบบทุกห้องให้ผ่อนคลาย เหมาะสำหรับพักผ่อนแบบลึก ๆ หรือการเดินทางเพื่อธุรกิจ</p>
                 </div>
             </div>
@@ -181,7 +181,7 @@
             <div class="col-lg-4 col-md-6">
                 <div class="feature-box">
                     <div class="feature-icon">★</div>
-                    <h4>Thoughtful service</h4>
+                    <h4>บริการใส่ใจ</h4>
                     <p class="text-muted">ทีมพนักงานให้ความใส่ใจในทุกการติดต่อ เพื่อให้ประสบการณ์เข้าพักมีความพึงพอใจสูง</p>
                 </div>
             </div>

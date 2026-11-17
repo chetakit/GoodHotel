@@ -38,7 +38,7 @@ public sealed class PaymentEvidenceStorage(
         };
         if (file.Length <= 0 || file.Length > MaximumBytes || contentType == null ||
             !string.Equals(file.ContentType, contentType, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Evidence must be a JPG, PNG or WEBP image of at most 5 MB.");
+            throw new InvalidDataException("หลักฐานต้องเป็นรูป JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB");
 
         await using var input = file.OpenReadStream();
         var header = new byte[12];
@@ -52,7 +52,7 @@ public sealed class PaymentEvidenceStorage(
                 header.AsSpan(8, 4).SequenceEqual("WEBP"u8),
             _ => false
         };
-        if (!valid) throw new InvalidDataException("Evidence content does not match its image type.");
+        if (!valid) throw new InvalidDataException("ไฟล์หลักฐานไม่ตรงกับชนิดรูปภาพ");
         input.Position = 0;
         Directory.CreateDirectory(DirectoryPath);
         var fileName = Guid.NewGuid().ToString("N") + extension;
@@ -79,7 +79,7 @@ public sealed class PaymentEvidenceStorage(
         if (!Guid.TryParseExact(Path.GetFileNameWithoutExtension(fileName), "N", out _) ||
             extension is not (".jpg" or ".jpeg" or ".png" or ".webp") ||
             fileName != Path.GetFileName(fileName))
-            throw new InvalidDataException("Invalid evidence identifier.");
+            throw new InvalidDataException("ไม่พบหลักฐาน");
         return Path.Combine(DirectoryPath, fileName);
     }
 

@@ -22,7 +22,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Good Hotel @role</title>
+    <title>@ViewData["Title"] - Good Hotel</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
@@ -32,12 +32,12 @@
             <div class="operations-sidebar-header">
                 <div class="sidebar-brand">
                     <span class="brand-mark">G</span>
-                    <div><strong>Good Hotel</strong><small>@role</small></div>
+                    <div><strong>Good Hotel</strong><small>@ThaiText.Status(role)</small></div>
                 </div>
                 <button class="operations-menu-toggle d-lg-none" type="button" data-bs-toggle="collapse"
                         data-bs-target="#operationsNavigation" aria-controls="operationsNavigation"
                         aria-expanded="false" aria-label="Toggle navigation">
-                    <span aria-hidden="true">&#9776;</span> Menu
+                    <span aria-hidden="true">&#9776;</span> เมนู
                 </button>
             </div>
 
@@ -46,50 +46,50 @@
                     @if (isStaff)
                     {
                         <a class="nav-item @(dashboard ? "active" : "")" aria-current="@(dashboard ? "page" : null)"
-                           asp-controller="Staff" asp-action="Index">Staff Dashboard</a>
+                           asp-controller="Staff" asp-action="Index">แดชบอร์ด</a>
                         <a class="nav-item @(bookings ? "active" : "")" aria-current="@(bookings ? "page" : null)"
-                           asp-controller="Staff" asp-action="Bookings">Bookings</a>
+                           asp-controller="Staff" asp-action="Bookings">รายการจอง</a>
                         <a class="nav-item @(walkIn ? "active" : "")" aria-current="@(walkIn ? "page" : null)"
-                           asp-controller="Staff" asp-action="WalkIn">Walk-in</a>
+                           asp-controller="Staff" asp-action="WalkIn">รับลูกค้า Walk-in</a>
                         <a class="nav-item @(roomStatus ? "active" : "")" aria-current="@(roomStatus ? "page" : null)"
-                           asp-controller="Staff" asp-action="RoomStatus">Room Status</a>
+                           asp-controller="Staff" asp-action="RoomStatus">สถานะห้อง</a>
                         <a class="nav-item @(verification ? "active" : "")" aria-current="@(verification ? "page" : null)"
-                           asp-controller="Staff" asp-action="VerificationTasks">Verify Cleaning</a>
+                           asp-controller="Staff" asp-action="VerificationTasks">ตรวจงานทำความสะอาด</a>
                         <a class="nav-item @(payments ? "active" : "")" aria-current="@(payments ? "page" : null)"
-                           asp-controller="Payment" asp-action="Queue">Payments</a>
+                           asp-controller="Payment" asp-action="Queue">การชำระเงิน</a>
                         <a class="nav-item @(maintenance ? "active" : "")" aria-current="@(maintenance ? "page" : null)"
-                           asp-controller="Staff" asp-action="MaintenanceReports">Maintenance</a>
+                           asp-controller="Staff" asp-action="MaintenanceReports">งานซ่อม</a>
                         
                     }
                     else
                     {
                         <a class="nav-item @(dashboard ? "active" : "")" aria-current="@(dashboard ? "page" : null)"
-                           asp-controller="Housekeeper" asp-action="Index">Dashboard</a>
+                           asp-controller="Housekeeper" asp-action="Index">แดชบอร์ด</a>
                         <a class="nav-item @(tasks ? "active" : "")" aria-current="@(tasks ? "page" : null)"
-                           asp-controller="Housekeeper" asp-action="Tasks">Cleaning Tasks</a>
+                           asp-controller="Housekeeper" asp-action="Tasks">งานทำความสะอาด</a>
                         <a class="nav-item @(maintenance ? "active" : "")" aria-current="@(maintenance ? "page" : null)"
-                           asp-controller="Housekeeper" asp-action="MaintenanceReports">Maintenance</a>
+                           asp-controller="Housekeeper" asp-action="MaintenanceReports">งานซ่อม</a>
                         <a class="nav-item @(history ? "active" : "")" aria-current="@(history ? "page" : null)"
-                           asp-controller="Housekeeper" asp-action="History">Task History</a>
+                           asp-controller="Housekeeper" asp-action="History">ประวัติงาน</a>
                         
                     }
                 </nav>
 
                 <div class="sidebar-user-container dropup">
                     <button class="sidebar-user w-100 border-0 text-start" type="button" data-bs-toggle="dropdown"
-                            aria-expanded="false" aria-label="Open account menu">
+                            aria-expanded="false" aria-label="เปิดเมนูบัญชี">
                         <span class="avatar" aria-hidden="true">@(isStaff ? "S" : "H")</span>
-                        <span class="flex-grow-1"><strong>@displayName</strong><small>@role</small></span>
+                        <span class="flex-grow-1"><strong>@displayName</strong><small>@ThaiText.Status(role)</small></span>
                         <span aria-hidden="true">&#8963;</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-dark w-100 shadow mb-2">
-                        <li><div class="dropdown-item-text"><strong>Account</strong><small class="d-block text-white-50">@displayName</small></div></li>
+                        <li><div class="dropdown-item-text"><strong>บัญชี</strong><small class="d-block text-white-50">@displayName</small></div></li>
                         <li><hr class="dropdown-divider" /></li>
-                        <li><a class="dropdown-item py-2" asp-controller="Home" asp-action="Index">Back to Home</a></li>
+                        <li><a class="dropdown-item py-2" asp-controller="Home" asp-action="Index">กลับหน้าแรก</a></li>
                         <li><hr class="dropdown-divider" /></li>
                         <li>
                             <form asp-controller="Home" asp-action="Logout" method="post">
-                                <button type="submit" class="dropdown-item text-danger py-2">Logout</button>
+                                <button type="submit" class="dropdown-item text-danger py-2">ออกจากระบบ</button>
                             </form>
                         </li>
                     </ul>
@@ -99,7 +99,7 @@
 
         <div class="admin-main">
             <header class="admin-topbar">
-                <div><p class="eyebrow">Hotel Operations</p><h2>@ViewData["Title"]</h2></div>
+                <div><p class="eyebrow">Good Hotel</p><h2>@ViewData["Title"]</h2></div>
             </header>
             <main class="admin-content">@RenderBody()</main>
         </div>

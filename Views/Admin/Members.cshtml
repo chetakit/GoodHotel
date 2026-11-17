@@ -3,7 +3,7 @@
 
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Members";
+    ViewData["Title"] = "สมาชิก";
     const int pageSize = 10;
     const string pageCookie = "AdminMembersPage";
     var members = Model.OrderBy(member => member.UserId).ToList();
@@ -25,7 +25,7 @@
 }
 
 <div class="container mt-4">
-    <h2 class="mb-4">Members</h2>
+    <h2 class="mb-4">สมาชิก</h2>
 
     @if (TempData["SuccessMessage"] is string successMessage)
     {
@@ -64,12 +64,12 @@
     <table class="table table-bordered">
         <thead>
             <tr>
-                <th>User ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Role</th>
-                <th>Action</th>
+                <th>รหัส</th>
+                <th>ชื่อ</th>
+                <th>อีเมล</th>
+                <th>เบอร์โทร</th>
+                <th>บทบาท</th>
+                <th></th>
             </tr>
         </thead>
 
@@ -81,13 +81,13 @@
                     <td>@item.FirstName @item.LastName</td>
                     <td>@item.Email</td>
                     <td>@item.Phone</td>
-                    <td>@item.Role</td>
+                    <td>@ThaiText.Status(item.Role)</td>
                     <td>
                     <a asp-controller="Admin"
                     asp-action="EditUser"
                     asp-route-id="@item.UserId"
                     class="btn btn-primary">
-                        Edit
+                        แก้ไข
                     </a>
 
                     <form asp-controller="Admin"
@@ -99,7 +99,7 @@
                         <input type="hidden" name="id" value="@item.UserId" />
 
                         <button type="submit" class="btn btn-danger">
-                            Delete
+                            ลบ
                         </button>
                     </form>
                 </td>
@@ -120,11 +120,11 @@
                 <li class="page-item @(currentPage == 1 ? "disabled" : "")">
                     @if (currentPage == 1)
                     {
-                        <span class="page-link">Previous</span>
+                        <span class="page-link">ก่อนหน้า</span>
                     }
                     else
                     {
-                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage - 1)">Previous</a>
+                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage - 1)">ก่อนหน้า</a>
                     }
                 </li>
                 @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
@@ -143,11 +143,11 @@
                 <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
                     @if (currentPage == totalPages)
                     {
-                        <span class="page-link">Next</span>
+                        <span class="page-link">ถัดไป</span>
                     }
                     else
                     {
-                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage + 1)">Next</a>
+                        <a class="page-link" asp-action="Members" asp-route-page="@(currentPage + 1)">ถัดไป</a>
                     }
                 </li>
             </ul>

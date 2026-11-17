@@ -2,62 +2,62 @@
 
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = "แดชบอร์ด";
 }
 
 <div class="row g-4">
     <div class="col-md-6 col-xl-3">
         <div class="stat-card">
-            <div class="label">Rooms</div>
+            <div class="label">ห้องพัก</div>
             <div class="value">@Model.RoomCount</div>
-            <div class="trend">Total room records</div>
+            <div class="trend">จำนวนห้องทั้งหมด</div>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
         <div class="stat-card">
-            <div class="label">User accounts</div>
+            <div class="label">บัญชีผู้ใช้</div>
             <div class="value">@Model.UserCount</div>
-            <div class="trend">All roles</div>
+            <div class="trend">ทุกบทบาท</div>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
         <div class="stat-card">
-            <div class="label">Bookings</div>
+            <div class="label">การจอง</div>
             <div class="value">@Model.BookingCount</div>
             <div class="trend">ไม่นับการจองที่ยกเลิก</div>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
         <div class="stat-card">
-            <div class="label">Revenue</div>
+            <div class="label">รายได้</div>
             <div class="value">@(Model.Revenue?.ToString("N2") ?? "N/A")</div>
-            <div class="trend">Confirmed payments less approved refunds; includes DEMO/MOCK amounts, not actual revenue</div>
+            <div class="trend">เงินที่ยืนยันแล้ว หักยอดคืนเงิน (รวมการชำระจำลอง)</div>
         </div>
     </div>
 </div>
 
 <div class="row g-4 mt-1">
-    <div class="col-md-4"><div class="stat-card"><div class="label">Pending housekeeping</div><div class="value">@Model.PendingHousekeepingCount</div></div></div>
-    <div class="col-md-4"><div class="stat-card"><div class="label">Awaiting verification</div><div class="value">@Model.AwaitingVerificationCount</div></div></div>
-    <div class="col-md-4"><div class="stat-card"><div class="label">Open maintenance reports</div><div class="value">@Model.OpenMaintenanceCount</div></div></div>
+    <div class="col-md-4"><div class="stat-card"><div class="label">งานทำความสะอาดรอคนรับ</div><div class="value">@Model.PendingHousekeepingCount</div></div></div>
+    <div class="col-md-4"><div class="stat-card"><div class="label">งานทำความสะอาดรอตรวจ</div><div class="value">@Model.AwaitingVerificationCount</div></div></div>
+    <div class="col-md-4"><div class="stat-card"><div class="label">งานซ่อมที่ยังไม่เริ่ม</div><div class="value">@Model.OpenMaintenanceCount</div></div></div>
 </div>
 
 <div class="row g-4">
     <div class="col-xl-8">
         <div class="table-panel">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0">Bookings by check-in date</h4>
-                <a asp-controller="Admin" asp-action="Reports" class="btn btn-link p-0">View reports</a>
+                <h4 class="mb-0">การจองล่าสุด (ตามวันเข้าพัก)</h4>
+                <a asp-controller="Admin" asp-action="Reports" class="btn btn-link p-0">ดูรายงาน</a>
             </div>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th>Booking ID</th>
-                            <th>Guest</th>
-                            <th>Room</th>
-                            <th>Check-in</th>
-                            <th>Booking amount</th>
+                            <th>เลขที่</th>
+                            <th>ลูกค้า</th>
+                            <th>ห้อง</th>
+                            <th>วันเข้าพัก</th>
+                            <th>ยอดรวม</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -65,7 +65,7 @@
                         {
                             <tr>
                                 <td colspan="5" class="text-center text-muted">
-                                    No bookings with a check-in date.
+                                    ยังไม่มีการจอง
                                 </td>
                             </tr>
                         }
@@ -77,7 +77,7 @@
                                     <td>@booking.BookingId</td>
                                     <td>@booking.GuestName</td>
                                     <td>@booking.RoomNumber</td>
-                                    <td>@booking.CheckIn?.ToString("yyyy-MM-dd")</td>
+                                    <td>@ThaiText.Date(booking.CheckIn)</td>
                                     <td>@(booking.Amount?.ToString("N2") ?? "")</td>
                                 </tr>
                             }
@@ -93,14 +93,14 @@
             <h4 class="mb-3">สถานะห้องตอนนี้</h4>
             @if (!Model.RoomStatusCounts.Any())
             {
-                <p class="text-muted mb-0">No room records.</p>
+                <p class="text-muted mb-0">ยังไม่มีห้องพัก</p>
             }
             else
             {
                 @foreach (var item in Model.RoomStatusCounts)
                 {
                     <div class="summary-line">
-                        <span>@(string.IsNullOrWhiteSpace(item.Status) ? "Unspecified" : item.Status)</span>
+                        <span>@(string.IsNullOrWhiteSpace(item.Status) ? "-" : item.Status)</span>
                         <strong>@item.Count</strong>
                     </div>
                 }
@@ -110,8 +110,8 @@
 </div>
 
 <div class="report-card mt-4">
-    <h4 class="mb-2">Payment amount note</h4>
+    <h4 class="mb-2">หมายเหตุเรื่องรายได้</h4>
     <p class="text-muted mb-0">
-        This total includes DEMO/MOCK transactions and does not represent actual money received. Unreviewed legacy records are excluded.
+        ยอดรายได้รวมการชำระเงินจำลอง (ไม่ใช่เงินจริง) และไม่นับข้อมูลการชำระเงินเก่าที่ยังไม่ได้ตรวจสอบ
     </p>
 </div>

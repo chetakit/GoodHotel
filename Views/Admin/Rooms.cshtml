@@ -2,7 +2,7 @@
 
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Rooms";
+    ViewData["Title"] = "ห้องพัก";
 }
 
 <style>
@@ -35,11 +35,11 @@
 
 <div class="table-panel">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Room management</h4>
+        <h4 class="mb-0">จัดการห้องพัก</h4>
         <a asp-controller="Admin"
            asp-action="AddRoom"
            class="btn btn-primary hotel-primary-btn">
-            + Add room
+            + เพิ่มห้อง
         </a>
     </div>
 
@@ -57,13 +57,13 @@
         <table class="table align-middle">
             <thead>
                 <tr>
-                    <th>Image</th>
-                    <th>Room</th>
-                    <th>Type</th>
-                    <th>Capacity</th>
-                    <th>Status</th>
-                    <th>Rate</th>
-                    <th>Action</th>
+                    <th>รูป</th>
+                    <th>ห้อง</th>
+                    <th>ประเภท</th>
+                    <th>รับได้</th>
+                    <th>สถานะ</th>
+                    <th>ราคา/คืน</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -71,7 +71,7 @@
                 {
                     <tr>
                         <td colspan="7" class="text-center text-muted">
-                            No rooms found.
+                            ยังไม่มีห้องพัก
                         </td>
                     </tr>
                 }
@@ -98,9 +98,9 @@
                             </td>
                             <td>@room.RoomNumber</td>
                             <td>@room.Type</td>
-                            <td>@(room.Capacity is int capacity ? $"{capacity} Guests" : "")</td>
+                            <td>@(room.Capacity is int capacity ? $"{capacity} คน" : "")</td>
                             <td>
-                                <span class="status-pill room-status @statusClass">@room.Status</span>
+                                <span class="status-pill room-status @statusClass">@ThaiText.Status(room.Status)</span>
                             </td>
                             <td>@(room.Rate.HasValue ? $"฿{room.Rate.Value:N2}" : "")</td>
                             <td>
@@ -108,16 +108,16 @@
                                    asp-action="EditRoom"
                                    asp-route-id="@room.RoomId"
                                    class="btn btn-sm btn-outline-secondary">
-                                    Edit
+                                    แก้ไข
                                 </a>
                                 <form asp-controller="Admin"
                                       asp-action="DeleteRoom"
                                       method="post"
                                       class="d-inline"
-                                      onsubmit="return confirm('Delete this room?');">
+                                      onsubmit="return confirm('ลบห้องนี้?');">
                                     <input type="hidden" name="id" value="@room.RoomId" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        Delete
+                                        ลบ
                                     </button>
                                 </form>
                             </td>

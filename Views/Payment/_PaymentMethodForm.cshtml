@@ -3,15 +3,15 @@
 <form asp-controller="Payment" asp-action="Submit" method="post" class="booking-panel mt-3">
     <input type="hidden" name="bookingId" value="@Model" />
     <input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
-    <p>DEMO/MOCK methods simulate payment only. No real money is transferred.</p>
-    <label for="payment-method" class="form-label">Payment method</label>
+    <p>วิธีที่มีคำว่า (จำลอง) เป็นการชำระเงินจำลองเพื่อสาธิตระบบ ไม่มีการโอนเงินจริง</p>
+    <label for="payment-method" class="form-label">วิธีชำระเงิน</label>
     <select id="payment-method" name="method" class="form-select" required>
-        <option value="">Select a method</option>
-        <option value="Bank Transfer (Mock)">Bank Transfer (Mock)</option>
-        <option value="PromptPay (Mock)">PromptPay (Mock)</option>
-        <option value="PayPal (Mock)">PayPal (Mock)</option>
-        <option value="Cash">Cash at Hotel</option>
+        <option value="">-- เลือกวิธีชำระเงิน --</option>
+        @foreach (var method in new[] { "Bank Transfer (Mock)", "PromptPay (Mock)", "PayPal (Mock)", "Cash" })
+        {
+            <option value="@method">@ThaiText.PaymentMethod(method)</option>
+        }
     </select>
-    <p class="small text-muted mt-2">Cash remains pending until Staff or Admin confirms receipt.</p>
-    <button type="submit" class="btn btn-primary">Confirm Payment</button>
+    <p class="small text-muted mt-2">ถ้าเลือกเงินสด สถานะจะเป็น "รอดำเนินการ" จนกว่าพนักงานจะยืนยันว่าได้รับเงินแล้ว</p>
+    <button type="submit" class="btn btn-primary">ยืนยันการชำระเงิน</button>
 </form>

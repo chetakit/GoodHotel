@@ -2,7 +2,7 @@
 @model IReadOnlyList<RoomStatusItem>
 
 @{
-    ViewData["Title"] = "Room Status";
+    ViewData["Title"] = "สถานะห้อง";
     var today = (DateOnly)ViewBag.Today;
 
     string Label(RoomLiveStatus status) => RoomStatusService.Label(status);

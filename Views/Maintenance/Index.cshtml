@@ -2,18 +2,18 @@
 
 @{
     if (User.IsInRole("Admin")) { Layout = "_AdminLayout"; }
-    ViewData["Title"] = "Maintenance Reports";
+    ViewData["Title"] = "งานซ่อม";
 }
 
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Hotel Operations</span>
-            <h2>Maintenance Reports</h2>
+            <span class="eyebrow text-dark">Maintenance</span>
+            <h2>รายการแจ้งซ่อม</h2>
         </div>
 
         <div class="alert alert-warning" role="status">
-            Unresolved reports block the room. Existing bookings are not cancelled.
+            ห้องที่มีงานซ่อมค้างอยู่จะถูกปิดไม่ให้จอง (การจองที่มีอยู่แล้วจะไม่ถูกยกเลิก)
         </div>
         @if (TempData["MaintenanceSuccess"] is string success)
         {
@@ -22,12 +22,12 @@
 
         @if (User.IsInRole("Staff") || User.IsInRole("Housekeeper"))
         {
-            <a asp-action="Create" class="btn btn-primary mb-3">Create report</a>
+            <a asp-action="Create" class="btn btn-primary mb-3">+ แจ้งอุปกรณ์ชำรุด</a>
         }
 
         @if (Model.Count == 0)
         {
-            <div class="alert alert-light border" role="status">No maintenance reports found.</div>
+            <div class="alert alert-light border" role="status">ยังไม่มีรายการแจ้งซ่อม</div>
         }
         else
         {
@@ -35,20 +35,20 @@
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            <th>Report ID</th>
-                            <th>Room</th>
-                            <th>Status</th>
-                            <th>Action</th>
+                            <th>เลขที่</th>
+                            <th>ห้อง</th>
+                            <th>สถานะ</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var report in Model)
                         {
                             <tr>
-                                <td>@report.ReportId</td>
-                                <td>@(string.IsNullOrWhiteSpace(report.RoomNumber) ? "Not specified" : report.RoomNumber)</td>
-                                <td>@report.Status</td>
-                                <td><a asp-action="Details" asp-route-id="@report.ReportId" class="btn btn-sm btn-outline-primary">Details</a></td>
+                                <td>#@report.ReportId</td>
+                                <td>@ThaiText.OrDash(report.RoomNumber)</td>
+                                <td>@ThaiText.Status(report.Status)</td>
+                                <td><a asp-action="Details" asp-route-id="@report.ReportId" class="btn btn-sm btn-outline-primary">ดูรายละเอียด</a></td>
                             </tr>
                         }
                     </tbody>

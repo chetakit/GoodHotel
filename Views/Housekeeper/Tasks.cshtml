@@ -1,31 +1,40 @@
 @model GoodHotel.Models.ViewModels.HousekeepingTasksViewModel
 @{
-    ViewData["Title"] = "Cleaning Tasks";
+    ViewData["Title"] = "งานทำความสะอาด";
 }
 <section class="content-section">
     <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Cleaning Tasks</h2></div>
+        <div class="section-heading"><span class="eyebrow text-dark">Housekeeping</span><h2>งานทำความสะอาด</h2></div>
+        <p class="text-muted">งานจะเด้งเข้ามาเองเมื่อพนักงานต้อนรับเช็คเอาท์ลูกค้า กดรับงาน → เริ่มทำ → ทำเสร็จ</p>
         @if (TempData["TaskSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
         @if (TempData["TaskError"] is string error) { <div class="alert alert-warning" role="alert">@error</div> }
-        <h3>My active tasks</h3>
-        @if (Model.Assigned.Count == 0) { <p>No active tasks assigned to you.</p> }
+
+        <h3>งานของฉันที่ยังไม่เสร็จ</h3>
+        @if (Model.Assigned.Count == 0)
+        {
+            <p>ไม่มีงานค้าง</p>
+        }
         else
         {
             <ul>
                 @foreach (var task in Model.Assigned)
                 {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">Task #@task.TaskId</a> — Room @(task.RoomNumber ?? "Not specified") — @task.TaskType — @task.Status</li>
+                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.TaskType) — @ThaiText.Status(task.Status)</li>
                 }
             </ul>
         }
-        <h3>Available tasks</h3>
-        @if (Model.Available.Count == 0) { <p>No tasks are available to claim.</p> }
+
+        <h3>งานที่รอคนรับ</h3>
+        @if (Model.Available.Count == 0)
+        {
+            <p>ไม่มีงานที่รอคนรับ</p>
+        }
         else
         {
             <ul>
                 @foreach (var task in Model.Available)
                 {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">Task #@task.TaskId</a> — Room @(task.RoomNumber ?? "Not specified") — @task.TaskType</li>
+                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.TaskType)</li>
                 }
             </ul>
         }

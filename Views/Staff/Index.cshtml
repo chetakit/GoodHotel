@@ -1,24 +1,25 @@
 @model GoodHotel.Models.ViewModels.StaffDashboardViewModel
 @{
-    ViewData["Title"] = "Staff Dashboard";
+    ViewData["Title"] = "แดชบอร์ดพนักงานต้อนรับ";
 }
 <section class="content-section">
     <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Staff Dashboard</h2></div>
-        <p>Today's counts use Asia/Bangkok time.</p>
+        <div class="section-heading"><span class="eyebrow text-dark">Front Desk</span><h2>แดชบอร์ดพนักงานต้อนรับ</h2></div>
+        <p class="text-muted">ตัวเลข "วันนี้" ใช้เวลาประเทศไทย</p>
         <div class="row g-3">
-            <div class="col-md-4"><div class="card p-3">Total bookings <strong>@Model.TotalBookings</strong></div></div>
-            <div class="col-md-4"><div class="card p-3">Currently checked in <strong>@Model.CheckedInStays</strong></div></div>
-            <div class="col-md-4"><div class="card p-3">Today's check-ins <strong>@Model.TodayCheckIns</strong></div></div>
-            <div class="col-md-4"><div class="card p-3">Today's check-outs <strong>@Model.TodayCheckOuts</strong></div></div>
-            <div class="col-md-4"><div class="card p-3">Tasks awaiting verification <strong>@Model.AwaitingVerification</strong></div></div>
-            <div class="col-md-4"><div class="card p-3">Open maintenance reports <strong>@Model.OpenMaintenanceReports</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">การจองทั้งหมด (ไม่นับที่ยกเลิก) <strong>@Model.TotalBookings</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">แขกที่เข้าพักอยู่ตอนนี้ <strong>@Model.CheckedInStays</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">เช็คอินวันนี้ <strong>@Model.TodayCheckIns</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">เช็คเอาท์วันนี้ <strong>@Model.TodayCheckOuts</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">งานทำความสะอาดรอตรวจ <strong>@Model.AwaitingVerification</strong></div></div>
+            <div class="col-md-4"><div class="card p-3">งานซ่อมที่ยังไม่เสร็จ <strong>@Model.OpenMaintenanceReports</strong></div></div>
         </div>
         <nav class="d-flex flex-wrap gap-2 mt-4">
-            <a asp-action="WalkIn" class="btn btn-primary">+ Walk-in</a>
-            <a asp-action="Bookings" class="btn btn-outline-primary">Bookings</a>
-            <a asp-action="RoomStatus" class="btn btn-outline-primary">Room Status</a>
-            <a asp-action="MaintenanceReports" class="btn btn-outline-primary">Maintenance</a>
+            <a asp-action="WalkIn" class="btn btn-primary">+ รับลูกค้า Walk-in</a>
+            <a asp-action="Bookings" class="btn btn-outline-primary">รายการจอง</a>
+            <a asp-action="RoomStatus" class="btn btn-outline-primary">สถานะห้อง</a>
+            <a asp-action="VerificationTasks" class="btn btn-outline-primary">ตรวจงานทำความสะอาด</a>
+            <a asp-action="MaintenanceReports" class="btn btn-outline-primary">งานซ่อม</a>
         </nav>
     </div>
 </section>

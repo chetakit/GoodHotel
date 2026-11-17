@@ -2,38 +2,38 @@
 @model GoodHotel.Models.ViewModels.EditUserViewModel
 
 @{
-    ViewData["Title"] = "Edit User";
+    ViewData["Title"] = "แก้ไขผู้ใช้";
     Layout = "_AdminLayout";
 }
 
 <div class="container mt-4">
-    <h2>Edit User</h2>
+    <h2>แก้ไขผู้ใช้</h2>
 
     <form asp-controller="Admin" asp-action="EditUser" method="post">
         <input type="hidden" asp-for="UserId" />
         <div asp-validation-summary="All" class="text-danger"></div>
 
         <div class="mb-3">
-            <label asp-for="FirstName" class="form-label">First Name</label>
+            <label asp-for="FirstName" class="form-label">ชื่อ</label>
             <input asp-for="FirstName" class="form-control" />
             <span asp-validation-for="FirstName" class="text-danger"></span>
         </div>
 
         <div class="mb-3">
-            <label asp-for="LastName" class="form-label">Last Name</label>
+            <label asp-for="LastName" class="form-label">นามสกุล</label>
             <input asp-for="LastName" class="form-control" />
             <span asp-validation-for="LastName" class="text-danger"></span>
         </div>
 
         <div class="mb-3">
-            <label asp-for="Email" class="form-label">Email</label>
+            <label asp-for="Email" class="form-label">อีเมล</label>
             <input asp-for="Email" type="email" class="form-control" />
             <span asp-validation-for="Email" class="text-danger"></span>
         </div>
 
        
 <div class="mb-3">
-    <label asp-for="Phone" class="form-label">Phone</label>
+    <label asp-for="Phone" class="form-label">เบอร์โทร</label>
     <input asp-for="Phone"
            class="form-control"
            type="tel"
@@ -48,18 +48,18 @@
 
 
         <div class="mb-3">
-            <label asp-for="Role" class="form-label">Role</label>
+            <label asp-for="Role" class="form-label">บทบาท</label>
             <select asp-for="Role" class="form-select">
-                <option value="Customer">Customer</option>
-                <option value="Staff">Staff</option>
-                <option value="Housekeeper">Housekeeper</option>
-                <option value="Admin">Admin</option>
+                <option value="Customer">ลูกค้า</option>
+                <option value="Staff">พนักงานต้อนรับ</option>
+                <option value="Housekeeper">แม่บ้าน</option>
+                <option value="Admin">ผู้ดูแลระบบ</option>
             </select>
             <span asp-validation-for="Role" class="text-danger"></span>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="submit" class="btn btn-primary">บันทึก</button>
         <a asp-controller="Admin" asp-action="Members"
-           class="btn btn-secondary">Cancel</a>
+           class="btn btn-secondary">ยกเลิก</a>
     </form>
 </div>

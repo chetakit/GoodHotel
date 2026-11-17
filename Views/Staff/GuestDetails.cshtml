@@ -1,43 +1,42 @@
 @model GoodHotel.Controllers.StaffController.GuestDetailsModel
 
 @{
-    ViewData["Title"] = "Guest Details";
-    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    ViewData["Title"] = "ข้อมูลลูกค้า";
 }
 
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Hotel Operations</span>
-            <h2>Guest Details</h2>
-            <p class="text-muted">Booking #@Model.BookingId</p>
+            <span class="eyebrow text-dark">Front Desk</span>
+            <h2>ข้อมูลลูกค้า</h2>
+            <p class="text-muted">การจอง #@Model.BookingId</p>
         </div>
 
         @if (!Model.HasGuest)
         {
-            <div class="alert alert-light border" role="status">No customer information was found for this booking.</div>
+            <div class="alert alert-light border" role="status">ไม่พบข้อมูลลูกค้าของการจองนี้</div>
         }
         else
         {
             <div class="booking-panel">
                 <dl class="row mb-0">
-                    <dt class="col-sm-5 col-lg-4">First name</dt>
-                    <dd class="col-sm-7 col-lg-8">@(string.IsNullOrWhiteSpace(Model.FirstName) ? "Not specified" : Model.FirstName)</dd>
-                    <dt class="col-sm-5 col-lg-4">Last name</dt>
-                    <dd class="col-sm-7 col-lg-8">@(string.IsNullOrWhiteSpace(Model.LastName) ? "Not specified" : Model.LastName)</dd>
-                    <dt class="col-sm-5 col-lg-4">Email</dt>
-                    <dd class="col-sm-7 col-lg-8">@(string.IsNullOrWhiteSpace(Model.Email) ? "Not specified" : Model.Email)</dd>
-                    <dt class="col-sm-5 col-lg-4">Phone</dt>
-                    <dd class="col-sm-7 col-lg-8">@(string.IsNullOrWhiteSpace(Model.Phone) ? "Not specified" : Model.Phone)</dd>
-                    <dt class="col-sm-5 col-lg-4">Birth date</dt>
-                    <dd class="col-sm-7 col-lg-8">@(Model.BirthDate?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</dd>
+                    <dt class="col-sm-5 col-lg-4">ชื่อ</dt>
+                    <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(Model.FirstName)</dd>
+                    <dt class="col-sm-5 col-lg-4">นามสกุล</dt>
+                    <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(Model.LastName)</dd>
+                    <dt class="col-sm-5 col-lg-4">อีเมล</dt>
+                    <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(Model.Email)</dd>
+                    <dt class="col-sm-5 col-lg-4">เบอร์โทร</dt>
+                    <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(Model.Phone)</dd>
+                    <dt class="col-sm-5 col-lg-4">วันเกิด</dt>
+                    <dd class="col-sm-7 col-lg-8">@ThaiText.Date(Model.BirthDate)</dd>
                 </dl>
             </div>
         }
 
-        <nav class="d-flex flex-wrap gap-2 mt-4" aria-label="Related workflow pages">
-            <a asp-action="BookingDetails" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">Back to Booking Details</a>
-            <a asp-action="Bookings" class="btn btn-outline-primary">Back to Bookings</a>
+        <nav class="d-flex flex-wrap gap-2 mt-4">
+            <a asp-action="BookingDetails" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">กลับไปที่การจอง</a>
+            <a asp-action="Bookings" class="btn btn-outline-primary">กลับไปรายการจอง</a>
         </nav>
     </div>
 </section>

@@ -1,7 +1,7 @@
 @model IReadOnlyList<GoodHotel.Models.ViewModels.MyBookingViewModel>
 
 @{
-    ViewData["Title"] = "My Bookings";
+    ViewData["Title"] = "การจองของฉัน";
     var upcoming = Model.Where(b => !b.IsHistory).ToList();
     var history = Model.Where(b => b.IsHistory).ToList();
 }

@@ -31,24 +31,24 @@
                     <ul class="navbar-nav mx-auto align-items-lg-center gap-lg-2">
                         <li class="nav-item">
                             <a class="nav-link"
-                               asp-controller="Home" asp-action="Index">Home</a>
+                               asp-controller="Home" asp-action="Index">หน้าแรก</a>
                         </li>
 
                         <li class="nav-item">
                             <a class="nav-link"
-                               asp-controller="Home" asp-action="Rooms">Rooms</a>
+                               asp-controller="Home" asp-action="Rooms">ห้องพัก</a>
                         </li>
 
                         <li class="nav-item">
                             <a class="nav-link"
-                               asp-controller="Home" asp-action="Promotion">Promotion</a>
+                               asp-controller="Home" asp-action="Promotion">โปรโมชั่น</a>
                         </li>
 
                         @if (User.IsInRole("Customer"))
                         {
                             <li class="nav-item">
                                 <a class="nav-link"
-                                   asp-controller="Home" asp-action="Rooms">Booking</a>
+                                   asp-controller="Home" asp-action="Rooms">จองห้อง</a>
                             </li>
                         }
                     </ul>
@@ -69,9 +69,7 @@
                                             @User.Identity.Name
                                         </span>
                                         <small class="text-muted">
-                                            @User.FindFirst(
-                                                System.Security.Claims.ClaimTypes.Role
-                                            )?.Value
+                                            @ThaiText.Status(User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value)
                                         </small>
                                     </span>
                                 </button>
@@ -85,7 +83,7 @@
                                             <a class="dropdown-item py-2"
                                                asp-controller="Home"
                                                asp-action="MyBookings">
-                                                ประวัติการจอง (My Bookings)
+                                                การจองของฉัน
                                             </a>
                                         </li>
                                     }
@@ -95,7 +93,7 @@
                                             <a class="dropdown-item py-2"
                                                asp-controller="Admin"
                                                asp-action="Dashboard">
-                                                Admin Manage
+                                                หน้าผู้ดูแลระบบ
                                             </a>
                                         </li>
                                     }
@@ -105,7 +103,7 @@
                                             <a class="dropdown-item py-2"
                                                asp-controller="@(User.IsInRole("Staff") ? "Staff" : "Housekeeper")"
                                                asp-action="Index">
-                                                Dashboard
+                                                หน้าทำงาน
                                             </a>
                                         </li>
                                     }
@@ -123,7 +121,7 @@
                                               method="post">
                                             <button type="submit"
                                                     class="dropdown-item text-danger py-2">
-                                                Logout
+                                                ออกจากระบบ
                                             </button>
                                         </form>
                                     </li>
@@ -134,12 +132,12 @@
                         {
                             <a class="btn btn-outline-primary hotel-secondary-btn"
                                asp-controller="Home" asp-action="Login">
-                                Login
+                                เข้าสู่ระบบ
                             </a>
 
                             <a class="btn btn-primary hotel-primary-btn"
                                asp-controller="Home" asp-action="Register">
-                                Register
+                                สมัครสมาชิก
                             </a>
                         }
                     </div>
@@ -163,19 +161,19 @@
                     </a>
 
                     <p class="footer-copy mt-3">
-                        Stay beautifully. Discover comfort, calm, and the warmth of
-                        service in every detail.
+                        พักผ่อนอย่างสบายใจ พร้อมบริการที่ใส่ใจ
+                        ในทุกรายละเอียด
                     </p>
                 </div>
 
                 <div class="col-lg-4 text-lg-center">
-                    <h6>Contact</h6>
+                    <h6>ติดต่อ</h6>
                     <p class="footer-copy mb-1">+66 2 555 8900</p>
                     <p class="footer-copy mb-0">hello@goodhotel.com</p>
                 </div>
 
                 <div class="col-lg-4 text-lg-end">
-                    <h6>Location</h6>
+                    <h6>ที่ตั้ง</h6>
                     <p class="footer-copy mb-0">
                         86 Sukhumvit Road, Bangkok
                     </p>

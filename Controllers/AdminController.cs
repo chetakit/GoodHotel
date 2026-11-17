@@ -155,7 +155,7 @@ namespace GoodHotel.Controllers
             {
                 ModelState.AddModelError(
                     nameof(data.RoomNumber),
-                    "A room with this number already exists.");
+                    "มีห้องหมายเลขนี้อยู่แล้ว");
                 return View("RoomForm", data);
             }
 
@@ -204,7 +204,7 @@ namespace GoodHotel.Controllers
                 DeleteNewUpload(uploadedImagePath);
                 ModelState.AddModelError(
                     nameof(data.Image),
-                    "The image could not be uploaded. Please try again.");
+                    "อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่");
                 return View("RoomForm", data);
             }
             catch (DbUpdateException exception)
@@ -213,11 +213,11 @@ namespace GoodHotel.Controllers
                 DeleteNewUpload(uploadedImagePath);
                 ModelState.AddModelError(
                     "",
-                    "The room could not be saved. Please try again.");
+                    "บันทึกห้องไม่สำเร็จ กรุณาลองใหม่");
                 return View("RoomForm", data);
             }
 
-            TempData["RoomSuccessMessage"] = "Room added successfully.";
+            TempData["RoomSuccessMessage"] = "เพิ่มห้องแล้ว";
             return RedirectToAction(nameof(Rooms));
         }
 
@@ -297,7 +297,7 @@ namespace GoodHotel.Controllers
             {
                 ModelState.AddModelError(
                     nameof(data.RoomNumber),
-                    "A room with this number already exists.");
+                    "มีห้องหมายเลขนี้อยู่แล้ว");
                 return View("RoomForm", data);
             }
 
@@ -331,7 +331,7 @@ namespace GoodHotel.Controllers
                 {
                     DeleteNewUpload(uploadedImagePath);
                     ModelState.AddModelError(string.Empty,
-                        "The room status changed since this form was opened. Reload the page and review it before saving.");
+                        "สถานะห้องเปลี่ยนไประหว่างที่เปิดหน้านี้ กรุณาโหลดหน้าใหม่");
                     return View("RoomForm", data);
                 }
                 var hasUnresolved = await _db.MaintenanceReports.AnyAsync(
@@ -341,7 +341,7 @@ namespace GoodHotel.Controllers
                 {
                     DeleteNewUpload(uploadedImagePath);
                     ModelState.AddModelError(nameof(data.Status),
-                        "The room must remain in Maintenance while reports are unresolved.");
+                        "ห้องต้องเป็นสถานะซ่อมบำรุงจนกว่างานซ่อมจะเสร็จ");
                     return View("RoomForm", data);
                 }
                 data.RequiresMaintenanceReview = room.Status == "Maintenance" && !hasUnresolved;
@@ -349,7 +349,7 @@ namespace GoodHotel.Controllers
                 {
                     DeleteNewUpload(uploadedImagePath);
                     ModelState.AddModelError(nameof(data.ConfirmMaintenanceReview),
-                        "Review the room restrictions before restoring its status.");
+                        "กรุณาตรวจสอบเงื่อนไขของห้องก่อนเปลี่ยนสถานะกลับ");
                     return View("RoomForm", data);
                 }
                 if (((room.Status == "Maintenance" && data.Status != "Maintenance") ||
@@ -358,7 +358,7 @@ namespace GoodHotel.Controllers
                 {
                     DeleteNewUpload(uploadedImagePath);
                     ModelState.AddModelError(nameof(data.Status),
-                        "The room has a current stay, booking or cleaning restriction. Review it after the restriction clears.");
+                        "ห้องนี้ยังมีแขก การจอง หรืองานทำความสะอาดค้างอยู่ กรุณาลองใหม่ภายหลัง");
                     return View("RoomForm", data);
                 }
 
@@ -390,7 +390,7 @@ namespace GoodHotel.Controllers
                 DeleteNewUpload(uploadedImagePath);
                 ModelState.AddModelError(
                     nameof(data.Image),
-                    "The image could not be uploaded. Please try again.");
+                    "อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่");
                 return View("RoomForm", data);
             }
             catch (DbUpdateException exception)
@@ -402,7 +402,7 @@ namespace GoodHotel.Controllers
                 DeleteNewUpload(uploadedImagePath);
                 ModelState.AddModelError(
                     "",
-                    "The room could not be updated. Please try again.");
+                    "แก้ไขห้องไม่สำเร็จ กรุณาลองใหม่");
                 return View("RoomForm", data);
             }
 
@@ -415,7 +415,7 @@ namespace GoodHotel.Controllers
                 DeletePreviousImageIfUnused(previousImagePath, data.RoomId.Value);
             }
 
-            TempData["RoomSuccessMessage"] = "Room updated successfully.";
+            TempData["RoomSuccessMessage"] = "บันทึกข้อมูลห้องแล้ว";
             return RedirectToAction(nameof(Rooms));
         }
 
@@ -492,14 +492,14 @@ namespace GoodHotel.Controllers
 
             if (room == null)
             {
-                TempData["RoomErrorMessage"] = "The selected room was not found.";
+                TempData["RoomErrorMessage"] = "ไม่พบห้องที่เลือก";
                 return RedirectToAction(nameof(Rooms));
             }
 
             if (_db.Bookings.Any(booking => booking.RoomId == id))
             {
                 TempData["RoomErrorMessage"] =
-                    "This room cannot be deleted because it has booking records.";
+                    "ลบห้องนี้ไม่ได้ เพราะมีประวัติการจอง";
                 return RedirectToAction(nameof(Rooms));
             }
 
@@ -516,11 +516,11 @@ namespace GoodHotel.Controllers
                     "Could not delete room {RoomId}; it may have a related booking.",
                     id);
                 TempData["RoomErrorMessage"] =
-                    "This room could not be deleted because it is referenced by another record.";
+                    "ลบห้องนี้ไม่ได้ เพราะมีข้อมูลอื่นอ้างอิงอยู่";
                 return RedirectToAction(nameof(Rooms));
             }
 
-            TempData["RoomSuccessMessage"] = "Room deleted successfully.";
+            TempData["RoomSuccessMessage"] = "ลบห้องแล้ว";
             return RedirectToAction(nameof(Rooms));
         }
 
@@ -530,21 +530,21 @@ namespace GoodHotel.Controllers
             {
                 ModelState.AddModelError(
                     nameof(data.RoomNumber),
-                    "Room number is required.");
+                    "กรุณากรอกหมายเลขห้อง");
             }
 
             if (string.IsNullOrWhiteSpace(data.Type))
             {
                 ModelState.AddModelError(
                     nameof(data.Type),
-                    "Room type is required.");
+                    "กรุณากรอกประเภทห้อง");
             }
 
             if (string.IsNullOrWhiteSpace(data.Status))
             {
                 ModelState.AddModelError(
                     nameof(data.Status),
-                    "Room status is required.");
+                    "กรุณาเลือกสถานะห้อง");
             }
             else if (!AllowedRoomStatuses.Contains(
                          data.Status,
@@ -552,7 +552,7 @@ namespace GoodHotel.Controllers
             {
                 ModelState.AddModelError(
                     nameof(data.Status),
-                    "Select a valid room status.");
+                    "กรุณาเลือกสถานะห้องให้ถูกต้อง");
             }
         }
 
@@ -1089,14 +1089,14 @@ namespace GoodHotel.Controllers
                     (t.Status == "Accepted" || t.Status == "InProgress"), ct))
             {
                 TempData["EmployeeError"] =
-                    "Cannot deactivate this employee until outstanding Accepted or InProgress tasks are completed or reassigned.";
+                    "ปิดการใช้งานพนักงานคนนี้ไม่ได้ เพราะยังมีงานทำความสะอาดค้างอยู่";
                 return RedirectToAction(nameof(EmployeeProfile), new { id });
             }
 
             user.IsActive = isActive.Value;
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            TempData["EmployeeSuccess"] = isActive.Value ? "Employee activated." : "Employee deactivated.";
+            TempData["EmployeeSuccess"] = isActive.Value ? "เปิดการใช้งานพนักงานแล้ว" : "ปิดการใช้งานพนักงานแล้ว";
             return RedirectToAction(nameof(EmployeeProfile), new { id });
         }
 
@@ -1143,7 +1143,7 @@ namespace GoodHotel.Controllers
             var error = await _housekeeping.AssignAsync(id, assigneeId, actorId,
                 expectedStatus, expectedAssigneeId, expectedEventId.Value, reason, ct);
             if (error == null)
-                TempData["HousekeepingSuccess"] = "Housekeeping assignment saved.";
+                TempData["HousekeepingSuccess"] = "บันทึกการมอบหมายงานแล้ว";
             else
                 TempData["HousekeepingError"] = error;
             return RedirectToAction(nameof(HousekeepingDetails), new { id });
@@ -1251,7 +1251,7 @@ namespace GoodHotel.Controllers
                 new[] { "BookingId", "UserId", "RoomId", "CheckIn", "CheckOut", "Guests", "Amount", "Status", "Promotion" },
                 rows.Select(b => new[] { Format(b.BookingId), Format(b.UserId), Format(b.RoomId),
                     Format(b.CheckIn), Format(b.CheckOut), Format(b.Guests), Format(b.Amount),
-                    Format(b.Status), Format(b.Promotion) }));
+                    b.Status, b.Promotion }));
         }
 
         [HttpGet]

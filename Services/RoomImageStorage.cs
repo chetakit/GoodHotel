@@ -18,7 +18,7 @@ public static class RoomImageStorage
 
         if (file.Length == 0 || file.Length > MaximumFileSize)
         {
-            return "Image must be larger than 0 bytes and no more than 5 MB.";
+            return "รูปต้องมีขนาดไม่เกิน 5 MB";
         }
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -36,7 +36,7 @@ public static class RoomImageStorage
                 expectedContentType,
                 StringComparison.OrdinalIgnoreCase))
         {
-            return "Only valid JPG, JPEG, PNG, or WEBP images are allowed.";
+            return "อัปโหลดได้เฉพาะรูป JPG, PNG หรือ WEBP";
         }
 
         return null;
@@ -66,7 +66,7 @@ public static class RoomImageStorage
         if (!await HasValidImageSignatureAsync(input, extension, cancellationToken))
         {
             throw new InvalidDataException(
-                "The uploaded file content does not match its image type.");
+                "ไฟล์ที่อัปโหลดไม่ตรงกับชนิดรูปภาพ");
         }
 
         input.Position = 0;

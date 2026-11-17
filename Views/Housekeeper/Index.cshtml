@@ -1,33 +1,33 @@
 @model GoodHotel.Models.ViewModels.HousekeepingDashboardViewModel
 @{
-    ViewData["Title"] = "Housekeeper Dashboard";
+    ViewData["Title"] = "แดชบอร์ดแม่บ้าน";
 }
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Hotel Operations</span>
-            <h2>Housekeeper Dashboard</h2>
+            <span class="eyebrow text-dark">Housekeeping</span>
+            <h2>แดชบอร์ดแม่บ้าน</h2>
         </div>
         <div class="row g-3 mb-4">
-            <div class="col-md-3"><div class="card p-3">Available tasks <strong>@Model.AvailableCount</strong></div></div>
-            <div class="col-md-3"><div class="card p-3">My accepted tasks <strong>@Model.AcceptedCount</strong></div></div>
-            <div class="col-md-3"><div class="card p-3">My in-progress tasks <strong>@Model.InProgressCount</strong></div></div>
-            <div class="col-md-3"><div class="card p-3">Completed today (UTC) <strong>@Model.CompletedTodayCount</strong></div></div>
+            <div class="col-md-3"><div class="card p-3">งานที่รอคนรับ <strong>@Model.AvailableCount</strong></div></div>
+            <div class="col-md-3"><div class="card p-3">งานที่ฉันรับแล้ว <strong>@Model.AcceptedCount</strong></div></div>
+            <div class="col-md-3"><div class="card p-3">งานที่ฉันกำลังทำ <strong>@Model.InProgressCount</strong></div></div>
+            <div class="col-md-3"><div class="card p-3">ทำเสร็จวันนี้ <strong>@Model.CompletedTodayCount</strong></div></div>
         </div>
-        <h3>My recent tasks</h3>
+        <h3>งานล่าสุดของฉัน</h3>
         @if (Model.RecentTasks.Count == 0)
         {
-            <p>No assigned tasks found.</p>
+            <p>ยังไม่มีงาน</p>
         }
         else
         {
             <ul>
                 @foreach (var task in Model.RecentTasks)
                 {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">Task #@task.TaskId</a> — Room @(task.RoomNumber ?? "Not specified") — @task.Status</li>
+                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.Status)</li>
                 }
             </ul>
         }
-        <a asp-action="Tasks" class="btn btn-primary">Cleaning Tasks</a>
+        <a asp-action="Tasks" class="btn btn-primary">ดูงานทำความสะอาด</a>
     </div>
 </section>

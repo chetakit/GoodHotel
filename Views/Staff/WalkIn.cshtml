@@ -1,7 +1,7 @@
 @model GoodHotel.Models.ViewModels.WalkInViewModel
 
 @{
-    ViewData["Title"] = "Walk-in";
+    ViewData["Title"] = "รับลูกค้า Walk-in";
     // <input type="date"> ต้องการปี ค.ศ. เสมอ จึงใช้ InvariantCulture (เครื่องที่ตั้งภาษาไทยจะได้ปี พ.ศ.)
     var iso = System.Globalization.CultureInfo.InvariantCulture;
     var minCheckOut = Model.Today.AddDays(1).ToString("yyyy-MM-dd", iso);

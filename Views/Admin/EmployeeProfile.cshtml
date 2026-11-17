@@ -2,7 +2,7 @@
 
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Employee Profile";
+    ViewData["Title"] = "ข้อมูลพนักงาน";
 }
 
 <div class="container mt-4">
@@ -16,30 +16,30 @@
     }
     <div class="card">
         <div class="card-header">
-            <h4 class="mb-0">Employee Profile</h4>
+            <h4 class="mb-0">ข้อมูลพนักงาน</h4>
         </div>
         <div class="card-body">
             <dl class="row mb-0">
-                <dt class="col-sm-3">User ID</dt>
+                <dt class="col-sm-3">รหัส</dt>
                 <dd class="col-sm-9">@Model.UserId</dd>
 
-                <dt class="col-sm-3">Name</dt>
+                <dt class="col-sm-3">ชื่อ</dt>
                 <dd class="col-sm-9">@Model.FirstName @Model.LastName</dd>
 
-                <dt class="col-sm-3">Email</dt>
+                <dt class="col-sm-3">อีเมล</dt>
                 <dd class="col-sm-9">@Model.Email</dd>
 
-                <dt class="col-sm-3">Phone</dt>
+                <dt class="col-sm-3">เบอร์โทร</dt>
                 <dd class="col-sm-9">@Model.Phone</dd>
 
-                <dt class="col-sm-3">Date of Birth</dt>
-                <dd class="col-sm-9">@Model.BirthDate?.ToString("yyyy-MM-dd")</dd>
+                <dt class="col-sm-3">วันเกิด</dt>
+                <dd class="col-sm-9">@ThaiText.Date(Model.BirthDate)</dd>
 
-                <dt class="col-sm-3">Role</dt>
-                <dd class="col-sm-9">@Model.Role</dd>
+                <dt class="col-sm-3">บทบาท</dt>
+                <dd class="col-sm-9">@ThaiText.Status(Model.Role)</dd>
 
-                <dt class="col-sm-3">Status</dt>
-                <dd class="col-sm-9">@(Model.IsActive ? "Active" : "Inactive")</dd>
+                <dt class="col-sm-3">สถานะ</dt>
+                <dd class="col-sm-9">@(Model.IsActive ? "ใช้งานอยู่" : "ปิดการใช้งาน")</dd>
             </dl>
         </div>
         <div class="card-footer">
@@ -47,13 +47,13 @@
                 <input type="hidden" name="id" value="@Model.UserId" />
                 <input type="hidden" name="isActive" value="@(Model.IsActive ? "false" : "true")" />
                 <button type="submit" class="btn @(Model.IsActive ? "btn-outline-danger" : "btn-outline-success")">
-                    @(Model.IsActive ? "Deactivate" : "Activate")
+                    @(Model.IsActive ? "ปิดการใช้งาน" : "เปิดการใช้งาน")
                 </button>
             </form>
             <a asp-controller="Admin"
                asp-action="Employees"
                class="btn btn-secondary">
-                Back to Employees
+                กลับไปรายชื่อพนักงาน
             </a>
         </div>
     </div>

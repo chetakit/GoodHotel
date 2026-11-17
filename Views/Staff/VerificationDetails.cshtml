@@ -1,24 +1,24 @@
 @model GoodHotel.Models.ViewModels.StaffTaskViewModel
 @{
-    ViewData["Title"] = "Cleaning Task Details";
+    ViewData["Title"] = "รายละเอียดงานทำความสะอาด";
 }
 <section class="content-section">
     <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Task #@Model.TaskId</h2></div>
+        <div class="section-heading"><span class="eyebrow text-dark">Front Desk</span><h2>งานทำความสะอาด #@Model.TaskId</h2></div>
         <dl>
-            <dt>Room</dt><dd>@(Model.RoomNumber ?? "Not specified")</dd>
-            <dt>Room type</dt><dd>@(Model.RoomType ?? "Not specified")</dd>
-            <dt>Task type</dt><dd>@Model.TaskType</dd>
-            <dt>Status</dt><dd>@Model.Status</dd>
-            <dt>Completed by user ID</dt><dd>@(Model.CompletedByUserId?.ToString() ?? "Not specified")</dd>
-            <dt>Completed (UTC)</dt><dd>@(Model.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? "Not specified")</dd>
+            <dt>ห้อง</dt><dd>@ThaiText.OrDash(Model.RoomNumber)</dd>
+            <dt>ประเภทห้อง</dt><dd>@ThaiText.OrDash(Model.RoomType)</dd>
+            <dt>ประเภทงาน</dt><dd>@ThaiText.Status(Model.TaskType)</dd>
+            <dt>สถานะ</dt><dd>@ThaiText.Status(Model.Status)</dd>
+            <dt>ทำโดยผู้ใช้ #</dt><dd>@(Model.CompletedByUserId?.ToString() ?? "-")</dd>
+            <dt>ทำเสร็จเมื่อ</dt><dd>@ThaiText.Time(Model.CompletedAtUtc)</dd>
         </dl>
         @if (Model.Status == "Completed")
         {
             <form asp-action="VerifyTask" asp-route-id="@Model.TaskId" method="post">
-                <button class="btn btn-primary" type="submit">Verify</button>
+                <button class="btn btn-primary" type="submit">ตรวจผ่าน</button>
             </form>
         }
-        <a asp-action="VerificationTasks" class="btn btn-outline-primary mt-3">Back to tasks</a>
+        <a asp-action="VerificationTasks" class="btn btn-outline-primary mt-3">กลับไปรายการงาน</a>
     </div>
 </section>

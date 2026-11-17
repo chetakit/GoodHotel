@@ -20,38 +20,38 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
 
     public async Task<string?> CheckInAsync(int bookingId, int actorId, string? note, CancellationToken ct)
     {
-        if (note?.Length > 2000) return "Check-in note must be at most 2000 characters.";
+        if (note?.Length > 2000) return "หมายเหตุต้องไม่เกิน 2000 ตัวอักษร";
         var roomId = await db.Bookings.AsNoTracking().Where(b => b.BookingId == bookingId)
             .Select(b => b.RoomId).SingleOrDefaultAsync(ct);
-        if (!roomId.HasValue) return "Booking or room not found.";
+        if (!roomId.HasValue) return "ไม่พบการจองหรือห้อง";
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        if (!await RoomAvailabilityService.LockRoomAsync(db, tx, roomId.Value, ct)) return "Room not found.";
+        if (!await RoomAvailabilityService.LockRoomAsync(db, tx, roomId.Value, ct)) return "ไม่พบห้อง";
         var booking = await db.Bookings.AsNoTracking()
             .Where(b => b.BookingId == bookingId)
             .Select(b => new { b.RoomId, b.CheckIn, b.CheckOut, b.Status, RoomStatus = b.Room == null ? null : b.Room.Status })
             .SingleOrDefaultAsync(ct);
-        if (booking == null || booking.RoomId != roomId) return "Booking or room changed. Please retry.";
-        if (booking.Status == BookingStatuses.Cancelled) return "This booking was cancelled.";
+        if (booking == null || booking.RoomId != roomId) return "ข้อมูลการจองหรือห้องเปลี่ยนไป กรุณาลองใหม่";
+        if (booking.Status == BookingStatuses.Cancelled) return "การจองนี้ถูกยกเลิกแล้ว";
         var today = HotelToday();
         if (!booking.CheckIn.HasValue || !booking.CheckOut.HasValue ||
             booking.CheckOut <= booking.CheckIn || today >= booking.CheckOut)
-            return "The booking dates are invalid or the check-out date has already arrived.";
-        if (booking.RoomStatus != "Available") return "The room is not available.";
+            return "วันที่การจองไม่ถูกต้อง หรือเลยวันออกไปแล้ว";
+        if (booking.RoomStatus != "Available") return "ห้องนี้ไม่พร้อมใช้งาน";
         var early = today < booking.CheckIn;
-        if (early) return "Early check-in is unavailable until booking availability accounts for active stays.";
+        if (early) return "ยังเช็คอินก่อนวันเข้าพักไม่ได้";
         if (!await PaymentService.IsPaidAsync(db, bookingId, ct))
             return "ยังไม่ได้รับชำระเงิน กรุณายืนยันการชำระเงินก่อนเช็คอิน";
         if (await db.BookingStays.AnyAsync(s => s.BookingId == bookingId, ct))
-            return "This booking already has a stay.";
+            return "การจองนี้เช็คอินไปแล้ว";
         if (await db.BookingStays.AnyAsync(s => s.Status == "CheckedIn" && s.Booking.RoomId == roomId, ct))
-            return "The room already has an active stay.";
+            return "ห้องนี้มีแขกเข้าพักอยู่แล้ว";
         if (await db.HousekeepingTasks.AnyAsync(t => t.RoomId == roomId &&
             t.TaskType == "CheckoutCleaning" && t.Status != "Verified", ct))
-            return "The room has a checkout cleaning task awaiting verification.";
+            return "ห้องนี้ยังรอทำความสะอาด/รอตรวจ";
         if (await db.MaintenanceReports.AnyAsync(r =>
             r.RoomId == roomId && r.Status != MaintenanceReport.Resolved, ct))
-            return "The room is blocked by maintenance during this stay.";
+            return "ห้องนี้ติดงานซ่อม";
 
         db.BookingStays.Add(new BookingStay
         {
@@ -67,19 +67,19 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
     {
         var roomId = await db.Bookings.AsNoTracking().Where(b => b.BookingId == bookingId)
             .Select(b => b.RoomId).SingleOrDefaultAsync(ct);
-        if (!roomId.HasValue) return "Booking or room not found.";
+        if (!roomId.HasValue) return "ไม่พบการจองหรือห้อง";
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        if (!await RoomAvailabilityService.LockRoomAsync(db, tx, roomId.Value, ct)) return "Room not found.";
+        if (!await RoomAvailabilityService.LockRoomAsync(db, tx, roomId.Value, ct)) return "ไม่พบห้อง";
         var booking = await db.Bookings.AsNoTracking().Where(b => b.BookingId == bookingId)
             .Select(b => new { b.RoomId }).SingleOrDefaultAsync(ct);
-        if (booking == null || booking.RoomId != roomId) return "Booking or room changed. Please retry.";
+        if (booking == null || booking.RoomId != roomId) return "ข้อมูลการจองหรือห้องเปลี่ยนไป กรุณาลองใหม่";
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var updated = await db.BookingStays.Where(s => s.BookingId == bookingId && s.Status == "CheckedIn")
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "CheckedOut")
                 .SetProperty(x => x.CheckedOutAtUtc, now)
                 .SetProperty(x => x.CheckedOutByUserId, actorId), ct);
-        if (updated != 1) return "No active stay is available for check-out.";
+        if (updated != 1) return "ไม่มีแขกที่เข้าพักอยู่ให้เช็คเอาท์";
 
         await housekeeping.CreateCheckoutCleaningAsync(roomId.Value, bookingId, actorId, now, ct);
         await tx.CommitAsync(ct);

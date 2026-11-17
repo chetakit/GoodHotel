@@ -59,29 +59,29 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
 
     private static string? ValidateAssignment(string status, int? previousAssignee, int newAssignee, string? reason)
     {
-        if (reason?.Length > 2000) return "Reason must be at most 2000 characters.";
+        if (reason?.Length > 2000) return "เหตุผลต้องไม่เกิน 2000 ตัวอักษร";
         if (status == "Pending" && previousAssignee == null) return null;
         if ((status == "Accepted" || status == "InProgress") && previousAssignee.HasValue)
         {
-            if (previousAssignee == newAssignee) return "Choose a different Housekeeper.";
-            if (string.IsNullOrWhiteSpace(reason)) return "A reason is required to reassign this task.";
+            if (previousAssignee == newAssignee) return "กรุณาเลือกแม่บ้านคนอื่น";
+            if (string.IsNullOrWhiteSpace(reason)) return "กรุณาระบุเหตุผลในการเปลี่ยนผู้รับงาน";
             return null;
         }
-        return "This task cannot be assigned or reassigned in its current state.";
+        return "มอบหมายงานนี้ไม่ได้ในสถานะปัจจุบัน";
     }
 
     public async Task<string?> AssignAsync(int taskId, int newAssignee, int actorId,
         string expectedStatus, int? expectedAssignee, int expectedEventId, string? reason, CancellationToken ct)
     {
         if (taskId <= 0 || newAssignee <= 0 || actorId <= 0 || expectedAssignee is <= 0 || expectedEventId < 0)
-            return "Invalid task or user.";
+            return "ไม่พบงานหรือผู้ใช้";
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         var snapshot = await db.HousekeepingTasks.AsNoTracking().Where(t => t.TaskId == taskId)
             .Select(t => new { t.Status, t.AssignedToUserId }).SingleOrDefaultAsync(ct);
-        if (snapshot == null) return "Task not found.";
+        if (snapshot == null) return "ไม่พบงาน";
         if (snapshot.Status != expectedStatus || snapshot.AssignedToUserId != expectedAssignee)
-            return "This task has changed. Review it before trying again.";
+            return "งานนี้ถูกเปลี่ยนไปแล้ว กรุณาตรวจสอบอีกครั้ง";
 
         var error = ValidateAssignment(snapshot.Status, snapshot.AssignedToUserId, newAssignee, reason);
         if (error != null) return error;
@@ -89,26 +89,26 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         var userIds = new[] { actorId, newAssignee, snapshot.AssignedToUserId ?? 0 }
             .Where(id => id > 0).Distinct().OrderBy(id => id);
         foreach (var userId in userIds)
-            if (!await LockUserAsync(db, userId, ct)) return "An involved user no longer exists.";
+            if (!await LockUserAsync(db, userId, ct)) return "ไม่พบผู้ใช้ที่เกี่ยวข้อง";
 
         var actor = await db.Users.AsNoTracking().Where(u => u.UserId == actorId)
             .Select(u => new { u.Role, u.IsActive }).SingleOrDefaultAsync(ct);
         if (actor == null || actor.Role != "Admin" || !actor.IsActive)
-            return "The administrator account is no longer authorized.";
+            return "บัญชีผู้ดูแลระบบนี้ไม่มีสิทธิ์แล้ว";
         var assignee = await db.Users.AsNoTracking().Where(u => u.UserId == newAssignee)
             .Select(u => new { u.Role, u.IsActive }).SingleOrDefaultAsync(ct);
         if (assignee == null || assignee.Role != "Housekeeper" || !assignee.IsActive)
-            return "Select an active Housekeeper.";
+            return "กรุณาเลือกแม่บ้านที่ยังใช้งานอยู่";
 
         var current = await db.HousekeepingTasks.AsNoTracking().Where(t => t.TaskId == taskId)
             .Select(t => new { t.Status, t.AssignedToUserId }).SingleOrDefaultAsync(ct);
         if (current == null || current.Status != snapshot.Status ||
             current.AssignedToUserId != snapshot.AssignedToUserId)
-            return "This task has changed. Review it before trying again.";
+            return "งานนี้ถูกเปลี่ยนไปแล้ว กรุณาตรวจสอบอีกครั้ง";
         var latestEventId = await db.HousekeepingTaskEvents.AsNoTracking()
             .Where(e => e.TaskId == taskId).MaxAsync(e => (int?)e.EventId, ct) ?? 0;
         if (latestEventId != expectedEventId)
-            return "This task has changed. Review it before trying again.";
+            return "งานนี้ถูกเปลี่ยนไปแล้ว กรุณาตรวจสอบอีกครั้ง";
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var changed = await db.HousekeepingTasks
@@ -118,7 +118,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
                 .SetProperty(t => t.AssignedToUserId, newAssignee)
                 .SetProperty(t => t.AcceptedAtUtc, now)
                 .SetProperty(t => t.StartedAtUtc, (DateTime?)null), ct);
-        if (changed != 1) return "This task has changed. Review it before trying again.";
+        if (changed != 1) return "งานนี้ถูกเปลี่ยนไปแล้ว กรุณาตรวจสอบอีกครั้ง";
 
         db.HousekeepingTaskEvents.Add(new HousekeepingTaskEvent
         {

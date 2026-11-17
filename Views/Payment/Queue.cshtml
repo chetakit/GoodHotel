@@ -1,59 +1,67 @@
 @model GoodHotel.Models.ViewModels.PaymentQueueViewModel
 @{
     if (User.IsInRole("Admin")) { Layout = "_AdminLayout"; }
-    ViewData["Title"] = "Payment History";
-    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    ViewData["Title"] = "การชำระเงิน";
 }
 <section class="content-section"><div class="container">
-    <h2>Payment history</h2>
-    <p>DEMO/MOCK payments are simulations; no real money is transferred.</p>
+    <h2>รายการชำระเงิน</h2>
+    <p class="text-muted">รายการที่มีคำว่า (จำลอง) เป็นการชำระเงินจำลอง ไม่มีการโอนเงินจริง</p>
     <form asp-action="Queue" method="get" class="row g-2 mb-4">
         <div class="col-md-4">
-            <label for="search" class="form-label">Booking ID, payment ID or customer</label>
+            <label for="search" class="form-label">เลขที่การจอง / เลขที่ชำระเงิน / ชื่อลูกค้า</label>
             <input id="search" name="search" value="@Model.Search" maxlength="100" class="form-control" />
         </div>
         <div class="col-md-3">
-            <label for="status" class="form-label">Status</label>
+            <label for="status" class="form-label">สถานะ</label>
             <select id="status" name="status" class="form-select">
-                <option value="">All statuses</option>
+                <option value="">ทุกสถานะ</option>
                 @foreach (var value in new[] { "Pending", "Submitted", "Paid", "Refunded", "Rejected", "Requires reconciliation", "Excluded" })
                 {
-                    <option value="@value" selected="@(Model.Status == value)">@value</option>
+                    <option value="@value" selected="@(Model.Status == value)">@ThaiText.Status(value)</option>
                 }
             </select>
         </div>
         <div class="col-md-3">
-            <label for="method" class="form-label">Method (exact; use Cash for cash)</label>
-            <input id="method" name="method" value="@Model.Method" maxlength="50" class="form-control" />
+            <label for="method" class="form-label">วิธีชำระเงิน</label>
+            <select id="method" name="method" class="form-select">
+                <option value="">ทุกวิธี</option>
+                @foreach (var value in new[] { "Cash", "Bank Transfer (Mock)", "PromptPay (Mock)", "PayPal (Mock)" })
+                {
+                    <option value="@value" selected="@(Model.Method == value)">@ThaiText.PaymentMethod(value)</option>
+                }
+            </select>
         </div>
         <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
+            <button type="submit" class="btn btn-primary w-100">กรอง</button>
         </div>
     </form>
-    @if (Model.Payments.Count == 0) { <p>No payment records found.</p> }
+    @if (Model.Payments.Count == 0)
+    {
+        <p>ไม่พบรายการชำระเงิน</p>
+    }
     else
     {
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>Booking ID</th><th>Customer</th><th>Method</th><th>Amount</th><th>Status</th><th>Transaction date</th><th>Action</th></tr></thead>
+                <thead><tr><th>การจอง</th><th>ลูกค้า</th><th>วิธีชำระ</th><th>จำนวนเงิน</th><th>สถานะ</th><th>วันที่ทำรายการ</th><th></th></tr></thead>
                 <tbody>
                 @foreach (var item in Model.Payments)
                 {
                     <tr>
-                        <td>@(item.Payment.BookingId?.ToString(culture) ?? "Not specified")</td>
-                        <td>@(string.IsNullOrWhiteSpace(item.Customer) ? "Not specified" : item.Customer)</td>
-                        <td>@(item.Payment.Method == "Cash" ? "Cash at Hotel" : item.Payment.Method ?? "Unknown")</td>
-                        <td>@(item.Payment.Amount?.ToString("N2", culture) ?? "Unknown")</td>
-                        <td>@item.Payment.DisplayStatus</td>
-                        <td>@(item.TransactionAtUtc.HasValue ? item.TransactionAtUtc.Value.ToString("yyyy-MM-dd HH:mm", culture) + " UTC" : item.PaymentDate?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</td>
+                        <td>@(item.Payment.BookingId.HasValue ? $"#{item.Payment.BookingId}" : "-")</td>
+                        <td>@ThaiText.OrDash(item.Customer)</td>
+                        <td>@ThaiText.PaymentMethod(item.Payment.Method)</td>
+                        <td>@(item.Payment.Amount.HasValue ? $"฿{item.Payment.Amount:N2}" : "-")</td>
+                        <td>@ThaiText.Status(item.Payment.DisplayStatus)</td>
+                        <td>@(item.TransactionAtUtc.HasValue ? ThaiText.Time(item.TransactionAtUtc) : ThaiText.Date(item.PaymentDate))</td>
                         <td>
                             @if (item.Payment.BookingId.HasValue)
                             {
-                                <a asp-action="Details" asp-route-id="@item.Payment.BookingId">Details / Manage</a>
+                                <a asp-action="Details" asp-route-id="@item.Payment.BookingId">ดู / จัดการ</a>
                             }
                             else
                             {
-                                <span>Missing booking</span>
+                                <span>ไม่พบการจอง</span>
                             }
                         </td>
                     </tr>
@@ -62,12 +70,15 @@
             </table>
         </div>
     }
-    <h3>Refund requests</h3>
-    @if (Model.Refunds.Count == 0) { <p>No refund requests.</p> }
+    <h3>คำขอคืนเงิน</h3>
+    @if (Model.Refunds.Count == 0)
+    {
+        <p>ไม่มีคำขอคืนเงิน</p>
+    }
     @foreach (var refund in Model.Refunds)
     {
-        <p>Refund #@refund.RefundId · Payment #@refund.PaymentId · @refund.Amount
-            @if (refund.BookingId.HasValue) { <a asp-action="Details" asp-route-id="@refund.BookingId">Review booking #@refund.BookingId</a> }
+        <p>คำขอคืนเงิน #@refund.RefundId · ชำระเงิน #@refund.PaymentId · ฿@refund.Amount.ToString("N2")
+            @if (refund.BookingId.HasValue) { <a asp-action="Details" asp-route-id="@refund.BookingId">ตรวจสอบการจอง #@refund.BookingId</a> }
         </p>
     }
 </div></section>

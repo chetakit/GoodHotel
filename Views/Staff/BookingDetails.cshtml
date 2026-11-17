@@ -1,17 +1,16 @@
 @model GoodHotel.Controllers.StaffController.BookingDetailsModel
 
 @{
-    ViewData["Title"] = "Booking Details";
-    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    ViewData["Title"] = "รายละเอียดการจอง";
     var customerName = $"{Model.FirstName} {Model.LastName}".Trim();
-    var isPaid = Model.PaymentLabel == GoodHotel.Services.PaymentService.PaidLabel;
+    var isPaid = Model.PaymentLabel == PaymentService.PaidLabel;
 }
 
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Hotel Operations</span>
-            <h2>Booking Details</h2>
+            <span class="eyebrow text-dark">Front Desk</span>
+            <h2>รายละเอียดการจอง #@Model.BookingId</h2>
         </div>
 
         @if (TempData["StaffSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
@@ -19,49 +18,34 @@
 
         <div class="booking-panel">
             <dl class="row mb-0">
-                <dt class="col-sm-5 col-lg-4">Booking ID</dt>
-                <dd class="col-sm-7 col-lg-8">@Model.BookingId</dd>
-                <dt class="col-sm-5 col-lg-4">Customer</dt>
-                <dd class="col-sm-7 col-lg-8">@(string.IsNullOrWhiteSpace(customerName) ? "Not specified" : customerName)</dd>
-                <dt class="col-sm-5 col-lg-4">Room</dt>
-                <dd class="col-sm-7 col-lg-8">@(string.IsNullOrWhiteSpace(Model.RoomNumber) ? "Not specified" : Model.RoomNumber)</dd>
-                <dt class="col-sm-5 col-lg-4">Check-in</dt>
-                <dd class="col-sm-7 col-lg-8">@(Model.CheckIn?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</dd>
-                <dt class="col-sm-5 col-lg-4">Check-out</dt>
-                <dd class="col-sm-7 col-lg-8">@(Model.CheckOut?.ToString("yyyy-MM-dd", culture) ?? "Not specified")</dd>
-                <dt class="col-sm-5 col-lg-4">Guests</dt>
-                <dd class="col-sm-7 col-lg-8">@(Model.Guests?.ToString(culture) ?? "Not specified")</dd>
-                <dt class="col-sm-5 col-lg-4">Extra bed</dt>
-                <dd class="col-sm-7 col-lg-8">@(Model.ExtraBed?.ToString(culture) ?? "Not specified")</dd>
-                <dt class="col-sm-5 col-lg-4">Promotion</dt>
-                <dd class="col-sm-7 col-lg-8">
-                    @if (Model.PromotionId.HasValue)
-                    {
-                        <span>#@Model.PromotionId</span>
-                        @if (!string.IsNullOrWhiteSpace(Model.PromotionName))
-                        {
-                            <span> - @Model.PromotionName</span>
-                        }
-                    }
-                    else
-                    {
-                        <span>Not specified</span>
-                    }
-                </dd>
-                <dt class="col-sm-5 col-lg-4">Amount</dt>
-                <dd class="col-sm-7 col-lg-8">@(Model.Amount?.ToString("N2", culture) ?? "Not specified")</dd>
-                <dt class="col-sm-5 col-lg-4">Stay status</dt>
-                <dd class="col-sm-7 col-lg-8">@(Model.StayStatus ?? "Not checked in")</dd>
-                <dt class="col-sm-5 col-lg-4">Booking status</dt>
-                <dd class="col-sm-7 col-lg-8">@Model.BookingStatus</dd>
-                <dt class="col-sm-5 col-lg-4">Payment</dt>
+                <dt class="col-sm-5 col-lg-4">ลูกค้า</dt>
+                <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(customerName)</dd>
+                <dt class="col-sm-5 col-lg-4">ห้อง</dt>
+                <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(Model.RoomNumber)</dd>
+                <dt class="col-sm-5 col-lg-4">วันเข้าพัก</dt>
+                <dd class="col-sm-7 col-lg-8">@ThaiText.Date(Model.CheckIn)</dd>
+                <dt class="col-sm-5 col-lg-4">วันออก</dt>
+                <dd class="col-sm-7 col-lg-8">@ThaiText.Date(Model.CheckOut)</dd>
+                <dt class="col-sm-5 col-lg-4">จำนวนผู้เข้าพัก</dt>
+                <dd class="col-sm-7 col-lg-8">@(Model.Guests?.ToString() ?? "-")</dd>
+                <dt class="col-sm-5 col-lg-4">เตียงเสริม</dt>
+                <dd class="col-sm-7 col-lg-8">@(Model.ExtraBed?.ToString() ?? "0")</dd>
+                <dt class="col-sm-5 col-lg-4">โปรโมชั่น</dt>
+                <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(Model.PromotionName)</dd>
+                <dt class="col-sm-5 col-lg-4">ยอดรวม</dt>
+                <dd class="col-sm-7 col-lg-8">@(Model.Amount.HasValue ? $"฿{Model.Amount:N2}" : "-")</dd>
+                <dt class="col-sm-5 col-lg-4">สถานะการจอง</dt>
+                <dd class="col-sm-7 col-lg-8">@ThaiText.Status(Model.BookingStatus)</dd>
+                <dt class="col-sm-5 col-lg-4">สถานะการเข้าพัก</dt>
+                <dd class="col-sm-7 col-lg-8">@(Model.StayStatus == null ? "ยังไม่เช็คอิน" : ThaiText.Status(Model.StayStatus))</dd>
+                <dt class="col-sm-5 col-lg-4">การชำระเงิน</dt>
                 <dd class="col-sm-7 col-lg-8">
                     <span class="badge @(isPaid ? "text-bg-success" : "text-bg-warning")">@Model.PaymentLabel</span>
                 </dd>
             </dl>
         </div>
 
-        @if (Model.BookingStatus == GoodHotel.Models.BookingStatuses.Cancelled)
+        @if (Model.BookingStatus == BookingStatuses.Cancelled)
         {
             <div class="alert alert-secondary mt-3">การจองนี้ถูกยกเลิกแล้ว</div>
         }
@@ -69,9 +53,9 @@
         {
             @* ยังไม่จ่ายเงิน: เช็คอินไม่ได้ ต้องยืนยันการชำระเงินก่อน หรือยกเลิกถ้าลูกค้าไม่มา *@
             <div class="booking-panel mt-3">
-                <p class="mb-2">ยังไม่ได้รับชำระเงิน จึงเช็คอินไม่ได้ ให้ไปยืนยันการชำระเงินที่หน้า Payment details ก่อน</p>
+                <p class="mb-2">ยังไม่ได้รับชำระเงิน จึงเช็คอินไม่ได้ ให้ไปยืนยันการชำระเงินก่อน</p>
                 <div class="d-flex flex-wrap gap-2">
-                    <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-primary">ไปหน้า Payment</a>
+                    <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-primary">ไปหน้าการชำระเงิน</a>
                     <form asp-action="CancelBooking" method="post"
                           onsubmit="return confirm('ยกเลิกการจอง #@Model.BookingId (ลูกค้าไม่มา/ไม่จ่ายเงิน)?');">
                         <input type="hidden" name="bookingId" value="@Model.BookingId" />
@@ -84,24 +68,24 @@
         {
             <form asp-action="CheckIn" method="post" class="booking-panel mt-3">
                 <input type="hidden" name="bookingId" value="@Model.BookingId" />
-                <p class="text-muted">Early check-in is unavailable until booking availability accounts for active stays.</p>
-                <label class="form-label mt-2" for="note">Check-in note (optional)</label>
+                <p class="text-muted">เช็คอินได้ตั้งแต่วันเข้าพักที่จองไว้ (ยังไม่รองรับการเช็คอินก่อนวัน)</p>
+                <label class="form-label mt-2" for="note">หมายเหตุ (ไม่บังคับ)</label>
                 <textarea class="form-control" id="note" name="note" maxlength="2000"></textarea>
-                <button class="btn btn-primary mt-3" type="submit">Check-in</button>
+                <button class="btn btn-primary mt-3" type="submit">เช็คอิน</button>
             </form>
         }
         else if (Model.StayStatus == "CheckedIn")
         {
             <form asp-action="CheckOut" method="post" class="mt-3">
                 <input type="hidden" name="bookingId" value="@Model.BookingId" />
-                <button class="btn btn-primary" type="submit">Check-out and create cleaning task</button>
+                <button class="btn btn-primary" type="submit">เช็คเอาท์ (ส่งงานทำความสะอาดให้แม่บ้าน)</button>
             </form>
         }
 
-        <nav class="d-flex flex-wrap gap-2 mt-4" aria-label="Related workflow pages">
-            <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">Payment details</a>
-            <a asp-action="GuestDetails" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-primary">Guest Details</a>
-            <a asp-action="Bookings" class="btn btn-outline-primary">Back to Bookings</a>
+        <nav class="d-flex flex-wrap gap-2 mt-4">
+            <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">การชำระเงิน</a>
+            <a asp-action="GuestDetails" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-primary">ข้อมูลลูกค้า</a>
+            <a asp-action="Bookings" class="btn btn-outline-primary">กลับไปรายการจอง</a>
         </nav>
     </div>
 </section>

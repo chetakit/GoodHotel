@@ -2,7 +2,7 @@
 
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Reports";
+    ViewData["Title"] = "รายงาน";
 
     string StatusClass(string? status) => status?.Trim().ToLowerInvariant() switch
     {
@@ -87,35 +87,35 @@
 </style>
 
 <div class="reports-page">
-    <p class="reports-intro">An all-time overview of bookings, payments and hotel operations.</p>
+    <p class="reports-intro">ภาพรวมการจอง การชำระเงิน และงานของโรงแรมตั้งแต่เปิดระบบ</p>
 
     <div class="reports-grid">
             <section class="reports-card" aria-labelledby="report-bookings">
-                <h3 id="report-bookings">Total Bookings</h3>
+                <h3 id="report-bookings">การจองทั้งหมด</h3>
                 <p class="reports-value">@Model.BookingCount.ToString("N0")</p>
                 <p class="reports-note">ไม่นับที่ยกเลิก (ยกเลิกแล้ว @Model.CancelledBookingCount.ToString("N0") รายการ)</p>
             </section>
             <section class="reports-card" aria-labelledby="report-booking-value">
-                <h3 id="report-booking-value">Booking Value</h3>
+                <h3 id="report-booking-value">มูลค่าการจอง (บาท)</h3>
                 <p class="reports-value">@(Model.BookingAmount?.ToString("N2") ?? "N/A")</p>
-                <p class="reports-note">Sum of recorded booking amounts</p>
+                <p class="reports-note">ยอดรวมของการจองที่ไม่ได้ยกเลิก</p>
             </section>
             <section class="reports-card" aria-labelledby="report-revenue">
-                <h3 id="report-revenue">Payment Revenue</h3>
+                <h3 id="report-revenue">รายได้ (บาท)</h3>
                 <p class="reports-value">@(Model.Revenue?.ToString("N2") ?? "N/A")</p>
-                <p class="reports-note">Confirmed payments less approved refunds</p>
-                <p class="reports-note reports-simulation">Includes DEMO/MOCK amounts; not actual money received.</p>
+                <p class="reports-note">เงินที่ยืนยันแล้ว หักยอดคืนเงินที่อนุมัติ</p>
+                <p class="reports-note reports-simulation">รวมการชำระเงินจำลอง (ไม่ใช่เงินจริง)</p>
             </section>
             <section class="reports-card" aria-labelledby="report-stay">
-                <h3 id="report-stay">Average Actual Stay</h3>
-                <p class="reports-value">@(Model.AverageActualStayNights.HasValue ? $"{Model.AverageActualStayNights.Value:N2} nights" : "N/A")</p>
-                <p class="reports-note">@Model.CompletedStaysWithValidDates completed stays with actual timestamps, using Asia/Bangkok dates</p>
+                <h3 id="report-stay">ระยะเวลาเข้าพักเฉลี่ย</h3>
+                <p class="reports-value">@(Model.AverageActualStayNights.HasValue ? $"{Model.AverageActualStayNights.Value:N2} คืน" : "N/A")</p>
+                <p class="reports-note">คิดจากการเข้าพักที่เช็คเอาท์แล้ว @Model.CompletedStaysWithValidDates ครั้ง (เวลาไทย)</p>
             </section>
             <section class="reports-card" aria-labelledby="report-maintenance">
-                <h3 id="report-maintenance">Maintenance Reports</h3>
+                <h3 id="report-maintenance">งานซ่อม</h3>
                 @if (Model.MaintenanceByStatus.Count == 0)
                 {
-                    <p class="reports-note reports-empty">No maintenance reports found.</p>
+                    <p class="reports-note reports-empty">ยังไม่มีงานซ่อม</p>
                 }
                 else
                 {
@@ -123,7 +123,7 @@
                         @foreach (var item in Model.MaintenanceByStatus)
                         {
                             <div class="reports-status-row">
-                                <dt><span class="reports-status @StatusClass(item.Status)">@(string.IsNullOrWhiteSpace(item.Status) ? "Unspecified" : item.Status)</span></dt>
+                                <dt><span class="reports-status @StatusClass(item.Status)">@ThaiText.Status(item.Status)</span></dt>
                                 <dd>@item.Count</dd>
                             </div>
                         }
@@ -131,10 +131,10 @@
                 }
             </section>
             <section class="reports-card" aria-labelledby="report-housekeeping">
-                <h3 id="report-housekeeping">Housekeeping Tasks</h3>
+                <h3 id="report-housekeeping">งานทำความสะอาด</h3>
                 @if (Model.HousekeepingByStatus.Count == 0)
                 {
-                    <p class="reports-note reports-empty">No housekeeping tasks found.</p>
+                    <p class="reports-note reports-empty">ยังไม่มีงานทำความสะอาด</p>
                 }
                 else
                 {
@@ -142,7 +142,7 @@
                         @foreach (var item in Model.HousekeepingByStatus)
                         {
                             <div class="reports-status-row">
-                                <dt><span class="reports-status @StatusClass(item.Status)">@(string.IsNullOrWhiteSpace(item.Status) ? "Unspecified" : item.Status)</span></dt>
+                                <dt><span class="reports-status @StatusClass(item.Status)">@ThaiText.Status(item.Status)</span></dt>
                                 <dd>@item.Count</dd>
                             </div>
                         }
@@ -185,11 +185,11 @@
     </section>
 
     <section class="reports-card reports-panel" aria-labelledby="report-payments">
-        <h3 id="report-payments">Payment amounts by recorded status</h3>
-        <p class="reports-note mt-2">@Model.PaymentCount payment records. Statuses and amounts below reflect stored records, not confirmed revenue.</p>
+        <h3 id="report-payments">ยอดชำระเงินแยกตามสถานะ</h3>
+        <p class="reports-note mt-2">มีรายการชำระเงินทั้งหมด @Model.PaymentCount รายการ (ตัวเลขด้านล่างเป็นยอดตามที่บันทึก ไม่ใช่รายได้ที่ยืนยันแล้ว)</p>
         @if (Model.PaymentsByStatus.Count == 0)
         {
-            <p class="reports-note reports-empty">No payment records found.</p>
+            <p class="reports-note reports-empty">ยังไม่มีรายการชำระเงิน</p>
         }
         else
         {
@@ -197,16 +197,16 @@
                 <table class="table reports-table">
                     <thead>
                         <tr>
-                            <th scope="col">Payment status</th>
-                            <th scope="col" class="text-end">Records</th>
-                            <th scope="col" class="text-end">Recorded amount</th>
+                            <th scope="col">สถานะ</th>
+                            <th scope="col" class="text-end">จำนวนรายการ</th>
+                            <th scope="col" class="text-end">ยอดเงิน (บาท)</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var payment in Model.PaymentsByStatus)
                         {
                             <tr>
-                                <td><span class="reports-status @StatusClass(payment.Status)">@(string.IsNullOrWhiteSpace(payment.Status) ? "Unspecified" : payment.Status)</span></td>
+                                <td><span class="reports-status @StatusClass(payment.Status)">@ThaiText.Status(payment.Status)</span></td>
                                 <td class="text-end">@payment.Count</td>
                                 <td class="text-end">@(payment.Amount?.ToString("N2") ?? "N/A")</td>
                             </tr>
@@ -218,10 +218,10 @@
     </section>
 
     <section class="reports-card reports-panel" aria-labelledby="report-scope">
-        <h3 id="report-scope">Report scope</h3>
+        <h3 id="report-scope">ขอบเขตของรายงาน</h3>
         <p class="reports-note mt-2">
-            Revenue includes simulated DEMO/MOCK payments and does not represent actual money received.
-            Unreviewed legacy payments are excluded from revenue. Actual stay duration excludes bookings without completed stay timestamps.
+            รายได้รวมการชำระเงินจำลอง ไม่ใช่เงินที่ได้รับจริง
+            ไม่นับข้อมูลการชำระเงินเก่าที่ยังไม่ได้ตรวจสอบ และระยะเวลาเข้าพักคิดเฉพาะการเข้าพักที่เช็คเอาท์แล้ว
         </p>
     </section>
 </div>

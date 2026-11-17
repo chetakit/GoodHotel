@@ -1,7 +1,7 @@
 @model GoodHotel.Models.ViewModels.AvailabilitySearchViewModel
 
 @{
-    ViewData["Title"] = "Rooms";
+    ViewData["Title"] = "ห้องพัก";
     var culture = System.Globalization.CultureInfo.InvariantCulture;
     var hotelToday = (DateOnly)ViewData["HotelToday"]!;
 }
@@ -17,7 +17,7 @@
         @if (Model.HasSearchCriteria && !ViewData.ModelState.IsValid)
         {
             <div class="feature-box mb-4">
-                <h4>กรุณาตรวจสอบข้อมูลการค้นหาจากหน้า Home</h4>
+                <h4>กรุณาเลือกวันที่เข้าพักจากหน้าแรก</h4>
                 <div asp-validation-summary="All" class="text-danger"></div>
             </div>
         }
@@ -62,7 +62,7 @@
                                 <div class="room-meta">
                                     <div>
                                         <h4 class="mb-1">@room.Type</h4>
-                                        <span class="text-muted">Room @room.RoomNumber</span>
+                                        <span class="text-muted">@room.RoomNumber</span>
                                     </div>
                                     <span class="badge-status @(room.Status == "Available" ? "available" : "booked")">
                                         @room.Status
@@ -70,7 +70,7 @@
                                 </div>
                                 <div class="room-price">
                                     @(room.Rate.HasValue ? $"฿{room.Rate.Value.ToString("N2", culture)}" : "ราคาไม่ระบุ")
-                                    <small>/night</small>
+                                    <small>/คืน</small>
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(room.Description))
                                 {

@@ -35,7 +35,7 @@ public class PaymentController(
         catch (DbUpdateException ex) when (ex.InnerException is MySqlException { Number: 1062 })
         {
             logger.LogWarning(ex, "Duplicate or conflicting payment operation for booking {BookingId}.", bookingId);
-            TempData["PaymentError"] = "The request was already processed or conflicts with another payment.";
+            TempData["PaymentError"] = "คำขอนี้ถูกดำเนินการไปแล้ว";
         }
         return RedirectToAction(nameof(Details), new { id = bookingId });
     }

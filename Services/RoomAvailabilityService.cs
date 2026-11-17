@@ -25,6 +25,17 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
         new(roomId, HotelDate(checkedInAtUtc),
             scheduledCheckout.HasValue && scheduledCheckout.Value > today ? scheduledCheckout : null);
 
+    /// <summary>
+    /// วันที่การจองนี้ปล่อยห้องจริง: ถ้าแขกเช็คเอาท์ก่อนกำหนด ใช้วันที่เช็คเอาท์จริง ไม่ใช่วันที่จองไว้
+    /// (ห้องยังติดงานทำความสะอาดจนกว่า Staff จะตรวจผ่าน ซึ่งถูกกันไว้แยกใน CleaningPeriod)
+    /// </summary>
+    public static DateOnly? EffectiveCheckOut(DateOnly? scheduledCheckOut, DateTime? checkedOutAtUtc)
+    {
+        if (checkedOutAtUtc == null) return scheduledCheckOut;
+        var actual = HotelDate(checkedOutAtUtc.Value);
+        return scheduledCheckOut.HasValue && scheduledCheckOut.Value < actual ? scheduledCheckOut : actual;
+    }
+
     public static RoomBlockedPeriod CleaningPeriod(int roomId, DateTime? checkedOutAtUtc) =>
         new(roomId, checkedOutAtUtc.HasValue ? HotelDate(checkedOutAtUtc.Value) : null, null);
 
@@ -46,8 +57,19 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
             .Where(b => b.Status != BookingStatuses.Cancelled &&
                 b.RoomId.HasValue && ids.Contains(b.RoomId.Value) &&
                 b.CheckIn.HasValue && b.CheckOut.HasValue && b.CheckIn < end && b.CheckOut > start)
-            .Select(b => new { RoomId = b.RoomId!.Value, b.CheckIn, b.CheckOut }).ToListAsync(ct);
-        periods.AddRange(bookings.Select(b => new RoomBlockedPeriod(b.RoomId, b.CheckIn, b.CheckOut)));
+            .Select(b => new
+            {
+                RoomId = b.RoomId!.Value,
+                b.CheckIn,
+                b.CheckOut,
+                CheckedOutAtUtc = db.BookingStays
+                    .Where(s => s.BookingId == b.BookingId && s.Status == "CheckedOut")
+                    .Select(s => s.CheckedOutAtUtc)
+                    .FirstOrDefault()
+            })
+            .ToListAsync(ct);
+        periods.AddRange(bookings.Select(b =>
+            new RoomBlockedPeriod(b.RoomId, b.CheckIn, EffectiveCheckOut(b.CheckOut, b.CheckedOutAtUtc))));
 
         var activeStays = await db.BookingStays.AsNoTracking()
             .Where(s => s.Status == "CheckedIn" && s.Booking.RoomId.HasValue && ids.Contains(s.Booking.RoomId.Value))
@@ -95,7 +117,10 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
     {
         var today = HotelToday();
         return await CurrentStays(db.BookingStays.AsNoTracking(), roomId).AnyAsync(ct) ||
-               await CurrentBookings(db.Bookings.AsNoTracking(), roomId, today).AnyAsync(ct) ||
+               await CurrentBookings(db.Bookings.AsNoTracking(), roomId, today)
+                   // แขกที่เช็คเอาท์ไปแล้ว (แม้ก่อนกำหนด) ไม่ถือว่ายังใช้ห้องอยู่
+                   .Where(b => !db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedOut"))
+                   .AnyAsync(ct) ||
                await PendingCheckoutCleaning(db.HousekeepingTasks.AsNoTracking(), roomId).AnyAsync(ct);
     }
 

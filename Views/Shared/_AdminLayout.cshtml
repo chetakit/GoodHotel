@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Good Hotel Admin</title>
+    <title>@ViewData["Title"] - Good Hotel</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
@@ -15,47 +15,47 @@
                 <span class="brand-mark">G</span>
                 <div>
                     <strong>Good Hotel</strong>
-                    <small>Management</small>
+                    <small>ผู้ดูแลระบบ</small>
                 </div>
             </div>
 
             <nav class="sidebar-nav">
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Dashboard" ? "active" : "")"
                    asp-controller="Admin" asp-action="Dashboard">
-                    <span>Dashboard</span>
+                    <span>แดชบอร์ด</span>
                 </a>
 
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Rooms" ? "active" : "")"
                    asp-controller="Admin" asp-action="Rooms">
-                    <span>Rooms</span>
+                    <span>ห้องพัก</span>
                 </a>
 
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Promotion" ? "active" : "")"
                    asp-controller="Admin" asp-action="Promotion">
-                    <span>Promotions</span>
+                    <span>โปรโมชั่น</span>
                 </a>
 
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Members" ? "active" : "")"
                    asp-controller="Admin" asp-action="Members">
-                    <span>Members</span>
+                    <span>สมาชิก</span>
                 </a>
 
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Employees" ? "active" : "")"
                    asp-controller="Admin" asp-action="Employees">
-                    <span>Employees</span>
+                    <span>พนักงาน</span>
                 </a>
 
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "MaintenanceReports" ? "active" : "")"
                    asp-controller="Admin" asp-action="MaintenanceReports">
-                    <span>Maintenance Reports</span>
+                    <span>งานซ่อม</span>
                 </a>
 
                 
 
-                <a class="nav-item" asp-controller="Payment" asp-action="Queue"><span>Payments</span></a>
+                <a class="nav-item" asp-controller="Payment" asp-action="Queue"><span>การชำระเงิน</span></a>
                 <a class="nav-item @(ViewContext.RouteData.Values["Action"]?.ToString() == "Reports" ? "active" : "")"
                    asp-controller="Admin" asp-action="Reports">
-                    <span>Reports</span>
+                    <span>รายงาน</span>
                 </a>
             </nav>
 
@@ -65,15 +65,15 @@
                         class="sidebar-user w-100 border-0 text-start"
                         data-bs-toggle="dropdown"
                         aria-expanded="false"
-                        aria-label="Open account menu">
+                        aria-label="เปิดเมนูบัญชี">
 
                     <div class="avatar">AM</div>
 
                     <div class="flex-grow-1">
                         <strong>
-                            @(User.Identity?.Name ?? "Admin Manager")
+                            @(User.Identity?.Name ?? "ผู้ดูแลระบบ")
                         </strong>
-                        <small>Admin Manager</small>
+                        <small>ผู้ดูแลระบบ</small>
                     </div>
 
                     <span class="ms-auto">⌃</span>
@@ -83,7 +83,7 @@
 
                     <li>
                         <div class="dropdown-item-text">
-                            <strong>Account</strong>
+                            <strong>บัญชี</strong>
                             <small class="d-block text-white-50">
                                 @User.Identity?.Name
                             </small>
@@ -96,7 +96,7 @@
                         <a class="dropdown-item py-2"
                            asp-controller="Admin"
                            asp-action="Dashboard">
-                            Admin Manage
+                            หน้าผู้ดูแลระบบ
                         </a>
                     </li>
 
@@ -104,7 +104,7 @@
                         <a class="dropdown-item py-2"
                            asp-controller="Home"
                            asp-action="Index">
-                            Back to Home
+                            กลับหน้าแรก
                         </a>
                     </li>
 
@@ -116,7 +116,7 @@
                               method="post">
                             <button type="submit"
                                     class="dropdown-item text-danger py-2">
-                                Logout
+                                ออกจากระบบ
                             </button>
                         </form>
                     </li>
@@ -127,18 +127,18 @@
         <div class="admin-main">
             <header class="admin-topbar">
                 <div>
-                    <p class="eyebrow">Hotel Operations</p>
+                    <p class="eyebrow">Good Hotel</p>
                     <h2>@ViewData["Title"]</h2>
                 </div>
 
                 <div class="d-flex align-items-center gap-3">
                     <div class="dropdown">
-                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Export CSV</button>
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">ส่งออก CSV</button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportBookings">Bookings</a></li>
-                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportPayments">Payments</a></li>
-                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportMaintenanceReports">Maintenance reports</a></li>
-                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportHousekeepingTasks">Housekeeping tasks</a></li>
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportBookings">การจอง</a></li>
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportPayments">การชำระเงิน</a></li>
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportMaintenanceReports">งานซ่อม</a></li>
+                            <li><a class="dropdown-item" asp-controller="Admin" asp-action="ExportHousekeepingTasks">งานทำความสะอาด</a></li>
                         </ul>
                     </div>
 
@@ -148,7 +148,7 @@
                         <a asp-controller="Admin"
                            asp-action="AddUser"
                            class="btn btn-primary btn-sm hotel-primary-btn">
-                            + Add New
+                            + เพิ่มผู้ใช้
                         </a>
                     }
                 </div>

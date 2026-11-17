@@ -68,7 +68,7 @@ public class MaintenanceController : Controller
         if (ModelState.IsValid &&
             !await _db.Rooms.AsNoTracking().AnyAsync(room => room.RoomId == model.RoomId, cancellationToken))
         {
-            ModelState.AddModelError(nameof(model.RoomId), "The selected room was not found.");
+            ModelState.AddModelError(nameof(model.RoomId), "ไม่พบห้องที่เลือก");
         }
 
         if (!ModelState.IsValid)
@@ -106,7 +106,7 @@ public class MaintenanceController : Controller
         _db.MaintenanceReports.Add(report);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        TempData["MaintenanceSuccess"] = "Report created and room blocked. Existing bookings are unchanged; notify an Admin.";
+        TempData["MaintenanceSuccess"] = "แจ้งซ่อมแล้ว ห้องถูกปิดไม่ให้จอง (การจองเดิมไม่ถูกยกเลิก) กรุณาแจ้งผู้ดูแลระบบ";
         return RedirectToAction(nameof(Index));
     }
 
@@ -151,7 +151,7 @@ public class MaintenanceController : Controller
         if (!ModelState.IsValid || (nextStatus == MaintenanceReport.Resolved &&
             (string.IsNullOrWhiteSpace(resolutionNote) || resolutionNote.Length > 2000)))
         {
-            TempData["MaintenanceError"] = "A resolution note of at most 2000 characters is required.";
+            TempData["MaintenanceError"] = "กรุณาระบุบันทึกการซ่อม (ไม่เกิน 2000 ตัวอักษร)";
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -173,7 +173,7 @@ public class MaintenanceController : Controller
             ? MaintenanceReport.Open : MaintenanceReport.InProgress;
         if (!MaintenanceReport.CanTransition(report.Status, nextStatus))
         {
-            TempData["MaintenanceError"] = "The report status changed or this transition is not allowed.";
+            TempData["MaintenanceError"] = "สถานะงานซ่อมเปลี่ยนไปแล้ว หรือทำรายการนี้ไม่ได้";
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -223,15 +223,15 @@ public class MaintenanceController : Controller
         }
         catch (DbUpdateConcurrencyException)
         {
-            TempData["MaintenanceError"] = "This report changed. Review it before trying again.";
+            TempData["MaintenanceError"] = "งานซ่อมนี้ถูกเปลี่ยนไปแล้ว กรุณาตรวจสอบอีกครั้ง";
             return RedirectToAction(nameof(Details), new { id });
         }
 
         TempData["MaintenanceSuccess"] = nextStatus == MaintenanceReport.Resolved
             ? (requiresReview
-                ? "Report resolved. The room remains in Maintenance for Admin review."
-                : "Maintenance report resolved.")
-            : "Maintenance work is in progress.";
+                ? "ปิดงานซ่อมแล้ว ห้องยังเป็นสถานะซ่อมบำรุงจนกว่าผู้ดูแลระบบจะตรวจสอบ"
+                : "ปิดงานซ่อมแล้ว")
+            : "เริ่มซ่อมแล้ว";
         return RedirectToAction(nameof(Details), new { id });
     }
 

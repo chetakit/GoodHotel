@@ -1,35 +1,36 @@
 @model GoodHotel.Models.ViewModels.MaintenanceCreateViewModel
 
 @{
-    ViewData["Title"] = "Create Maintenance Report";
+    ViewData["Title"] = "แจ้งอุปกรณ์ชำรุด";
 }
 
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Hotel Operations</span>
-            <h2>Create Maintenance Report</h2>
+            <span class="eyebrow text-dark">Maintenance</span>
+            <h2>แจ้งอุปกรณ์ชำรุด</h2>
         </div>
         <div class="alert alert-warning" role="status">
-            A new report blocks the room immediately. Existing bookings are not cancelled; notify an Admin.
+            เมื่อแจ้งแล้ว ห้องจะถูกปิดไม่ให้จองทันที การจองที่มีอยู่แล้วจะไม่ถูกยกเลิก กรุณาแจ้ง Admin ด้วย
         </div>
         <div class="booking-panel">
             <form asp-action="Create" method="post">
                 <div asp-validation-summary="All" class="text-danger"></div>
                 <div class="mb-3">
-                    <label asp-for="RoomId" class="form-label">Room</label>
+                    <label asp-for="RoomId" class="form-label">ห้อง</label>
                     <select asp-for="RoomId" asp-items="Model.Rooms" class="form-select">
-                        <option value="">Select a room</option>
+                        <option value="">-- เลือกห้อง --</option>
                     </select>
                     <span asp-validation-for="RoomId" class="text-danger"></span>
                 </div>
                 <div class="mb-3">
-                    <label asp-for="Description" class="form-label">Issue details</label>
-                    <textarea asp-for="Description" class="form-control" rows="5" maxlength="2000"></textarea>
+                    <label asp-for="Description" class="form-label">รายละเอียดปัญหา</label>
+                    <textarea asp-for="Description" class="form-control" rows="5" maxlength="2000"
+                              placeholder="เช่น แอร์ไม่เย็น, ฝักบัวน้ำไม่ไหล"></textarea>
                     <span asp-validation-for="Description" class="text-danger"></span>
                 </div>
-                <button type="submit" class="btn btn-primary">Submit report</button>
-                <a asp-action="Index" class="btn btn-outline-primary">Back to reports</a>
+                <button type="submit" class="btn btn-primary">ส่งเรื่องแจ้งซ่อม</button>
+                <a asp-action="Index" class="btn btn-outline-primary">กลับไปรายการแจ้งซ่อม</a>
             </form>
         </div>
     </div>

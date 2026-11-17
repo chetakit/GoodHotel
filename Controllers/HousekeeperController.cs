@@ -66,9 +66,9 @@ public class HousekeeperController(HousekeepingService housekeeping, GoodHotelDb
             return Forbid();
 
         if (await housekeeping.TransitionAsync(id, userId, action, ct))
-            TempData["TaskSuccess"] = "Task updated successfully.";
+            TempData["TaskSuccess"] = "อัปเดตงานแล้ว";
         else
-            TempData["TaskError"] = "Task not found, unavailable, or no longer in the required state.";
+            TempData["TaskError"] = "ทำรายการไม่ได้ งานนี้ถูกเปลี่ยนไปแล้ว";
 
         return RedirectToAction(nameof(Tasks));
     }

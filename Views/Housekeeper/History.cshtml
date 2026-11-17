@@ -1,32 +1,47 @@
 @model GoodHotel.Models.ViewModels.HousekeepingHistoryViewModel
 @{
-    ViewData["Title"] = "Task History";
+    ViewData["Title"] = "ประวัติงาน";
 }
 <section class="content-section">
     <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Hotel Operations</span><h2>Task History</h2></div>
-        <h3>Tasks completed by you</h3>
-        @if (Model.Completed.Count == 0) { <p>No completed tasks found.</p> }
+        <div class="section-heading"><span class="eyebrow text-dark">Housekeeping</span><h2>ประวัติงาน</h2></div>
+
+        <h3>งานที่ฉันทำเสร็จ</h3>
+        @if (Model.Completed.Count == 0)
+        {
+            <p>ยังไม่มีงานที่ทำเสร็จ</p>
+        }
         else
         {
             <ul>
                 @foreach (var task in Model.Completed)
                 {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">Task #@task.TaskId</a> — Room @(task.RoomNumber ?? "Not specified") — @task.Status — @(task.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm")) UTC</li>
+                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.Status) — @ThaiText.Time(task.CompletedAtUtc)</li>
                 }
             </ul>
         }
-        <h3>Your task events</h3>
-        @if (Model.Events.Count == 0) { <p>No task events found.</p> }
+
+        <h3>ความเคลื่อนไหวของฉัน</h3>
+        @if (Model.Events.Count == 0)
+        {
+            <p>ยังไม่มีประวัติ</p>
+        }
         else
         {
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>Task</th><th>Room</th><th>Action</th><th>Status change</th><th>Time (UTC)</th><th>Reason</th></tr></thead>
+                    <thead><tr><th>งาน</th><th>ห้อง</th><th>การกระทำ</th><th>สถานะ</th><th>เวลา</th><th>เหตุผล</th></tr></thead>
                     <tbody>
                         @foreach (var item in Model.Events)
                         {
-                            <tr><td>#@item.TaskId</td><td>@(item.RoomNumber ?? "Not specified")</td><td>@item.EventType</td><td>@item.PreviousStatus → @item.NewStatus</td><td>@item.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@item.Reason</td></tr>
+                            <tr>
+                                <td>#@item.TaskId</td>
+                                <td>@ThaiText.OrDash(item.RoomNumber)</td>
+                                <td>@ThaiText.Status(item.EventType)</td>
+                                <td>@ThaiText.Status(item.PreviousStatus) → @ThaiText.Status(item.NewStatus)</td>
+                                <td>@ThaiText.Time(item.OccurredAtUtc)</td>
+                                <td>@item.Reason</td>
+                            </tr>
                         }
                     </tbody>
                 </table>

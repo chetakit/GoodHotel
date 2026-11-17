@@ -2,76 +2,76 @@
 
 @{
     Layout = "_AdminLayout";
-    ViewData["Title"] = "Add User";
+    ViewData["Title"] = "เพิ่มผู้ใช้";
 }
 
 <div class="container mt-4">
-    <h3 class="mb-3">Add User</h3>
+    <h3 class="mb-3">เพิ่มผู้ใช้</h3>
 
     <form asp-controller="Admin" asp-action="AddUser" method="post">
         <div asp-validation-summary="All" class="text-danger"></div>
         <div class="row">
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label asp-for="FirstName" class="form-label">First Name</label>
+                    <label asp-for="FirstName" class="form-label">ชื่อ</label>
                     <input asp-for="FirstName" class="form-control" placeholder="Enter first name" />
                     <span asp-validation-for="FirstName" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label asp-for="LastName" class="form-label">Last Name</label>
+                    <label asp-for="LastName" class="form-label">นามสกุล</label>
                     <input asp-for="LastName" class="form-control" placeholder="Enter last name" />
                     <span asp-validation-for="LastName" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label asp-for="Email" class="form-label">Email</label>
+                    <label asp-for="Email" class="form-label">อีเมล</label>
                     <input asp-for="Email" type="email" class="form-control" placeholder="Enter email" />
                     <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label asp-for="Phone" class="form-label">Phone</label>
+                    <label asp-for="Phone" class="form-label">เบอร์โทร</label>
                     <input asp-for="Phone" type="tel" class="form-control" inputmode="numeric"
                            autocomplete="tel" placeholder="081 234 5678" maxlength="12"
                            aria-describedby="phoneHelp" />
-                    <div id="phoneHelp" class="form-text">Enter a 10-digit Thai mobile number (06, 08, or 09).</div>
+                    <div id="phoneHelp" class="form-text">เบอร์มือถือ 10 หลัก ขึ้นต้นด้วย 06, 08 หรือ 09</div>
                     <span asp-validation-for="Phone" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label asp-for="Password" class="form-label">Password</label>
+                    <label asp-for="Password" class="form-label">รหัสผ่าน</label>
                     <input asp-for="Password" type="password" class="form-control" placeholder="Enter password" />
                     <span asp-validation-for="Password" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label asp-for="BirthDate" class="form-label">Date of Birth</label>
+                    <label asp-for="BirthDate" class="form-label">วันเกิด</label>
                     <input asp-for="BirthDate" type="date" class="form-control" />
                     <span asp-validation-for="BirthDate" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-12">
                 <div class="mb-3">
-                    <label asp-for="Role" class="form-label">Role</label>
+                    <label asp-for="Role" class="form-label">บทบาท</label>
                     <select asp-for="Role" class="form-select">
-                        <option value="">Select a role</option>
-                        <option value="Customer">Customer</option>
-                        <option value="Staff">Staff</option>
-                        <option value="Housekeeper">Housekeeper</option>
-                        <option value="Admin">Admin</option>
+                        <option value="">-- เลือกบทบาท --</option>
+                        <option value="Customer">ลูกค้า</option>
+                        <option value="Staff">พนักงานต้อนรับ</option>
+                        <option value="Housekeeper">แม่บ้าน</option>
+                        <option value="Admin">ผู้ดูแลระบบ</option>
                     </select>
                     <span asp-validation-for="Role" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-primary">Add User</button>
-                <a asp-controller="Admin" asp-action="Members" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">เพิ่มผู้ใช้</button>
+                <a asp-controller="Admin" asp-action="Members" class="btn btn-secondary">ยกเลิก</a>
             </div>
         </div>
     </form>
