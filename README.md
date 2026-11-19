@@ -9,18 +9,20 @@ ASP.NET Core MVC (.NET 10) · Entity Framework Core 9 · MySQL บน Railway
 ## ลงเครื่องใหม่
 
 1. ลง **.NET 10 SDK** จาก https://dotnet.microsoft.com/download (ถ้ายังไม่มี)
-2. Clone แล้วรัน
+2. Clone
 
    ```bash
    git clone https://github.com/chetakit/GoodHotel.git
    cd GoodHotel
-   dotnet run
    ```
 
-3. เปิด http://localhost:5022
+3. ก๊อปไฟล์ `appsettings.json` (ขอจากเจ้าของโปรเจค) มาวางในโฟลเดอร์ `GoodHotel`
+   ไฟล์นี้มีรหัสฐานข้อมูล จึงไม่ได้อยู่บน GitHub
+4. รัน แล้วเปิด http://localhost:5022
 
-`appsettings.json` มีข้อมูลเชื่อมฐานข้อมูล Railway อยู่แล้ว จึงไม่ต้องตั้งค่าอะไรเพิ่ม
-repo นี้เป็น **private**: ถ้าจะเปลี่ยนเป็น public ต้องเปลี่ยนรหัสฐานข้อมูลใน Railway ก่อน เพราะรหัสเดิมอยู่ในประวัติ git
+   ```bash
+   dotnet run
+   ```
 
 ---
 
