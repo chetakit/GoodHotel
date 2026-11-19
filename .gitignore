@@ -6,10 +6,12 @@ obj/
 *.user
 *.suo
 
-# Local configuration and secrets
-appsettings.Development.json
+# appsettings.json ถูก commit ไว้เพื่อให้ clone แล้วรันได้ทันที (repo เป็น private)
+# ถ้าจะเปลี่ยน repo เป็น public ต้องเปลี่ยนรหัสฐานข้อมูลใน Railway ก่อน เพราะรหัสเดิมอยู่ในประวัติ git
 secrets.json
-appsettings.json
+
+# ไฟล์ตั้งค่าของ Claude Code (มีบัญชีทดสอบ) ไม่ต้องใช้บนเครื่องอื่น
+.claude/
 
 # OS files
 .DS_Store
