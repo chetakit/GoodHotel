@@ -16,7 +16,9 @@ public class PaymentController(
     PaymentService payments,
     PaymentEvidenceStorage evidence,
     IConfiguration configuration,
-    ILogger<PaymentController> logger) : Controller
+    ILogger<PaymentController> logger,
+    ParallelReader reader,
+    UserDirectory users) : Controller
 {
     private bool TryActor(out int id) => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),
         NumberStyles.None, CultureInfo.InvariantCulture, out id) && id > 0;
@@ -75,34 +77,46 @@ public class PaymentController(
     }
 
     [HttpGet]
-    [Authorize(Roles = "Customer,Staff,Admin")]
+    [Authorize(Roles = "Customer,Staff,Accountant")]
     public async Task<IActionResult> Details(int id, CancellationToken ct)
     {
         if (id <= 0 || !TryActor(out var actorId)) return BadRequest();
-        var booking = await db.Bookings.AsNoTracking().Where(b => b.BookingId == id)
-            .Select(b => new { b.UserId, b.Amount }).SingleOrDefaultAsync(ct);
-        if (booking == null) return NotFound();
-        if (User.IsInRole("Customer") && booking.UserId != actorId) return Forbid();
-        var list = await PaymentItems(db.Payments.AsNoTracking().Where(p => p.BookingId == id)
-            .OrderByDescending(p => p.PaymentId)).ToListAsync(ct);
-        var history = await db.PaymentEvents.AsNoTracking().Where(e => e.Payment.BookingId == id)
+
+        // 4 query ไม่ขึ้นต่อกัน ยิงพร้อมกัน แล้วค่อยเช็คสิทธิ์จากผลของ query แรก
+        var bookingTask = reader.Run(c => c.Bookings.AsNoTracking().Where(b => b.BookingId == id)
+            .Select(b => new { b.UserId, b.Amount, b.Status,
+                GuestName = b.User == null ? null : b.User.FirstName + " " + b.User.LastName,
+                RoomNumber = b.Room == null ? null : b.Room.Room1, b.CreatedAtUtc, b.CancelReason }).SingleOrDefaultAsync(ct));
+        var listTask = reader.Run(c => PaymentItems(c.Payments.AsNoTracking().Where(p => p.BookingId == id)
+            .OrderByDescending(p => p.PaymentId)).ToListAsync(ct));
+        var historyTask = reader.Run(c => c.PaymentEvents.AsNoTracking().Where(e => e.Payment.BookingId == id)
             .OrderByDescending(e => e.EventId)
             .Select(e => new PaymentHistoryItem(e.EventId, e.PaymentId, e.ActorUserId, e.EventType, e.OccurredAtUtc,
-                e.Amount, e.PaymentMethod, e.Reason)).ToListAsync(ct);
-        var refunds = await db.PaymentRefunds.AsNoTracking().Where(r => r.Payment.BookingId == id)
+                e.Amount, e.PaymentMethod, e.Reason)).ToListAsync(ct));
+        var refundsTask = reader.Run(c => c.PaymentRefunds.AsNoTracking().Where(r => r.Payment.BookingId == id)
             .OrderByDescending(r => r.RefundId)
             .Select(r => new PaymentRefundItem(r.RefundId, r.PaymentId, r.Payment.BookingId, r.Amount, r.Status, r.Reason,
-                r.RequestedByUserId, r.RequestedAtUtc, r.ApprovedByUserId, r.ApprovedAtUtc)).ToListAsync(ct);
+                r.RequestedByUserId, r.RequestedAtUtc, r.ApprovedByUserId, r.ApprovedAtUtc)).ToListAsync(ct));
+        await Task.WhenAll(bookingTask, listTask, historyTask, refundsTask);
+
+        var booking = bookingTask.Result;
+        if (booking == null) return NotFound();
+        if (User.IsInRole("Customer") && booking.UserId != actorId) return Forbid();
+        var list = listTask.Result;
+        var history = historyTask.Result;
+        var refunds = refundsTask.Result;
+        await users.PreloadAsync(history.Select(h => (int?)h.ActorUserId), ct);
         var confirmedPayment = list.Where(p => p.IsVerified).OrderBy(p => p.PaymentId).FirstOrDefault();
         var confirmed = confirmedPayment?.Amount ?? 0m;
         var refunded = refunds.Where(r => r.Status == "Approved" && r.PaymentId == confirmedPayment?.PaymentId)
             .Sum(r => r.Amount);
         return View(new PaymentDetailsViewModel(id, booking.Amount, confirmed, refunded,
-            list.Any(p => p.IsLegacy), list, history, refunds));
+            list.Any(p => p.IsLegacy), list, history, refunds, booking.Status, booking.GuestName, booking.RoomNumber,
+            booking.CreatedAtUtc, booking.CancelReason));
     }
 
     [HttpGet]
-    [Authorize(Roles = "Staff,Admin")]
+    [Authorize(Roles = "Staff,Accountant")]
     public async Task<IActionResult> Queue(string? search, string? status, string? method, CancellationToken ct)
     {
         search = search?.Trim();
@@ -132,7 +146,7 @@ public class PaymentController(
     }
 
     [HttpPost]
-    [Authorize(Roles = "Staff,Admin")]
+    [Authorize(Roles = "Staff,Accountant")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Review(int bookingId, int paymentId, bool? confirm,
         decimal? received, string? reason, string key, CancellationToken ct)
@@ -143,7 +157,7 @@ public class PaymentController(
     }
 
     [HttpPost]
-    [Authorize(Roles = "Staff,Admin")]
+    [Authorize(Roles = "Accountant")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reconcile(int bookingId, int paymentId, bool? confirmed,
         string? reason, string key, CancellationToken ct)
@@ -164,7 +178,7 @@ public class PaymentController(
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Accountant")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApproveRefund(int bookingId, int refundId, bool actualRefundSent,
         string key, CancellationToken ct)
@@ -175,7 +189,7 @@ public class PaymentController(
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Accountant")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RejectRefund(int bookingId, int refundId, string? reason,
         string key, CancellationToken ct)
@@ -186,7 +200,7 @@ public class PaymentController(
     }
 
     [HttpGet]
-    [Authorize(Roles = "Customer,Staff,Admin")]
+    [Authorize(Roles = "Customer,Staff,Accountant")]
     public async Task<IActionResult> Evidence(int id, CancellationToken ct)
     {
         if (id <= 0 || !TryActor(out var actor)) return BadRequest();

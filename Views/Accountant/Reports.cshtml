@@ -1,0 +1,130 @@
+@model GoodHotel.Models.ViewModels.FinanceReportViewModel
+@{
+    ViewData["Title"] = "รายงานการเงิน";
+    var iso = System.Globalization.CultureInfo.InvariantCulture;
+    var from = Model.From.ToString("yyyy-MM-dd", iso);
+    var to = Model.To.ToString("yyyy-MM-dd", iso);
+    var maxDaily = Model.Daily.Select(d => d.Received).DefaultIfEmpty(0m).Max();
+}
+
+@section Actions {
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportLedger" asp-route-from="@from" asp-route-to="@to">สมุดรายวัน CSV</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportPayments">การชำระเงินทั้งหมด CSV</a>
+}
+
+<form method="get" asp-action="Reports" class="toolbar">
+    <div>
+        <label class="form-label" for="from">ตั้งแต่</label>
+        <input id="from" name="from" type="date" class="form-control" value="@from" />
+    </div>
+    <div>
+        <label class="form-label" for="to">ถึง</label>
+        <input id="to" name="to" type="date" class="form-control" value="@to" />
+    </div>
+    <button type="submit" class="btn btn-primary">ดูรายงาน</button>
+</form>
+
+<div class="figures">
+    <div class="figure">
+        <div class="label">เงินรับ</div>
+        <div class="value">฿@Model.Total.Received.ToString("N2")</div>
+    </div>
+    <div class="figure">
+        <div class="label">เงินคืน</div>
+        <div class="value">฿@Model.Total.Refunded.ToString("N2")</div>
+    </div>
+    <div class="figure">
+        <div class="label">รายได้สุทธิ</div>
+        <div class="value">@ThaiText.Baht(Model.Total.Net)</div>
+    </div>
+    <div class="figure">
+        <div class="label">มูลค่าการจอง (เข้าพักในช่วงนี้)</div>
+        <div class="value">฿@Model.BookedAmount.ToString("N2")</div>
+        <div class="note">@Model.BookingCount การจองที่ไม่ได้ยกเลิก</div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <section class="table-panel">
+            <div class="panel-head"><h2>รายวัน</h2></div>
+            @if (Model.Daily.Count == 0)
+            {
+                <p class="panel-empty">ไม่มีรายการในช่วงนี้</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr><th>วันที่</th><th></th><th class="text-end">รับ</th><th class="text-end">คืน</th><th class="text-end">สุทธิ</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var day in Model.Daily)
+                            {
+                                var width = maxDaily == 0 ? 0 : (int)(day.Received / maxDaily * 100);
+                                <tr>
+                                    <td class="num">
+                                        <a asp-action="Daily" asp-route-date="@day.Date.ToString("yyyy-MM-dd", iso)">@ThaiText.Date(day.Date)</a>
+                                    </td>
+                                    <td style="width: 30%"><div class="bar-track"><div class="bar-fill" style="width: @width%"></div></div></td>
+                                    <td class="text-end num">@day.Received.ToString("N2")</td>
+                                    <td class="text-end num @(day.Refunded > 0 ? "money-out" : "")">@day.Refunded.ToString("N2")</td>
+                                    <td class="text-end num fw-semibold">@ThaiText.Baht(day.Net)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="table-panel mb-3">
+            <div class="panel-head"><h2>เงินรับตามช่องทาง</h2></div>
+            @if (Model.ByMethod.Count == 0)
+            {
+                <p class="panel-empty">ไม่มีรายการ</p>
+            }
+            else
+            {
+                <table class="table">
+                    <tbody>
+                        @foreach (var method in Model.ByMethod)
+                        {
+                            <tr>
+                                <td>@method.Method <span class="text-muted small">(@method.Count)</span></td>
+                                <td class="text-end num">฿@method.Amount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="table-panel">
+            <div class="panel-head"><h2>โปรโมชันที่ถูกใช้</h2></div>
+            @if (Model.Promotions.Count == 0)
+            {
+                <p class="panel-empty">ไม่มีการจองที่ใช้โปรโมชันในช่วงนี้</p>
+            }
+            else
+            {
+                <table class="table">
+                    <thead><tr><th>โปรโมชัน</th><th class="text-end">การจอง</th><th class="text-end">ยอดจอง</th></tr></thead>
+                    <tbody>
+                        @foreach (var promotion in Model.Promotions)
+                        {
+                            <tr>
+                                <td>@promotion.PromotionName</td>
+                                <td class="text-end num">@promotion.BookingCount</td>
+                                <td class="text-end num">฿@promotion.BookingAmount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+    </div>
+</div>
+<p class="text-muted small mt-2">เงินรับนับตามวันที่ยืนยันการชำระ เงินคืนนับตามวันที่อนุมัติ (เวลาไทย) และรวมการชำระเงินจำลองด้วย</p>

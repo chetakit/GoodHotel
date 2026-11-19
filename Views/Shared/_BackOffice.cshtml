@@ -1,0 +1,113 @@
+@{
+    // เมนูของแต่ละ role ในหน้าพนักงาน (Staff / แม่บ้าน / บัญชี / Admin ใช้ layout เดียวกัน)
+    var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+    var controller = ViewContext.RouteData.Values["Controller"]?.ToString() ?? "";
+    var action = ViewContext.RouteData.Values["Action"]?.ToString() ?? "";
+
+    bool On(string c, params string[] actions) =>
+        controller.Equals(c, StringComparison.OrdinalIgnoreCase) &&
+        (actions.Length == 0 || actions.Contains(action, StringComparer.OrdinalIgnoreCase));
+
+    var menu = role switch
+    {
+        "Staff" => new (string Label, string Controller, string Action, bool Active)[]
+        {
+            ("หน้าหลัก", "Staff", "Index", On("Staff", "Index")),
+            ("การจอง", "Staff", "Bookings", On("Staff", "Bookings", "BookingDetails", "GuestDetails")),
+            ("รับลูกค้า Walk-in", "Staff", "WalkIn", On("Staff", "WalkIn")),
+            ("สถานะห้อง", "Staff", "RoomStatus", On("Staff", "RoomStatus")),
+            ("ตรวจห้องหลังทำความสะอาด", "Staff", "VerificationTasks", On("Staff", "VerificationTasks", "VerificationDetails")),
+            ("การชำระเงิน", "Payment", "Queue", On("Payment")),
+            ("แจ้งซ่อม", "Maintenance", "Index", On("Maintenance")),
+        },
+        "Housekeeper" => new[]
+        {
+            ("หน้าหลัก", "Housekeeper", "Index", On("Housekeeper", "Index")),
+            ("งานทำความสะอาด", "Housekeeper", "Tasks", On("Housekeeper", "Tasks", "TaskDetails")),
+            ("ประวัติงาน", "Housekeeper", "History", On("Housekeeper", "History")),
+            ("แจ้งซ่อม", "Maintenance", "Index", On("Maintenance")),
+        },
+        "Accountant" => new[]
+        {
+            ("ภาพรวม", "Accountant", "Index", On("Accountant", "Index")),
+            ("ปิดยอดรายวัน", "Accountant", "Daily", On("Accountant", "Daily")),
+            ("รายการชำระเงิน", "Payment", "Queue", On("Payment")),
+            ("รายงานการเงิน", "Accountant", "Reports", On("Accountant", "Reports")),
+        },
+        "Admin" => new[]
+        {
+            ("ภาพรวม", "Admin", "Dashboard", On("Admin", "Dashboard")),
+            ("ห้องพัก", "Admin", "Rooms", On("Admin", "Rooms", "AddRoom", "EditRoom")),
+            ("โปรโมชัน", "Admin", "Promotion", On("Admin", "Promotion", "AddPromotion", "EditPromotion")),
+            ("บัญชีผู้ใช้", "Admin", "Members", On("Admin", "Members", "AddUser", "EditUser")),
+            ("พนักงาน", "Admin", "Employees", On("Admin", "Employees", "EmployeeProfile")),
+            ("งานซ่อม", "Maintenance", "Index", On("Maintenance")),
+            ("รายงาน", "Admin", "Reports", On("Admin", "Reports")),
+        },
+        _ => Array.Empty<(string, string, string, bool)>()
+    };
+    var home = menu.Length > 0 ? menu[0] : ("", "Home", "Index", false);
+}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · Good Hotel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Serif+Thai:wght@600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="bo">
+    <div class="bo-shell">
+        <aside class="bo-side">
+            <div class="bo-side-head">
+                <a class="bo-brand" asp-controller="@home.Item2" asp-action="@home.Item3">Good Hotel</a>
+                <span class="bo-role">@ThaiText.Status(role)</span>
+                <button class="bo-menu-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#boNav"
+                        aria-controls="boNav" aria-expanded="false">เมนู</button>
+            </div>
+
+            <div class="bo-side-body collapse" id="boNav">
+                <nav class="bo-nav" aria-label="เมนูหลัก">
+                    @foreach (var item in menu)
+                    {
+                        <a class="@(item.Item4 ? "active" : "")" aria-current="@(item.Item4 ? "page" : null)"
+                           asp-controller="@item.Item2" asp-action="@item.Item3">@item.Item1</a>
+                    }
+                </nav>
+
+                <div class="bo-user">
+                    <div class="bo-user-name">@User.Identity?.Name</div>
+                    <div class="bo-user-links">
+                        <a asp-controller="Home" asp-action="Index">หน้าเว็บลูกค้า</a>
+                        <form asp-controller="Home" asp-action="Logout" method="post" class="d-inline">
+                            <button type="submit">ออกจากระบบ</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="bo-main">
+            <header class="bo-top">
+                <h1>@ViewData["Title"]</h1>
+                @if (IsSectionDefined("Actions"))
+                {
+                    <div class="bo-actions">@RenderSection("Actions", required: false)</div>
+                }
+            </header>
+            <main class="bo-content">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

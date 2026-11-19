@@ -1,117 +1,104 @@
 @model GoodHotel.Models.ViewModels.AdminDashboardViewModel
 
 @{
-    Layout = "_AdminLayout";
-    ViewData["Title"] = "แดชบอร์ด";
+    ViewData["Title"] = "ภาพรวม";
 }
 
-<div class="row g-4">
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">ห้องพัก</div>
-            <div class="value">@Model.RoomCount</div>
-            <div class="trend">จำนวนห้องทั้งหมด</div>
-        </div>
+@section Actions {
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Reports">รายงาน</a>
+}
+
+<div class="figures">
+    <div class="figure">
+        <a asp-action="Rooms"><div class="label">ห้องพัก</div><div class="value">@Model.RoomCount</div></a>
     </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">บัญชีผู้ใช้</div>
-            <div class="value">@Model.UserCount</div>
-            <div class="trend">ทุกบทบาท</div>
-        </div>
+    <div class="figure">
+        <a asp-action="Members"><div class="label">บัญชีผู้ใช้</div><div class="value">@Model.UserCount</div></a>
     </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">การจอง</div>
-            <div class="value">@Model.BookingCount</div>
-            <div class="trend">ไม่นับการจองที่ยกเลิก</div>
-        </div>
+    <div class="figure">
+        <div class="label">การจอง</div>
+        <div class="value">@Model.BookingCount</div>
+        <div class="note">ไม่นับที่ยกเลิก</div>
     </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="stat-card">
-            <div class="label">รายได้</div>
-            <div class="value">@(Model.Revenue?.ToString("N2") ?? "N/A")</div>
-            <div class="trend">เงินที่ยืนยันแล้ว หักยอดคืนเงิน (รวมการชำระจำลอง)</div>
-        </div>
+    <div class="figure">
+        <div class="label">รายได้สุทธิ</div>
+        <div class="value">฿@((Model.Revenue ?? 0m).ToString("N0"))</div>
+        <div class="note">รายละเอียดอยู่ที่ฝ่ายบัญชี</div>
     </div>
 </div>
 
-<div class="row g-4 mt-1">
-    <div class="col-md-4"><div class="stat-card"><div class="label">งานทำความสะอาดรอคนรับ</div><div class="value">@Model.PendingHousekeepingCount</div></div></div>
-    <div class="col-md-4"><div class="stat-card"><div class="label">งานทำความสะอาดรอตรวจ</div><div class="value">@Model.AwaitingVerificationCount</div></div></div>
-    <div class="col-md-4"><div class="stat-card"><div class="label">งานซ่อมที่ยังไม่เริ่ม</div><div class="value">@Model.OpenMaintenanceCount</div></div></div>
+<div class="figures">
+    <div class="figure @(Model.PendingHousekeepingCount > 0 ? "is-alert" : "")">
+        <div class="label">งานทำความสะอาดรอคนรับ</div>
+        <div class="value">@Model.PendingHousekeepingCount</div>
+    </div>
+    <div class="figure @(Model.AwaitingVerificationCount > 0 ? "is-alert" : "")">
+        <div class="label">ห้องรอพนักงานตรวจ</div>
+        <div class="value">@Model.AwaitingVerificationCount</div>
+    </div>
+    <div class="figure @(Model.OpenMaintenanceCount > 0 ? "is-alert" : "")">
+        <a asp-controller="Maintenance" asp-action="Index">
+            <div class="label">งานซ่อมที่ยังไม่เริ่ม</div>
+            <div class="value">@Model.OpenMaintenanceCount</div>
+        </a>
+    </div>
 </div>
 
-<div class="row g-4">
+<div class="row g-3">
     <div class="col-xl-8">
-        <div class="table-panel">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0">การจองล่าสุด (ตามวันเข้าพัก)</h4>
-                <a asp-controller="Admin" asp-action="Reports" class="btn btn-link p-0">ดูรายงาน</a>
-            </div>
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>เลขที่</th>
-                            <th>ลูกค้า</th>
-                            <th>ห้อง</th>
-                            <th>วันเข้าพัก</th>
-                            <th>ยอดรวม</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if (!Model.BookingsByCheckInDate.Any())
-                        {
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">
-                                    ยังไม่มีการจอง
-                                </td>
-                            </tr>
-                        }
-                        else
-                        {
-                            @foreach (var booking in Model.BookingsByCheckInDate)
-                            {
-                                <tr>
-                                    <td>@booking.BookingId</td>
-                                    <td>@booking.GuestName</td>
-                                    <td>@booking.RoomNumber</td>
-                                    <td>@ThaiText.Date(booking.CheckIn)</td>
-                                    <td>@(booking.Amount?.ToString("N2") ?? "")</td>
-                                </tr>
-                            }
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-xl-4">
-        <div class="booking-summary">
-            <h4 class="mb-3">สถานะห้องตอนนี้</h4>
-            @if (!Model.RoomStatusCounts.Any())
+        <section class="table-panel">
+            <div class="panel-head"><h2>การจองล่าสุด (ตามวันเข้าพัก)</h2></div>
+            @if (!Model.BookingsByCheckInDate.Any())
             {
-                <p class="text-muted mb-0">ยังไม่มีห้องพัก</p>
+                <p class="panel-empty">ยังไม่มีการจอง</p>
             }
             else
             {
-                @foreach (var item in Model.RoomStatusCounts)
-                {
-                    <div class="summary-line">
-                        <span>@(string.IsNullOrWhiteSpace(item.Status) ? "-" : item.Status)</span>
-                        <strong>@item.Count</strong>
-                    </div>
-                }
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>ห้อง</th><th>วันเข้าพัก</th><th class="text-end">ยอดรวม</th></tr></thead>
+                        <tbody>
+                            @foreach (var booking in Model.BookingsByCheckInDate)
+                            {
+                                <tr>
+                                    <td>#@booking.BookingId</td>
+                                    <td>@ThaiText.OrDash(booking.GuestName?.Trim())</td>
+                                    <td>@ThaiText.OrDash(booking.RoomNumber)</td>
+                                    <td class="num">@ThaiText.Date(booking.CheckIn)</td>
+                                    <td class="text-end num">@(booking.Amount.HasValue ? $"฿{booking.Amount:N2}" : "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             }
-        </div>
+        </section>
     </div>
-</div>
 
-<div class="report-card mt-4">
-    <h4 class="mb-2">หมายเหตุเรื่องรายได้</h4>
-    <p class="text-muted mb-0">
-        ยอดรายได้รวมการชำระเงินจำลอง (ไม่ใช่เงินจริง) และไม่นับข้อมูลการชำระเงินเก่าที่ยังไม่ได้ตรวจสอบ
-    </p>
+    <div class="col-xl-4">
+        <section class="table-panel">
+            <div class="panel-head">
+                <h2>สถานะห้องตอนนี้</h2>
+                <a asp-action="Rooms">จัดการห้อง</a>
+            </div>
+            @if (!Model.RoomStatusCounts.Any())
+            {
+                <p class="panel-empty">ยังไม่มีห้องพัก</p>
+            }
+            else
+            {
+                <table class="table">
+                    <tbody>
+                        @foreach (var item in Model.RoomStatusCounts)
+                        {
+                            <tr>
+                                <td>@ThaiText.OrDash(item.Status)</td>
+                                <td class="text-end num fw-semibold">@item.Count</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+    </div>
 </div>

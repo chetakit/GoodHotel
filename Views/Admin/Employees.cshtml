@@ -1,10 +1,9 @@
 @model IEnumerable<GoodHotel.Models.ViewModels.EmployeeListViewModel>
 
 @{
-    Layout = "_AdminLayout";
     ViewData["Title"] = "พนักงาน";
     var employees = Model.ToList();
-    var roles = new[] { "Staff", "Housekeeper" };
+    var roles = new[] { "Staff", "Housekeeper", "Accountant" };
     var groups = roles.Select(role => new
     {
         Role = role,
@@ -19,14 +18,11 @@
     }
 }
 
-<div class="table-panel">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">รายชื่อพนักงาน</h4>
-    </div>
+<div>
 
     @foreach (var group in groups)
     {
-        <section class="mt-4">
+        <section class="mb-4">
             <h5>@ThaiText.Status(group.Role)</h5>
             <div class="table-responsive">
                 <table class="table align-middle">
@@ -60,7 +56,7 @@
                                     <td>@employee.Email</td>
                                     <td>@employee.Phone</td>
                                     <td>@ThaiText.Status(employee.Role)</td>
-                                    <td>@(employee.IsActive ? "ใช้งานอยู่" : "ปิดการใช้งาน")</td>
+                                    <td><span class="badge @(employee.IsActive ? "text-bg-success" : "text-bg-secondary")">@(employee.IsActive ? "ใช้งานอยู่" : "ปิดการใช้งาน")</span></td>
                                     <td>
                                         <a asp-controller="Admin"
                                            asp-action="EmployeeProfile"

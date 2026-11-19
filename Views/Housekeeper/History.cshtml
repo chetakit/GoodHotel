@@ -2,50 +2,62 @@
 @{
     ViewData["Title"] = "ประวัติงาน";
 }
-<section class="content-section">
-    <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Housekeeping</span><h2>ประวัติงาน</h2></div>
 
-        <h3>งานที่ฉันทำเสร็จ</h3>
-        @if (Model.Completed.Count == 0)
-        {
-            <p>ยังไม่มีงานที่ทำเสร็จ</p>
-        }
-        else
-        {
-            <ul>
-                @foreach (var task in Model.Completed)
-                {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.Status) — @ThaiText.Time(task.CompletedAtUtc)</li>
-                }
-            </ul>
-        }
-
-        <h3>ความเคลื่อนไหวของฉัน</h3>
-        @if (Model.Events.Count == 0)
-        {
-            <p>ยังไม่มีประวัติ</p>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead><tr><th>งาน</th><th>ห้อง</th><th>การกระทำ</th><th>สถานะ</th><th>เวลา</th><th>เหตุผล</th></tr></thead>
-                    <tbody>
-                        @foreach (var item in Model.Events)
-                        {
-                            <tr>
-                                <td>#@item.TaskId</td>
-                                <td>@ThaiText.OrDash(item.RoomNumber)</td>
-                                <td>@ThaiText.Status(item.EventType)</td>
-                                <td>@ThaiText.Status(item.PreviousStatus) → @ThaiText.Status(item.NewStatus)</td>
-                                <td>@ThaiText.Time(item.OccurredAtUtc)</td>
-                                <td>@item.Reason</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
+<section class="table-panel mb-3">
+    <div class="panel-head">
+        <h2>งานที่ฉันทำเสร็จ</h2>
+        <span class="text-muted small">@Model.Completed.Count งาน</span>
     </div>
+    @if (Model.Completed.Count == 0)
+    {
+        <p class="panel-empty">ยังไม่มีงานที่ทำเสร็จ</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>งาน</th><th>ห้อง</th><th>สถานะ</th><th>ทำเสร็จเมื่อ</th></tr></thead>
+                <tbody>
+                    @foreach (var task in Model.Completed)
+                    {
+                        <tr>
+                            <td><a asp-action="TaskDetails" asp-route-id="@task.TaskId">#@task.TaskId</a></td>
+                            <td>@ThaiText.OrDash(task.RoomNumber)</td>
+                            <td><span class="badge @(task.Status == "Verified" ? "text-bg-success" : "text-bg-info")">@ThaiText.Status(task.Status)</span></td>
+                            <td class="num">@ThaiText.Time(task.CompletedAtUtc)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section class="table-panel">
+    <div class="panel-head"><h2>ความเคลื่อนไหวของฉัน</h2></div>
+    @if (Model.Events.Count == 0)
+    {
+        <p class="panel-empty">ยังไม่มีประวัติ</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th>เวลา</th><th>งาน</th><th>ห้อง</th><th>การกระทำ</th><th>สถานะ</th><th>เหตุผล</th></tr></thead>
+                <tbody>
+                    @foreach (var item in Model.Events)
+                    {
+                        <tr>
+                            <td class="num">@ThaiText.Time(item.OccurredAtUtc)</td>
+                            <td>#@item.TaskId</td>
+                            <td>@ThaiText.OrDash(item.RoomNumber)</td>
+                            <td>@ThaiText.Status(item.EventType)</td>
+                            <td class="small">@ThaiText.Status(item.PreviousStatus) → @ThaiText.Status(item.NewStatus)</td>
+                            <td class="small">@ThaiText.OrDash(item.Reason)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </section>

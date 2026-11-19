@@ -8,7 +8,7 @@ public sealed record CancelBookingResult(bool Succeeded, string Message);
 /// <summary>
 /// ลูกค้ายกเลิกการจองของตัวเอง
 /// เงื่อนไข: ต้องเป็นเจ้าของการจอง, ยังไม่ถูกยกเลิก, ยังไม่ check-in และต้องยกเลิกก่อนวันเข้าพัก
-/// ถ้าจ่ายเงินแล้ว ระบบจะสร้างคำขอคืนเงินให้ Admin อนุมัติต่ออัตโนมัติ
+/// ถ้าจ่ายเงินแล้ว ระบบจะสร้างคำขอคืนเงินให้ฝ่ายบัญชีอนุมัติต่ออัตโนมัติ
 /// </summary>
 public sealed class BookingCancellationService(
     GoodHotelDbContext db,
@@ -35,16 +35,28 @@ public sealed class BookingCancellationService(
                         !db.BookingStays.Any(s => s.BookingId == b.BookingId))
             .ExecuteUpdateAsync(b => b
                 .SetProperty(x => x.Status, BookingStatuses.Cancelled)
-                .SetProperty(x => x.CancelledAtUtc, now), ct);
+                .SetProperty(x => x.CancelledAtUtc, now)
+                .SetProperty(x => x.CancelReason, CancelReasons.Customer), ct);
 
         if (updated == 0)
         {
             return new CancelBookingResult(false, await ExplainWhyNotCancelledAsync(bookingId, customerId, today, ct));
         }
 
+        await CloseOpenPaymentsAsync(bookingId, ct);
         var refundMessage = await RequestRefundIfPaidAsync(bookingId, customerId, ct);
         return new CancelBookingResult(true, $"ยกเลิกการจอง #{bookingId} เรียบร้อยแล้ว {refundMessage}".Trim());
     }
+
+    /// <summary>
+    /// การจองถูกยกเลิกแล้ว: การชำระที่ยังรอยืนยัน (เช่น เลือกจ่ายเงินสดไว้) ไม่ต้องรอพนักงานหรือบัญชีตรวจอีก
+    /// ไม่งั้นจะค้างอยู่ในคิว "สลิปรอตรวจ" ทั้งที่การจองไม่มีแล้ว
+    /// </summary>
+    private Task<int> CloseOpenPaymentsAsync(int bookingId, CancellationToken ct) =>
+        db.Payments
+            .Where(p => p.BookingId == bookingId && p.VerifiedAtUtc == null &&
+                        (p.PaymentStatus == "Pending" || p.PaymentStatus == "Submitted"))
+            .ExecuteUpdateAsync(p => p.SetProperty(x => x.PaymentStatus, "Cancelled"), ct);
 
     /// <summary>
     /// พนักงานต้อนรับยกเลิกการจองแทนลูกค้า (เช่น ลูกค้าไม่มาเข้าพัก / จองแล้วไม่จ่ายเงิน)
@@ -64,7 +76,10 @@ public sealed class BookingCancellationService(
                         !db.BookingStays.Any(s => s.BookingId == b.BookingId))
             .ExecuteUpdateAsync(b => b
                 .SetProperty(x => x.Status, BookingStatuses.Cancelled)
-                .SetProperty(x => x.CancelledAtUtc, time.GetUtcNow().UtcDateTime), ct);
+                .SetProperty(x => x.CancelledAtUtc, time.GetUtcNow().UtcDateTime)
+                .SetProperty(x => x.CancelReason, CancelReasons.Staff), ct);
+
+        if (updated == 1) await CloseOpenPaymentsAsync(bookingId, ct);
 
         return updated == 1
             ? new CancelBookingResult(true, $"ยกเลิกการจอง #{bookingId} แล้ว ห้องกลับมาว่างให้จองได้")
@@ -102,7 +117,7 @@ public sealed class BookingCancellationService(
             ct);
 
         return refund.Succeeded
-            ? $"ส่งคำขอคืนเงิน ฿{remaining:N2} ให้ Admin อนุมัติแล้ว"
+            ? $"ส่งคำขอคืนเงิน ฿{remaining:N2} ให้ฝ่ายบัญชีอนุมัติแล้ว"
             : $"แต่ส่งคำขอคืนเงินอัตโนมัติไม่สำเร็จ ({refund.Message}) กรุณาขอคืนเงินที่หน้า Payment details";
     }
 

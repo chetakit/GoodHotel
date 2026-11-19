@@ -1,13 +1,12 @@
 @model IReadOnlyList<GoodHotel.Models.ViewModels.PromotionListViewModel>
 
 @{
-    ViewData["Title"] = "โปรโมชั่น";
+    ViewData["Title"] = "โปรโมชัน";
 }
 
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Special Offers</span>
             <h2>Promotion ของ Good Hotel</h2>
             <p>ไม่ต้องกรอกโค้ด ระบบจะเลือกโปรที่คุ้มที่สุดให้อัตโนมัติตอนจอง (1 การจองใช้ได้ 1 โปร)</p>
         </div>
@@ -15,7 +14,7 @@
         @if (Model.Count == 0)
         {
             <div class="promo-card text-center">
-                <h4>ยังไม่มีโปรโมชั่น</h4>
+                <h4>ยังไม่มีโปรโมชัน</h4>
                 <p class="text-muted mb-0">ขณะนี้ยังไม่มีข้อเสนอพิเศษ</p>
             </div>
         }

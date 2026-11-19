@@ -6,8 +6,8 @@
 
 <section class="content-section">
     <div class="container">
-        <div class="auth-card">
-            <ul class="nav nav-pills mb-4 justify-content-center">
+        <div class="auth-card auth-card-wide">
+            <ul class="nav nav-pills nav-fill mb-4">
                 <li class="nav-item">
                     <a class="nav-link" asp-controller="Home" asp-action="Login">เข้าสู่ระบบ</a>
                 </li>
@@ -16,12 +16,12 @@
                 </li>
             </ul>
 
-            <h2 class="mb-3 text-center">สมัครสมาชิก</h2>
+            <h2 class="h4 mb-1">สมัครสมาชิก</h2>
             @if (ViewBag.Status != null)
             {
                 <div class="alert alert-warning" role="alert">@ViewBag.Status</div>
             }
-            <p class="text-muted text-center mb-4">สมัครสมาชิกเพื่อรับสิทธิประโยชน์พิเศษและติดตามการจองอย่างรวดเร็ว</p>
+            <p class="text-muted small mb-3">ใช้อีเมลนี้เข้าสู่ระบบเพื่อจอง ชำระเงิน และดูการจองของคุณ</p>
 
             <form asp-controller="Home" asp-action="Register" method="post">
                 <div asp-validation-summary="All" class="text-danger mb-3"></div>

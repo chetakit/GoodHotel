@@ -39,5 +39,8 @@ public class BookingConfirmationViewModel : CreateBookingViewModel
 
     public bool CanSubmitPayment { get; set; }
 
+    // เส้นตายชำระเงินของการจองที่เพิ่งบันทึก (null = ไม่ต้องแสดง)
+    public DateTime? PaymentDueAtUtc { get; set; }
+
     public string? StatusMessage { get; set; }
 }

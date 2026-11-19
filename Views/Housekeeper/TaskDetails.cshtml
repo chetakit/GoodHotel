@@ -1,11 +1,10 @@
 @model GoodHotel.Models.ViewModels.HousekeepingDetailsViewModel
 @{
-    ViewData["Title"] = "รายละเอียดงาน";
+    ViewData["Title"] = $"งาน #{Model.Task.TaskId} · ห้อง {Model.Task.RoomNumber}";
     var task = Model.Task;
 }
 <section class="content-section">
     <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Housekeeping</span><h2>งาน #@task.TaskId</h2></div>
         <dl>
             <dt>ห้อง</dt><dd>@ThaiText.OrDash(task.RoomNumber)</dd>
             <dt>ประเภทห้อง</dt><dd>@ThaiText.OrDash(task.RoomType)</dd>

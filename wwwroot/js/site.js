@@ -1,8 +1,73 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
+﻿// ---------- ให้รู้ว่ากำลังโหลด และกันกดซ้ำ ----------
+// ฐานข้อมูลอยู่ไกล แต่ละหน้าใช้เวลาเสี้ยววินาที: แสดงแถบโหลดด้านบนทันทีที่กด
+// และเมื่อส่งฟอร์มแล้ว ปุ่มจะหมุนรอ กดซ้ำไม่ได้ (กันจองซ้ำ/เช็คอินซ้ำ)
+(() => {
+    const bar = document.createElement("div");
+    bar.className = "page-loading";
+    document.body.appendChild(bar);
 
-// Write your JavaScript code.
+    const start = () => bar.classList.add("is-active");
+    const reset = () => {
+        bar.classList.remove("is-active");
+        document.querySelectorAll(".is-busy").forEach(button => button.classList.remove("is-busy"));
+        document.querySelectorAll("form[data-submitting]").forEach(form => delete form.dataset.submitting);
+    };
 
+    document.addEventListener("click", event => {
+        const link = event.target.closest("a[href]");
+        if (!link || event.defaultPrevented || event.button !== 0 ||
+            event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        const url = new URL(link.href, location.href);
+        const samePage = url.pathname === location.pathname && url.search === location.search;
+        if (link.target || link.hasAttribute("download") || url.origin !== location.origin ||
+            samePage || url.pathname.includes("/Export") || link.dataset.bsToggle) return;
+        start();
+    });
+
+    document.addEventListener("submit", event => {
+        const form = event.target;
+        if (event.defaultPrevented) return;
+        if (form.dataset.submitting) {
+            event.preventDefault();
+            return;
+        }
+        form.dataset.submitting = "true";
+        // ไม่ใช้ disabled เพราะปุ่มบางปุ่มส่งค่า name/value ไปด้วย (เช่น ยืนยัน/ปฏิเสธ)
+        event.submitter?.classList.add("is-busy");
+        start();
+    });
+
+    // กดย้อนกลับแล้วหน้าเดิมโผล่มาจาก cache: เคลียร์สถานะรอ
+    window.addEventListener("pageshow", reset);
+})();
+
+// ---------- นับถอยหลังเวลาชำระเงิน ----------
+// หมดเวลาแล้ว: เปลี่ยนข้อความ และซ่อนปุ่ม/ฟอร์มชำระเงินที่มี data-hide-on-expire
+(() => {
+    const boxes = document.querySelectorAll("[data-deadline]");
+    if (boxes.length === 0) return;
+
+    const tick = () => {
+        let anyExpired = false;
+        boxes.forEach(box => {
+            const left = Math.max(0, Math.floor((new Date(box.dataset.deadline) - Date.now()) / 1000));
+            const counter = box.querySelector("[data-countdown]");
+            if (counter) counter.textContent = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+            if (left === 0) {
+                box.querySelector("[data-deadline-open]")?.setAttribute("hidden", "");
+                box.querySelector("[data-deadline-closed]")?.removeAttribute("hidden");
+                anyExpired = true;
+            }
+        });
+        if (anyExpired) {
+            document.querySelectorAll("[data-hide-on-expire]").forEach(el => el.setAttribute("hidden", ""));
+        }
+    };
+    tick();
+    setInterval(tick, 1000);
+})();
+
+// ---------- ปฏิทินเลือกวันเข้าพัก ----------
 (() => {
     const modal = document.getElementById("room-calendar-modal");
     if (!modal) {

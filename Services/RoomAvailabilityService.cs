@@ -11,7 +11,7 @@ public sealed record RoomBlockedPeriod(int RoomId, DateOnly? Start, DateOnly? En
         (!Start.HasValue || Start < end) && (!End.HasValue || End > start);
 }
 
-public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider timeProvider)
+public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider timeProvider, ParallelReader reader)
 {
     private static readonly TimeZoneInfo HotelTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Bangkok");
 
@@ -45,55 +45,69 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
         if (start >= end) throw new ArgumentException("The end date must be after the start date.");
         if (roomIds.Count == 0) return Array.Empty<RoomBlockedPeriod>();
         var ids = roomIds.Distinct().ToList();
-        var rooms = await db.Rooms.AsNoTracking().Where(r => ids.Contains(r.RoomId))
-            .Select(r => new { r.RoomId, r.Status }).ToListAsync(ct);
-        var periods = new List<RoomBlockedPeriod>();
-        var found = rooms.Select(r => r.RoomId).ToHashSet();
-        periods.AddRange(ids.Where(id => !found.Contains(id)).Select(id => new RoomBlockedPeriod(id, null, null)));
-        periods.AddRange(rooms.Where(r => !string.Equals(r.Status, "Available", StringComparison.Ordinal))
-            .Select(r => new RoomBlockedPeriod(r.RoomId, null, null)));
-
-        var bookings = await db.Bookings.AsNoTracking()
-            .Where(b => b.Status != BookingStatuses.Cancelled &&
-                b.RoomId.HasValue && ids.Contains(b.RoomId.Value) &&
-                b.CheckIn.HasValue && b.CheckOut.HasValue && b.CheckIn < end && b.CheckOut > start)
-            .Select(b => new
-            {
-                RoomId = b.RoomId!.Value,
-                b.CheckIn,
-                b.CheckOut,
-                CheckedOutAtUtc = db.BookingStays
-                    .Where(s => s.BookingId == b.BookingId && s.Status == "CheckedOut")
-                    .Select(s => s.CheckedOutAtUtc)
-                    .FirstOrDefault()
-            })
-            .ToListAsync(ct);
-        periods.AddRange(bookings.Select(b =>
-            new RoomBlockedPeriod(b.RoomId, b.CheckIn, EffectiveCheckOut(b.CheckOut, b.CheckedOutAtUtc))));
-
-        var activeStays = await db.BookingStays.AsNoTracking()
-            .Where(s => s.Status == "CheckedIn" && s.Booking.RoomId.HasValue && ids.Contains(s.Booking.RoomId.Value))
-            .Select(s => new { RoomId = s.Booking.RoomId!.Value, s.CheckedInAtUtc, s.Booking.CheckOut })
-            .ToListAsync(ct);
         var today = HotelToday();
-        periods.AddRange(activeStays.Select(s => ActiveStayPeriod(s.RoomId, s.CheckedInAtUtc, s.CheckOut, today)));
 
-        var reports = await db.MaintenanceReports.AsNoTracking()
-            .Where(r => ids.Contains(r.RoomId) && r.Status != MaintenanceReport.Resolved)
-            .Select(r => r.RoomId).Distinct().ToListAsync(ct);
-        periods.AddRange(reports.Select(roomId => new RoomBlockedPeriod(roomId, null, null)));
-
-        var cleaning = await (from task in db.HousekeepingTasks.AsNoTracking()
-            join stay in db.BookingStays.AsNoTracking() on task.StayBookingId equals (int?)stay.BookingId into stays
-            from stay in stays.DefaultIfEmpty()
-            where ids.Contains(task.RoomId) && task.TaskType == "CheckoutCleaning" && task.Status != "Verified"
-            select new
+        // แต่ละ query คืนช่วงเวลาที่ห้องไม่ว่าง (query ไม่ขึ้นต่อกัน)
+        var queries = new Func<GoodHotelDbContext, Task<IEnumerable<RoomBlockedPeriod>>>[]
+        {
+            async c =>
             {
-                task.RoomId,
-                CheckedOutAtUtc = stay == null || stay.Status != "CheckedOut" || stay.Booking.RoomId != task.RoomId
-                    ? null : stay.CheckedOutAtUtc
-            }).ToListAsync(ct);
-        periods.AddRange(cleaning.Select(t => CleaningPeriod(t.RoomId, t.CheckedOutAtUtc)));
+                var rooms = await c.Rooms.AsNoTracking().Where(r => ids.Contains(r.RoomId))
+                    .Select(r => new { r.RoomId, r.Status }).ToListAsync(ct);
+                var found = rooms.Select(r => r.RoomId).ToHashSet();
+                return ids.Where(id => !found.Contains(id)).Select(id => new RoomBlockedPeriod(id, null, null))
+                    .Concat(rooms.Where(r => !string.Equals(r.Status, "Available", StringComparison.Ordinal))
+                        .Select(r => new RoomBlockedPeriod(r.RoomId, null, null)))
+                    .ToList();
+            },
+            async c => (await c.Bookings.AsNoTracking()
+                .Where(b => b.Status != BookingStatuses.Cancelled &&
+                    b.RoomId.HasValue && ids.Contains(b.RoomId.Value) &&
+                    b.CheckIn.HasValue && b.CheckOut.HasValue && b.CheckIn < end && b.CheckOut > start)
+                .Select(b => new
+                {
+                    RoomId = b.RoomId!.Value,
+                    b.CheckIn,
+                    b.CheckOut,
+                    CheckedOutAtUtc = c.BookingStays
+                        .Where(s => s.BookingId == b.BookingId && s.Status == "CheckedOut")
+                        .Select(s => s.CheckedOutAtUtc)
+                        .FirstOrDefault()
+                })
+                .ToListAsync(ct))
+                .Select(b => new RoomBlockedPeriod(b.RoomId, b.CheckIn, EffectiveCheckOut(b.CheckOut, b.CheckedOutAtUtc))),
+            async c => (await c.BookingStays.AsNoTracking()
+                .Where(s => s.Status == "CheckedIn" && s.Booking.RoomId.HasValue && ids.Contains(s.Booking.RoomId.Value))
+                .Select(s => new { RoomId = s.Booking.RoomId!.Value, s.CheckedInAtUtc, s.Booking.CheckOut })
+                .ToListAsync(ct))
+                .Select(s => ActiveStayPeriod(s.RoomId, s.CheckedInAtUtc, s.CheckOut, today)),
+            async c => (await c.MaintenanceReports.AsNoTracking()
+                .Where(r => ids.Contains(r.RoomId) && r.Status != MaintenanceReport.Resolved)
+                .Select(r => r.RoomId).Distinct().ToListAsync(ct))
+                .Select(roomId => new RoomBlockedPeriod(roomId, null, null)),
+            async c => (await (from task in c.HousekeepingTasks.AsNoTracking()
+                join stay in c.BookingStays.AsNoTracking() on task.StayBookingId equals (int?)stay.BookingId into stays
+                from stay in stays.DefaultIfEmpty()
+                where ids.Contains(task.RoomId) && task.TaskType == "CheckoutCleaning" && task.Status != "Verified"
+                select new
+                {
+                    task.RoomId,
+                    CheckedOutAtUtc = stay == null || stay.Status != "CheckedOut" || stay.Booking.RoomId != task.RoomId
+                        ? null : stay.CheckedOutAtUtc
+                }).ToListAsync(ct))
+                .Select(t => CleaningPeriod(t.RoomId, t.CheckedOutAtUtc))
+        };
+
+        var periods = new List<RoomBlockedPeriod>();
+        if (db.Database.CurrentTransaction != null)
+        {
+            // อยู่ใน transaction ตอนจอง (ห้องถูกล็อกไว้) ต้องอ่านผ่าน connection เดิมทีละ query
+            foreach (var query in queries) periods.AddRange(await query(db));
+        }
+        else
+        {
+            foreach (var result in await Task.WhenAll(queries.Select(reader.Run))) periods.AddRange(result);
+        }
         return periods.Where(p => p.Overlaps(start, end)).ToList();
     }
 

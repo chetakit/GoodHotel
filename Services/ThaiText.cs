@@ -68,6 +68,7 @@ public static class ThaiText
         ["Customer"] = "ลูกค้า",
         ["Staff"] = "พนักงานต้อนรับ",
         ["Housekeeper"] = "แม่บ้าน",
+        ["Accountant"] = "ฝ่ายบัญชี",
         ["Admin"] = "ผู้ดูแลระบบ"
     };
 
@@ -103,4 +104,8 @@ public static class ThaiText
 
     /// <summary>ข้อความว่าง → "-"</summary>
     public static string OrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    /// <summary>จำนวนเงิน เช่น "฿9,000.00" หรือ "−฿9,000.00" (ติดลบใส่เครื่องหมายไว้หน้า ฿)</summary>
+    public static string Baht(decimal amount, string format = "N2") =>
+        (amount < 0 ? "−฿" : "฿") + Math.Abs(amount).ToString(format, System.Globalization.CultureInfo.InvariantCulture);
 }

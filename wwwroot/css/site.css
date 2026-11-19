@@ -1,324 +1,483 @@
+/* ============================================================
+   Good Hotel — stylesheet ชุดเดียวทั้งระบบ
+   1) ค่ากลาง (สี ตัวอักษร ระยะ)   2) ปรับ Bootstrap ให้เข้าชุด
+   3) หน้าเว็บลูกค้า               4) หลังบ้านพนักงาน
+   5) ปฏิทินเลือกวัน (ของเดิม)
+   ============================================================ */
+
+/* ---------- 1) ค่ากลาง ---------- */
 :root {
-    --hotel-navy: #11263d;
-    --hotel-blue: #1c4d73;
-    --hotel-gold: #d9b56d;
-    --hotel-gold-soft: #f3e6c9;
-    --hotel-sand: #f6f3ee;
-    --hotel-ink: #1d2430;
-    --hotel-muted: #6b7280;
-    --hotel-success: #2a8f6f;
-    --hotel-warning: #e9a13b;
-    --hotel-danger: #d15d5d;
-    --hotel-card: #ffffff;
-    --hotel-border: rgba(17, 38, 61, 0.1);
-    --brand-shadow: 0 22px 45px rgba(17, 38, 61, 0.12);
+    --paper: #f5f3ef;
+    --surface: #ffffff;
+    --ink: #1f2328;
+    --ink-2: #474c54;
+    --muted: #6f6a63;
+    --line: #e4dfd7;
+    --line-strong: #cfc8bd;
+
+    --accent: #1e5a52;
+    --accent-hover: #164640;
+    --accent-soft: #e4eeeb;
+
+    --ok: #2d6b42;      --ok-soft: #e5f0e8;
+    --warn: #8d5a10;    --warn-soft: #f7ecd9;
+    --bad: #a3372f;     --bad-soft: #f6e4e1;
+    --info: #2b5a85;    --info-soft: #e4ecf5;
+
+    --radius: 6px;
+    --font: "IBM Plex Sans Thai", "Segoe UI", Tahoma, sans-serif;
+    --serif: "Noto Serif Thai", Georgia, serif;
+
+    /* ชื่อเดิมที่ปฏิทินและบางหน้ายังใช้ */
+    --hotel-navy: var(--ink);
+    --hotel-ink: var(--ink);
+    --hotel-muted: var(--muted);
+    --hotel-border: var(--line);
+    --hotel-gold: var(--accent);
+    --hotel-gold-soft: var(--accent-soft);
+
+    /* Bootstrap */
+    --bs-body-font-family: var(--font);
+    --bs-body-color: var(--ink);
+    --bs-body-bg: var(--paper);
+    --bs-border-color: var(--line);
+    --bs-border-radius: var(--radius);
+    --bs-border-radius-sm: 4px;
+    --bs-border-radius-lg: 8px;
+    --bs-primary: var(--accent);
+    --bs-primary-rgb: 30, 90, 82;
+    --bs-link-color: var(--accent);
+    --bs-link-color-rgb: 30, 90, 82;
+    --bs-link-hover-color: var(--accent-hover);
+    --bs-secondary-color: var(--muted);
+    --bs-focus-ring-color: rgba(30, 90, 82, .25);
 }
 
-html {
-    scroll-behavior: smooth;
-}
+html { scroll-behavior: smooth; }
 
 body {
-    margin: 0;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background: #f4f1eb;
-    color: var(--hotel-ink);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
 }
 
-img {
-    max-width: 100%;
-    display: block;
-}
+img { max-width: 100%; display: block; }
+h1, h2, h3, h4, h5, h6 { color: var(--ink); font-weight: 600; letter-spacing: 0; }
+h3 { font-size: 1.15rem; }
+h4 { font-size: 1.05rem; }
+.text-muted { color: var(--muted) !important; }
+a { text-underline-offset: 2px; }
 
-p {
-    margin-bottom: 0.75rem;
+/* ---------- 2) Bootstrap ---------- */
+.btn {
+    --bs-btn-font-weight: 500;
+    --bs-btn-padding-y: .45rem;
+    --bs-btn-padding-x: .95rem;
+    --bs-btn-border-radius: var(--radius);
+    --bs-btn-focus-box-shadow: 0 0 0 3px rgba(30, 90, 82, .25);
+    transition: background-color .12s, border-color .12s, color .12s;
 }
+.btn-sm { --bs-btn-padding-y: .25rem; --bs-btn-padding-x: .6rem; --bs-btn-font-size: .85rem; }
 
-.hotel-body {
-    min-height: 100vh;
-    background: linear-gradient(180deg, #f9f5f0 0%, #f2efe9 100%);
+.btn-primary, .hotel-primary-btn {
+    --bs-btn-bg: var(--accent);
+    --bs-btn-border-color: var(--accent);
+    --bs-btn-hover-bg: var(--accent-hover);
+    --bs-btn-hover-border-color: var(--accent-hover);
+    --bs-btn-active-bg: var(--accent-hover);
+    --bs-btn-active-border-color: var(--accent-hover);
+    --bs-btn-disabled-bg: var(--accent);
+    --bs-btn-disabled-border-color: var(--accent);
+    --bs-btn-color: #fff;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-active-color: #fff;
 }
+.btn-outline-primary, .hotel-secondary-btn {
+    --bs-btn-color: var(--accent);
+    --bs-btn-border-color: var(--line-strong);
+    --bs-btn-bg: var(--surface);
+    --bs-btn-hover-color: var(--accent-hover);
+    --bs-btn-hover-bg: var(--accent-soft);
+    --bs-btn-hover-border-color: var(--accent);
+    --bs-btn-active-color: var(--accent-hover);
+    --bs-btn-active-bg: var(--accent-soft);
+    --bs-btn-active-border-color: var(--accent);
+}
+.btn-outline-secondary {
+    --bs-btn-color: var(--ink-2);
+    --bs-btn-border-color: var(--line-strong);
+    --bs-btn-bg: var(--surface);
+    --bs-btn-hover-color: var(--ink);
+    --bs-btn-hover-bg: var(--paper);
+    --bs-btn-hover-border-color: var(--line-strong);
+}
+.btn-secondary {
+    --bs-btn-color: var(--ink);
+    --bs-btn-bg: #ece8e1;
+    --bs-btn-border-color: #ece8e1;
+    --bs-btn-hover-color: var(--ink);
+    --bs-btn-hover-bg: #e2ddd4;
+    --bs-btn-hover-border-color: #e2ddd4;
+}
+.btn-success {
+    --bs-btn-bg: var(--ok); --bs-btn-border-color: var(--ok);
+    --bs-btn-hover-bg: #245636; --bs-btn-hover-border-color: #245636;
+}
+.btn-danger {
+    --bs-btn-bg: var(--bad); --bs-btn-border-color: var(--bad);
+    --bs-btn-hover-bg: #8a2d26; --bs-btn-hover-border-color: #8a2d26;
+}
+.btn-outline-danger {
+    --bs-btn-color: var(--bad);
+    --bs-btn-border-color: #e3c3bf;
+    --bs-btn-bg: var(--surface);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--bad);
+    --bs-btn-hover-border-color: var(--bad);
+}
+.btn-light { --bs-btn-bg: var(--surface); --bs-btn-border-color: var(--line); }
+.btn-link { --bs-btn-color: var(--accent); --bs-btn-hover-color: var(--accent-hover); }
 
-.top-header {
-    background: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid rgba(17, 38, 61, 0.08);
+/* ปุ่มที่กดแล้วรอเซิร์ฟเวอร์ (site.js ใส่ class นี้ให้) */
+.btn.is-busy { position: relative; color: transparent !important; pointer-events: none; }
+.btn.is-busy::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-color: rgba(255,255,255,.9) rgba(255,255,255,.9) transparent transparent;
+    border-radius: 50%;
+    animation: busy-spin .7s linear infinite;
+}
+.btn-outline-primary.is-busy::after, .btn-outline-secondary.is-busy::after,
+.btn-outline-danger.is-busy::after, .btn-light.is-busy::after, .btn-secondary.is-busy::after {
+    border-color: var(--accent) var(--accent) transparent transparent;
+}
+@keyframes busy-spin { to { transform: rotate(360deg); } }
+
+.form-label { font-weight: 500; font-size: .875rem; color: var(--ink-2); margin-bottom: .3rem; }
+.form-control, .form-select {
+    border-color: var(--line-strong);
+    border-radius: var(--radius);
+    padding: .45rem .7rem;
+    background-color: var(--surface);
+}
+.form-control:focus, .form-select:focus, .form-check-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(30, 90, 82, .18);
+}
+.form-check-input:checked { background-color: var(--accent); border-color: var(--accent); }
+.form-text { color: var(--muted); }
+
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--line);
+    --bs-table-hover-bg: #faf8f5;
+    margin-bottom: 0;
+    font-size: .925rem;
+}
+.table > thead th {
+    font-size: .78rem;
+    font-weight: 500;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line-strong);
+    padding: .55rem .75rem;
+    white-space: nowrap;
+}
+.table > tbody td { padding: .65rem .75rem; vertical-align: middle; }
+.table > tbody tr:last-child > * { border-bottom: 0; }
+
+/* ป้ายสถานะ: พื้นอ่อน ตัวอักษรเข้ม ใช้ความหมายเดียวกันทั้งระบบ */
+.badge { font-weight: 500; font-size: .78rem; padding: .3em .6em; border-radius: 4px; }
+.text-bg-success { background: var(--ok-soft) !important; color: var(--ok) !important; }
+.text-bg-warning { background: var(--warn-soft) !important; color: var(--warn) !important; }
+.text-bg-danger { background: var(--bad-soft) !important; color: var(--bad) !important; }
+.text-bg-info { background: var(--info-soft) !important; color: var(--info) !important; }
+.text-bg-primary { background: var(--accent-soft) !important; color: var(--accent) !important; }
+.text-bg-secondary, .text-bg-light { background: #eeebe6 !important; color: var(--ink-2) !important; }
+.text-bg-dark { background: #e7e5e1 !important; color: var(--ink) !important; }
+
+.alert {
+    border: 1px solid var(--line);
+    border-left-width: 3px;
+    border-radius: var(--radius);
+    padding: .7rem .9rem;
+    font-size: .925rem;
+    background: var(--surface);
+    color: var(--ink);
+}
+.alert-success { border-left-color: var(--ok); background: var(--ok-soft); }
+.alert-warning { border-left-color: var(--warn); background: var(--warn-soft); }
+.alert-danger { border-left-color: var(--bad); background: var(--bad-soft); }
+.alert-info { border-left-color: var(--info); background: var(--info-soft); }
+.alert-light, .alert-secondary { border-left-color: var(--line-strong); }
+
+.card { border: 1px solid var(--line); border-radius: 8px; box-shadow: none; }
+.card-body { padding: 1rem 1.1rem; }
+
+.nav-pills .nav-link { color: var(--ink-2); border-radius: var(--radius); padding: .35rem .8rem; font-size: .9rem; }
+.nav-pills .nav-link.active { background: var(--ink); color: #fff; }
+.nav-tabs { border-bottom-color: var(--line); }
+.nav-tabs .nav-link { color: var(--ink-2); }
+.nav-tabs .nav-link.active { color: var(--ink); border-color: var(--line) var(--line) var(--surface); }
+
+.pagination { --bs-pagination-color: var(--ink-2); --bs-pagination-active-bg: var(--ink); --bs-pagination-active-border-color: var(--ink); --bs-pagination-border-color: var(--line); --bs-pagination-hover-color: var(--ink); --bs-pagination-focus-box-shadow: 0 0 0 3px rgba(30,90,82,.18); }
+.dropdown-menu { border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(31, 35, 40, .08); font-size: .925rem; }
+.dropdown-item:active { background: var(--accent); }
+
+dl { margin-bottom: 1rem; }
+dt { font-weight: 500; font-size: .8rem; color: var(--muted); }
+dd { margin-bottom: .6rem; }
+
+/* ---------- ชิ้นส่วนที่ใช้ร่วมกัน ---------- */
+
+/* กล่องเนื้อหาพื้นขาว */
+.booking-panel, .table-panel, .report-card, .feature-box, .promo-card, .summary-card, .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1.1rem 1.2rem;
+}
+.table-panel { padding: 0; overflow: hidden; }
+.table-panel > .table-responsive, .table-panel > table { margin: 0; }
+.panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .85rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+}
+.panel-head h2, .panel-head h3 { font-size: 1rem; margin: 0; }
+.panel-head a { font-size: .875rem; }
+.panel-empty { padding: 1.1rem; color: var(--muted); margin: 0; }
+
+/* แถว "หัวข้อ ... ค่า" ในกล่องสรุป */
+.summary-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .45rem 0;
+    border-bottom: 1px dashed var(--line);
+}
+.summary-line:last-child { border-bottom: 0; }
+
+/* ตัวเลขสรุป: แถบเดียวแบ่งช่อง แทนการ์ดลอยหลายใบ */
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: .85rem 1rem;
+    height: 100%;
+}
+.stat-card .label { font-size: .8rem; color: var(--muted); }
+.stat-card .value { font-size: 1.5rem; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.stat-card .trend { font-size: .8rem; color: var(--muted); }
+
+.figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+}
+/* เส้นแบ่งช่องวาดด้วยเงา: ขอบนอกถูกตัดด้วย overflow ทำให้ขึ้นบรรทัดใหม่แล้วเส้นยังถูก */
+.figure { padding: .85rem 1.1rem; box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line); }
+.figure .label { font-size: .8rem; color: var(--muted); }
+.figure .value { font-size: 1.45rem; font-weight: 600; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.figure .note { font-size: .78rem; color: var(--muted); }
+.figure a { color: inherit; text-decoration: none; }
+.figure a:hover .value { color: var(--accent); }
+.figure.is-alert .value { color: var(--warn); }
+
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money-out { color: var(--bad); }
+
+/* ---------- 3) หน้าเว็บลูกค้า ---------- */
+.hotel-body { min-height: 100vh; display: flex; flex-direction: column; }
+.hotel-body > main { flex: 1; }
+
+.top-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.hotel-navbar { padding: .7rem 0; }
+.hotel-brand {
+    font-family: var(--serif);
+    font-size: 1.35rem;
+    color: var(--ink) !important;
+    text-decoration: none;
+}
+.brand-mark { display: none; }
+.hotel-navbar .nav-link { color: var(--ink-2); font-weight: 500; padding: .4rem .2rem !important; margin: 0 .55rem; border-bottom: 2px solid transparent; }
+.hotel-navbar .nav-link:hover, .hotel-navbar .nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
+.user-chip { text-align: right; line-height: 1.25; font-size: .875rem; }
+.user-chip small { color: var(--muted); }
+
+.content-section { padding: 2.75rem 0; }
+.content-section.bg-light { background: #efece6 !important; }
+.section-heading { margin-bottom: 1.25rem; }
+.section-heading h2 { font-family: var(--serif); font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin-bottom: .35rem; }
+.section-heading p { color: var(--muted); margin: 0; }
+
+/* หน้าแรก */
+.home-hero { padding: 3rem 0 2.5rem; }
+.home-hero h1 { font-family: var(--serif); font-size: clamp(2rem, 4.5vw, 3.1rem); line-height: 1.25; margin-bottom: 1rem; }
+.home-hero .lead { color: var(--ink-2); font-size: 1.05rem; max-width: 34rem; }
+.home-hero-photo { border-radius: 8px; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #e8e3da; }
+.stay-search {
+    display: grid;
+    grid-template-columns: 1fr 1fr 6.5rem;
+    gap: .75rem;
+    align-items: end;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1.75rem;
+}
+.stay-search .btn { grid-column: 1 / -1; }
+@media (max-width: 575.98px) { .stay-search { grid-template-columns: 1fr 1fr; } }
+
+.hotel-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.hotel-facts div { padding: 1rem 1.1rem; border-right: 1px solid var(--line); }
+.hotel-facts div:last-child { border-right: 0; }
+.hotel-facts dt { margin-bottom: .15rem; }
+.hotel-facts dd { margin: 0; font-weight: 500; }
+
+/* การ์ดห้องพัก */
+.room-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+.room-image { width: 100%; height: 210px; object-fit: cover; background: #e8e3da; }
+.room-body { padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: .6rem; flex: 1; }
+.room-body > .btn:last-child, .room-body > a.btn:last-of-type { margin-top: auto; }
+.room-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; }
+.room-meta h4 { font-size: 1.05rem; margin: 0; }
+.room-price { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.room-price small { font-size: .85rem; font-weight: 400; color: var(--muted); }
+.room-features { display: flex; flex-wrap: wrap; gap: .4rem; }
+.room-features span { font-size: .8rem; color: var(--ink-2); background: var(--paper); border: 1px solid var(--line); padding: .15rem .5rem; border-radius: 4px; }
+.badge-status { font-size: .78rem; font-weight: 500; padding: .2rem .55rem; border-radius: 4px; background: #eeebe6; color: var(--ink-2); white-space: nowrap; }
+.badge-status.available { background: var(--ok-soft); color: var(--ok); }
+.badge-status.booked { background: var(--warn-soft); color: var(--warn); }
+.badge-status.cleaning { background: var(--info-soft); color: var(--info); }
+
+.promo-card { height: 100%; }
+.promo-card h4, .promo-card h5 { margin-bottom: .35rem; }
+.promo-card .tag { display: inline-block; font-size: .78rem; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: .15rem .5rem; border-radius: 4px; margin-bottom: .5rem; }
+.feature-box h4 { margin-bottom: .35rem; }
+.feature-icon { display: none; }
+
+/* ฟอร์มเข้าสู่ระบบ/สมัคร และสรุปการจอง */
+.auth-card { max-width: 440px; margin: 0 auto; padding: 1.6rem; }
+.auth-card .nav-pills { background: var(--paper); border-radius: var(--radius); padding: .25rem; }
+.auth-card .nav-pills .nav-link { color: var(--ink-2); }
+.auth-card .nav-pills .nav-link.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.summary-card { position: sticky; top: 1rem; }
+.summary-total { font-size: 1.25rem; font-weight: 600; }
+.promotion-feedback-success { color: var(--ok); }
+.promotion-feedback-error { color: var(--bad); }
+
+/* ส่วนท้าย */
+.hotel-footer { border-top: 1px solid var(--line); background: var(--surface); padding: 2rem 0 1.25rem; margin-top: 2rem; font-size: .9rem; }
+.hotel-footer h6 { font-size: .8rem; color: var(--muted); font-weight: 500; margin-bottom: .35rem; }
+.footer-copy { color: var(--ink-2); margin: 0; }
+.footer-bottom { display: flex; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--line); margin-top: 1.5rem; padding-top: 1rem; color: var(--muted); font-size: .8rem; }
+
+/* ---------- 4) หลังบ้านพนักงาน ---------- */
+.bo { background: var(--paper); }
+.bo-shell { display: flex; min-height: 100vh; }
+
+.bo-side {
+    width: 232px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
     position: sticky;
     top: 0;
-    z-index: 1030;
-}
-
-.hotel-navbar {
-    padding: 1rem 0;
-}
-
-.hotel-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--hotel-navy) !important;
-    letter-spacing: 0.02em;
-}
-
-.brand-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.2rem;
-    height: 2.2rem;
-    border-radius: 0.7rem;
-    background: linear-gradient(135deg, var(--hotel-gold) 0%, #b88a46 100%);
-    color: white;
-    font-weight: 800;
-    box-shadow: 0 10px 20px rgba(185, 134, 58, 0.3);
-}
-
-.hotel-navbar .nav-link {
-    color: rgba(17, 38, 61, 0.8) !important;
-    font-weight: 600;
-    padding: 0.7rem 1rem !important;
-}
-
-.hotel-navbar .nav-link.active,
-.hotel-navbar .nav-link:hover {
-    color: var(--hotel-blue) !important;
-}
-
-.hotel-primary-btn,
-.hotel-primary-btn:hover,
-.hotel-primary-btn:focus {
-    background: linear-gradient(135deg, var(--hotel-blue) 0%, var(--hotel-navy) 100%);
-    border: none;
-    border-radius: 0.9rem;
-    color: #fff;
-    padding: 0.8rem 1.3rem;
-    font-weight: 600;
-    box-shadow: 0 12px 24px rgba(17, 38, 61, 0.2);
-}
-
-.hotel-secondary-btn {
-    border-radius: 0.9rem;
-    padding: 0.8rem 1.2rem;
-    border-color: rgba(28, 77, 115, 0.2);
-    color: var(--hotel-blue);
-    font-weight: 600;
-}
-
-.page-hero {
-    background: linear-gradient(135deg, rgba(17, 38, 61, 0.82), rgba(28, 77, 115, 0.7)), url("https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80") center/cover no-repeat;
-    color: #fff;
-    padding: 7rem 0 5rem;
-}
-
-.hero-content {
-    max-width: 650px;
-}
-
-.eyebrow {
-    display: inline-block;
-    margin-bottom: 1rem;
-    padding: 0.45rem 0.9rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #dfeaf5;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    font-weight: 700;
-}
-
-.page-hero h1 {
-    font-size: clamp(2.6rem, 5vw, 4.5rem);
-    font-weight: 800;
-    letter-spacing: -0.05em;
-    margin-bottom: 1rem;
-}
-
-.hero-subtitle {
-    font-size: 1.08rem;
-    color: rgba(255, 255, 255, 0.88);
-    max-width: 580px;
-    margin-bottom: 2rem;
-}
-
-.hero-actions {
+    height: 100vh;
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
+    flex-direction: column;
 }
-
-.hero-search-card {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 1.2rem;
-    padding: 1.2rem;
-    backdrop-filter: blur(10px);
+.bo-side-head { padding: 1.1rem 1.1rem .9rem; display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .5rem; }
+.bo-brand { font-family: var(--serif); font-size: 1.2rem; color: var(--ink); text-decoration: none; }
+.bo-role { font-size: .8rem; color: var(--muted); }
+.bo-menu-toggle { display: none; margin-left: auto; border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--radius); padding: .2rem .65rem; font-size: .85rem; }
+.bo-side-body { display: flex !important; flex-direction: column; flex: 1; min-height: 0; }
+.bo-nav { display: flex; flex-direction: column; padding: .25rem .6rem; gap: 1px; overflow-y: auto; }
+.bo-nav a {
+    display: block;
+    padding: .45rem .6rem;
+    border-radius: var(--radius);
+    color: var(--ink-2);
+    text-decoration: none;
+    font-size: .925rem;
 }
+.bo-nav a:hover { background: var(--paper); color: var(--ink); }
+.bo-nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.bo-user { margin-top: auto; padding: .9rem 1.1rem 1.1rem; border-top: 1px solid var(--line); font-size: .85rem; }
+.bo-user-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bo-user-links { display: flex; gap: .9rem; margin-top: .3rem; }
+.bo-user-links a, .bo-user-links button { color: var(--muted); background: none; border: 0; padding: 0; font-size: .85rem; text-decoration: none; }
+.bo-user-links a:hover, .bo-user-links button:hover { color: var(--ink); text-decoration: underline; }
 
-.hero-search-card .form-control,
-.hero-search-card .form-select {
-    border-radius: 0.8rem;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-}
-
-.hero-search-card .form-control::placeholder,
-.hero-search-card .form-select {
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.content-section {
-    padding: 5rem 0;
-}
-
-.section-heading {
-    margin-bottom: 2rem;
-}
-
-.section-heading h2 {
-    font-size: clamp(2rem, 3vw, 2.8rem);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    margin-bottom: 0.75rem;
-    color: var(--hotel-navy);
-}
-
-.section-heading p {
-    color: var(--hotel-muted);
-    max-width: 620px;
-    margin: 0;
-}
-
-.room-card,
-.promo-card,
-.feature-box,
-.auth-card,
-.booking-panel,
-.table-panel,
-.report-card,
-.stat-card,
-.admin-panel {
-    background: var(--hotel-card);
-    border: 1px solid var(--hotel-border);
-    border-radius: 1.4rem;
-    box-shadow: var(--brand-shadow);
-}
-
-.room-card {
-    overflow: hidden;
-}
-
-.room-image {
-    height: 230px;
-    object-fit: cover;
-}
-
-.room-body {
-    padding: 1.2rem 1.2rem 1.4rem;
-}
-
-.room-meta {
+.bo-main { flex: 1; min-width: 0; }
+.bo-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.9rem;
-}
-
-.room-price {
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: var(--hotel-blue);
-}
-
-.room-price small {
-    color: var(--hotel-muted);
-    font-size: 0.8rem;
-}
-
-.badge-status {
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.45rem 0.7rem;
-}
-
-.badge-status.available {
-    background: rgba(42, 143, 111, 0.12);
-    color: var(--hotel-success);
-}
-
-.badge-status.booked {
-    background: rgba(233, 161, 59, 0.14);
-    color: var(--hotel-warning);
-}
-
-.badge-status.cleaning {
-    background: rgba(209, 93, 93, 0.1);
-    color: var(--hotel-danger);
-}
-
-.room-features {
-    display: flex;
+    gap: 1rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin: 0.9rem 0 1.2rem;
-    color: var(--hotel-muted);
-    font-size: 0.92rem;
+    padding: 1.15rem 1.75rem .25rem;
+    max-width: 1280px;
+}
+.bo-top h1 { font-size: 1.35rem; margin: 0; }
+.bo-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.bo-content { padding: .9rem 1.75rem 2.5rem; max-width: 1280px; }
+
+/* หน้าเดิมที่ห่อด้วย section/container แบบหน้าลูกค้า ให้ชิดเต็มพื้นที่ในหลังบ้าน */
+.bo-content .content-section { padding: 0; }
+.bo-content .content-section > .container { max-width: none; padding: 0; }
+.bo-content .section-heading { margin-bottom: .9rem; }
+.bo-content .section-heading p { font-size: .925rem; }
+.bo-content h3 { font-size: 1rem; margin: 1.5rem 0 .6rem; }
+.bo-content .table-responsive:not(.table-panel .table-responsive) {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
 }
 
-.room-features span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    background: #f5f7fa;
-    padding: 0.4rem 0.65rem;
-    border-radius: 999px;
+/* ตัวกรองบนหัวตาราง */
+.toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; margin-bottom: 1rem; }
+.toolbar .form-control, .toolbar .form-select { width: auto; min-width: 12rem; }
+
+/* สถานะห้องแบบตาราง */
+.status-pill { display: inline-block; font-size: .78rem; font-weight: 500; padding: .2rem .55rem; border-radius: 4px; background: #eeebe6; color: var(--ink-2); }
+.status-pill.occupied { background: var(--info-soft); color: var(--info); }
+.status-pill.clean { background: var(--ok-soft); color: var(--ok); }
+.status-pill.maintenance { background: var(--bad-soft); color: var(--bad); }
+
+/* กราฟแท่งแนวนอนแบบง่าย (รายงาน) */
+.bar-row { display: grid; grid-template-columns: 8.5rem 1fr 7rem; gap: .75rem; align-items: center; padding: .35rem 0; font-size: .9rem; }
+.bar-track { height: 8px; background: var(--paper); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+
+@media (max-width: 991.98px) {
+    .bo-shell { flex-direction: column; }
+    .bo-side { width: auto; height: auto; position: static; border-right: 0; border-bottom: 1px solid var(--line); }
+    .bo-side-head { align-items: center; padding: .75rem 1rem; }
+    .bo-menu-toggle { display: inline-block; }
+    .bo-side-body { display: none !important; }
+    .bo-side-body.show, .bo-side-body.collapsing { display: flex !important; }
+    .bo-top { padding: 1rem 1rem .25rem; }
+    .bo-content { padding: .75rem 1rem 2rem; }
 }
 
-.promo-card {
-    padding: 1.4rem;
-    height: 100%;
-}
-
-.promo-card .tag {
-    display: inline-block;
-    background: var(--hotel-gold-soft);
-    color: var(--hotel-navy);
-    padding: 0.4rem 0.7rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    margin-bottom: 0.9rem;
-}
-
-.feature-box {
-    padding: 1.5rem;
-    height: 100%;
-}
-
-.feature-icon {
-    width: 3.2rem;
-    height: 3.2rem;
-    border-radius: 1rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #edf4fb 0%, #f8f1e1 100%);
-    color: var(--hotel-blue);
-    font-size: 1.3rem;
-    margin-bottom: 1rem;
-}
-
-.hotel-footer {
-    background: var(--hotel-navy);
-    color: rgba(255, 255, 255, 0.7);
-    padding: 2.5rem 0 1rem;
-}
-
+/* ---------- 5) ปฏิทินเลือกวัน ---------- */
 .calendar-modal {
     position: fixed;
     inset: 0;
@@ -571,10 +730,6 @@ body.calendar-modal-open {
     overflow: hidden;
 }
 
-.footer-copy {
-    color: rgba(255, 255, 255, 0.72);
-}
-
 @media (max-width: 575.98px) {
     .calendar-modal {
         align-items: flex-end;
@@ -611,498 +766,81 @@ body.calendar-modal-open {
     }
 }
 
-.footer-brand {
-    color: #fff !important;
-}
 
-.footer-bottom {
-    margin-top: 1.5rem;
-    padding-top: 1.2rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.75);
+/* แถบโหลดด้านบนของหน้า (site.js) */
+.page-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2px;
+    width: 0;
+    background: var(--accent);
+    z-index: 2000;
+    opacity: 0;
 }
-
-.booking-panel,
-.auth-card,
-.table-panel,
-.report-card,
-.stat-card,
-.admin-panel {
-    padding: 1.5rem;
+.page-loading.is-active {
+    opacity: 1;
+    animation: page-loading 8s cubic-bezier(.1, .7, .2, 1) forwards;
 }
+@keyframes page-loading { 0% { width: 0; } 15% { width: 45%; } 100% { width: 92%; } }
 
-.booking-form .form-control,
-.booking-form .form-select,
-.auth-card .form-control {
-    border-radius: 0.85rem;
-    border: 1px solid rgba(17, 38, 61, 0.12);
-    padding: 0.8rem 1rem;
-    background: #ffffff;
-}
-
-.summary-card {
-    background: linear-gradient(135deg, var(--hotel-blue), var(--hotel-navy));
-    color: #fff;
-    border-radius: 1.2rem;
-    padding: 1.5rem;
-}
-
-.summary-total {
-    font-size: 2rem;
-    font-weight: 800;
-    margin: 0.8rem 0 0.2rem;
-}
-
-.promotion-feedback-success {
-    color: #b8f3d0;
-}
-
-.promotion-feedback-error {
-    color: #ffd0d0;
-}
-
-.auth-card {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
-.auth-card .nav-pills .nav-link {
-    border-radius: 999px;
-    color: var(--hotel-muted);
-    font-weight: 600;
-}
-
-.auth-card .nav-pills .nav-link.active {
-    background: var(--hotel-blue);
-    color: #fff;
-}
-
-.admin-body {
-    background: #eef2f5;
-}
-
-.admin-shell {
-    display: flex;
-    min-height: 100vh;
-}
-
-.admin-sidebar {
-    width: 260px;
-    background: var(--hotel-navy);
-    color: #fff;
-    padding: 1.5rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.sidebar-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    padding: 0.4rem 0.6rem 1.2rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.sidebar-brand strong,
-.sidebar-brand small {
-    display: block;
-}
-
-.sidebar-nav {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.sidebar-nav .nav-item {
-    display: block;
-    color: rgba(255, 255, 255, 0.8);
-    text-decoration: none;
-    padding: 0.8rem 0.9rem;
-    border-radius: 0.8rem;
-    transition: all 0.2s ease;
-    font-weight: 600;
-}
-
-.sidebar-nav .nav-item:hover,
-.sidebar-nav .nav-item.active {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-}
-
-.sidebar-user {
-    margin-top: auto;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    padding: 0.9rem 0.85rem;
-}
-
-.avatar {
-    width: 2.4rem;
-    height: 2.4rem;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--hotel-gold), #b88a46);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    font-weight: 800;
-    color: white;
-}
-
-.admin-main {
-    flex: 1;
-    padding: 1.5rem 1.5rem 2.5rem;
-}
-
-.admin-topbar {
-    background: #fff;
-    border: 1px solid var(--hotel-border);
-    border-radius: 1.2rem;
-    padding: 1.25rem 1.4rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 6px 18px rgba(17, 38, 61, 0.04);
-}
-
-.admin-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.summary-grid {
+/* รายการงานของแม่บ้าน: แถวละห้อง ปุ่มใหญ่ กดง่ายบนมือถือ */
+.task-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-}
-
-.stat-card {
-    min-height: 150px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.stat-card .label {
-    color: var(--hotel-muted);
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.stat-card .value {
-    font-size: 2rem;
-    font-weight: 800;
-    color: var(--hotel-navy);
-}
-
-.stat-card .trend {
-    font-size: 0.82rem;
-    color: var(--hotel-success);
-    font-weight: 600;
-}
-
-.table-panel table {
-    margin-bottom: 0;
-}
-
-.table-panel th {
-    color: var(--hotel-muted);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border-bottom: 1px solid rgba(17, 38, 61, 0.08);
-}
-
-.table-panel td {
-    vertical-align: middle;
-    padding: 0.9rem 0.75rem;
-}
-
-.status-pill {
-    display: inline-flex;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "room action" "meta action";
+    gap: .1rem 1rem;
     align-items: center;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    padding: 0.42rem 0.7rem;
-    font-weight: 700;
+    padding: .8rem 1.1rem;
+    border-bottom: 1px solid var(--line);
 }
-
-.status-pill.occupied {
-    background: rgba(233, 161, 59, 0.13);
-    color: var(--hotel-warning);
-}
-
-.status-pill.clean {
-    background: rgba(42, 143, 111, 0.12);
-    color: var(--hotel-success);
-}
-
-.status-pill.maintenance {
-    background: rgba(209, 93, 93, 0.12);
-    color: var(--hotel-danger);
-}
-
-.report-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-}
-
-.report-chart {
-    height: 180px;
-    border-radius: 1rem;
-    background: linear-gradient(180deg, rgba(28, 77, 115, 0.14), rgba(17, 38, 61, 0.04));
-    position: relative;
-    overflow: hidden;
-}
-
-.report-chart::before {
-    content: "";
-    position: absolute;
-    left: 8%;
-    right: 8%;
-    bottom: 10%;
-    top: 15%;
-    background: linear-gradient(180deg, rgba(28, 77, 115, 0.2), rgba(28, 77, 115, 0.03));
-    clip-path: polygon(0% 65%, 14% 58%, 25% 62%, 36% 44%, 50% 35%, 66% 58%, 82% 26%, 100% 12%, 100% 100%, 0% 100%);
-}
-
-.booking-summary {
-    background: linear-gradient(135deg, var(--hotel-blue), var(--hotel-navy));
-    color: #fff;
-    border-radius: 1.2rem;
-    padding: 1.5rem;
-}
-
-.booking-summary .summary-line {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.55rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-@media (max-width: 991.98px) {
-    .admin-shell {
-        display: block;
-    }
-
-    .admin-sidebar {
-        width: 100%;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .sidebar-nav {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 767.98px) {
-    .page-hero {
-        padding: 5rem 0 3rem;
-    }
-
-    .hero-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .footer-bottom {
-        flex-direction: column;
-        gap: 0.5rem;
-        text-align: center;
-    }
-
-    .admin-topbar {
-        flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
-    }
-}
-
-
-/* ========================================
-   ADMIN SIDEBAR USER DROPDOWN
-======================================== */
-
-.sidebar-user-container {
-    margin-top: auto;
-    width: 100%;
-    position: relative;
-}
-
-.sidebar-user-container .sidebar-user {
-    width: 100%;
-    min-width: 0;
-    margin-top: 0;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    padding: 0.8rem;
-    color: #ffffff;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.sidebar-user-container .sidebar-user:hover,
-.sidebar-user-container .sidebar-user:focus {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-}
-
-.sidebar-user-container .sidebar-user strong {
-    display: block;
-    color: #ffffff;
-    font-size: 0.85rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 155px;
-}
-
-.sidebar-user-container .sidebar-user small {
-    display: block;
-    color: rgba(255, 255, 255, 0.65);
-    font-size: 0.75rem;
-}
-
-.sidebar-user-container .avatar {
-    flex-shrink: 0;
-}
-
-.sidebar-user-container .dropdown-menu {
-    width: 100%;
-    border-radius: 0.9rem;
-    padding: 0.5rem;
-}
-
-.sidebar-user-container .dropdown-item {
-    border-radius: 0.5rem;
-    font-size: 0.9rem;
-}
-
-.sidebar-user-container .dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.sidebar-user-container form {
-    margin: 0;
-}
-
-.sidebar-user-container form button {
-    width: 100%;
-    text-align: left;
-    background: transparent;
-    border: 0;
-}
-
-.operations-sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.operations-sidebar-header .sidebar-brand {
-    flex: 1;
-    min-width: 0;
-}
-
-.operations-navigation.show,
-.operations-navigation.collapsing {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.operations-menu-toggle {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 0.7rem;
-    padding: 0.55rem 0.8rem;
-}
-
-.operations-shell .admin-main {
-    min-width: 0;
-}
-
-.operations-shell .content-section {
-    padding: 0;
-}
-
-.operations-shell .content-section > .container {
-    max-width: none;
-    padding: 0;
-}
-
-.operations-shell .section-heading {
-    margin-bottom: 1.5rem;
-}
-
-.operations-shell .section-heading h2 {
-    font-size: 1.5rem;
-    letter-spacing: normal;
-}
-
-.operations-shell .admin-content .card {
-    height: 100%;
-    border: 1px solid var(--hotel-border);
-    border-radius: 1.2rem;
-    box-shadow: var(--brand-shadow);
-}
-
-.operations-shell .admin-content .card strong {
-    color: var(--hotel-navy);
-    font-size: 1.6rem;
-}
-
-@media (min-width: 992px) {
-    .operations-shell .admin-sidebar {
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        overflow-y: auto;
-        z-index: 1030;
-    }
-
-    .operations-shell .operations-navigation.collapse {
-        display: flex;
-        flex: 1;
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-
-    .operations-shell .admin-main {
-        margin-left: 260px;
-    }
-}
-
-@media (max-width: 991.98px) {
-    .operations-shell .sidebar-nav {
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    }
-}
-
+.task-row:last-child { border-bottom: 0; }
+.task-room { grid-area: room; font-weight: 600; font-size: 1.05rem; color: var(--ink); text-decoration: none; }
+.task-room:hover { color: var(--accent); }
+.task-meta { grid-area: meta; font-size: .85rem; color: var(--muted); }
+.task-action { grid-area: action; }
+.task-action form { margin: 0; }
 @media (max-width: 575.98px) {
-    .operations-shell .admin-main {
-        padding: 1rem;
-    }
+    .task-row { grid-template-columns: 1fr; grid-template-areas: "room" "meta" "action"; }
+    .task-action { margin-top: .5rem; }
+    .task-action .btn { width: 100%; padding-top: .6rem; padding-bottom: .6rem; }
 }
+
+/* กระดานสถานะห้อง: แถบสีด้านซ้ายบอกสถานะ */
+.room-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .75rem; }
+.room-tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line-strong);
+    border-radius: 6px;
+    padding: .75rem .9rem;
+}
+.room-tile-number { font-size: 1.1rem; }
+.room-tile-status { font-size: .8rem; font-weight: 600; color: var(--ink-2); }
+.tone-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .4rem; background: var(--line-strong); }
+.tone-ok { --tone: var(--ok); }
+.tone-accent { --tone: var(--accent); }
+.tone-info { --tone: var(--info); }
+.tone-warn { --tone: var(--warn); }
+.tone-bad { --tone: var(--bad); }
+.room-tile[class*="tone-"] { border-left-color: var(--tone, var(--line-strong)); }
+.room-tile[class*="tone-"] .room-tile-status { color: var(--tone, var(--ink-2)); }
+.tone-dot[class*="tone-"] { background: var(--tone, var(--line-strong)); }
+
+/* ตัวเลือกห้องแบบการ์ด (Walk-in): การ์ดที่เลือกอยู่เป็นสีหลัก */
+label.card { transition: border-color .12s, background-color .12s; }
+label.card:hover { border-color: var(--line-strong); }
+label.card:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+
+/* กล่องที่เป็น .row ด้วย (เช่นฟอร์ม Walk-in) ไม่ให้ล้นขอบ */
+.booking-panel.row { margin-left: 0; margin-right: 0; padding: .4rem .5rem 1.1rem; }
+
+/* หน้ารายละเอียดการชำระเงิน: แถวละรายการ ฟอร์มที่ต้องทำอยู่ใต้รายการนั้นเลย */
+.pay-row { padding: .85rem 1.1rem; border-bottom: 1px solid var(--line); }
+.pay-row:last-child { border-bottom: 0; }
+.pay-row-main { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.pay-action { margin-top: .75rem; padding-top: .75rem; border-top: 1px dashed var(--line); }
+.pay-action summary { cursor: pointer; color: var(--accent); font-size: .9rem; }
+.hotel-body .figures { margin-top: .25rem; }
+.auth-card-wide { max-width: 640px; }
+.table .btn { white-space: nowrap; }

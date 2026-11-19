@@ -7,75 +7,53 @@
 
     string Label(RoomLiveStatus status) => RoomStatusService.Label(status);
 
-    string Color(RoomLiveStatus status) => status switch
+    string Tone(RoomLiveStatus status) => status switch
     {
-        RoomLiveStatus.Available => "success",
-        RoomLiveStatus.ArrivingToday => "info",
-        RoomLiveStatus.Occupied => "primary",
-        RoomLiveStatus.Cleaning => "warning",
-        RoomLiveStatus.Maintenance => "danger",
-        _ => "secondary"
+        RoomLiveStatus.Available => "ok",
+        RoomLiveStatus.ArrivingToday => "accent",
+        RoomLiveStatus.Occupied => "info",
+        RoomLiveStatus.Cleaning => "warn",
+        RoomLiveStatus.Maintenance => "bad",
+        _ => "none"
     };
-
-    var statusOrder = Enum.GetValues<RoomLiveStatus>();
 }
 
-<section class="content-section">
-    <div class="container">
-        <div class="section-heading">
-            <span class="eyebrow text-dark">Hotel Operations</span>
-            <h2>สถานะห้องพัก</h2>
-            <p class="text-muted">ข้อมูล ณ วันที่ @today.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) (เวลาไทย)</p>
-        </div>
+<p class="text-muted mb-3">ข้อมูล ณ @ThaiText.Date(today) (เวลาไทย) · คิดจากการเข้าพัก งานทำความสะอาด และงานซ่อมจริง</p>
 
-        @* สรุปจำนวนห้องแต่ละสถานะ *@
-        <div class="row g-3 mb-4">
-            @foreach (var status in statusOrder)
-            {
-                <div class="col-6 col-md-4 col-xl-2">
-                    <div class="card border-@Color(status) h-100">
-                        <div class="card-body py-2">
-                            <small class="text-@Color(status) fw-semibold">@Label(status)</small>
-                            <div class="fs-3 fw-bold">@Model.Count(r => r.Status == status)</div>
-                        </div>
-                    </div>
+<div class="figures">
+    @foreach (var status in Enum.GetValues<RoomLiveStatus>())
+    {
+        <div class="figure">
+            <div class="label"><span class="tone-dot tone-@Tone(status)"></span>@Label(status)</div>
+            <div class="value">@Model.Count(r => r.Status == status)</div>
+        </div>
+    }
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-light">ยังไม่มีข้อมูลห้องพัก</div>
+}
+else
+{
+    <div class="room-board">
+        @foreach (var room in Model)
+        {
+            <div class="room-tile tone-@Tone(room.Status)">
+                <div class="d-flex justify-content-between align-items-baseline gap-2">
+                    <strong class="room-tile-number">@room.RoomNumber</strong>
+                    <span class="room-tile-status">@Label(room.Status)</span>
                 </div>
-            }
-        </div>
-
-        @if (Model.Count == 0)
-        {
-            <div class="alert alert-light border">ยังไม่มีข้อมูลห้องพัก</div>
-        }
-        else
-        {
-            <div class="row g-3">
-                @foreach (var room in Model)
+                <div class="text-muted small">@ThaiText.OrDash(room.RoomType) · @room.Capacity คน</div>
+                @if (!string.IsNullOrWhiteSpace(room.Detail))
                 {
-                    <div class="col-sm-6 col-lg-4 col-xl-3">
-                        <div class="card h-100 border-@Color(room.Status) border-2">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <h3 class="h5 mb-0">@room.RoomNumber</h3>
-                                        <small class="text-muted">@room.RoomType · @room.Capacity คน</small>
-                                    </div>
-                                    <span class="badge text-bg-@Color(room.Status)">@Label(room.Status)</span>
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(room.Detail))
-                                {
-                                    <p class="small mb-2">@room.Detail</p>
-                                }
-                                @if (room.BookingId.HasValue)
-                                {
-                                    <a asp-action="BookingDetails" asp-route-id="@room.BookingId"
-                                       class="btn btn-sm btn-outline-primary">ดูการจอง #@room.BookingId</a>
-                                }
-                            </div>
-                        </div>
-                    </div>
+                    <div class="small mt-2">@room.Detail</div>
+                }
+                @if (room.BookingId.HasValue)
+                {
+                    <a asp-action="BookingDetails" asp-route-id="@room.BookingId" class="small d-inline-block mt-2">การจอง #@room.BookingId</a>
                 }
             </div>
         }
     </div>
-</section>
+}

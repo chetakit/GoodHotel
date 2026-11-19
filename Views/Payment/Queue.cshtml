@@ -1,84 +1,124 @@
 @model GoodHotel.Models.ViewModels.PaymentQueueViewModel
 @{
-    if (User.IsInRole("Admin")) { Layout = "_AdminLayout"; }
-    ViewData["Title"] = "การชำระเงิน";
+    ViewData["Title"] = "รายการชำระเงิน";
+    var isAccountant = User.IsInRole("Accountant");
+
+    string Badge(string status) => status switch
+    {
+        "Paid" => "text-bg-success",
+        "Submitted" or "Pending" or "Requires reconciliation" => "text-bg-warning",
+        "Rejected" => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
 }
-<section class="content-section"><div class="container">
-    <h2>รายการชำระเงิน</h2>
-    <p class="text-muted">รายการที่มีคำว่า (จำลอง) เป็นการชำระเงินจำลอง ไม่มีการโอนเงินจริง</p>
-    <form asp-action="Queue" method="get" class="row g-2 mb-4">
-        <div class="col-md-4">
-            <label for="search" class="form-label">เลขที่การจอง / เลขที่ชำระเงิน / ชื่อลูกค้า</label>
-            <input id="search" name="search" value="@Model.Search" maxlength="100" class="form-control" />
+
+@if (Model.Refunds.Count > 0)
+{
+    <section class="table-panel mb-3">
+        <div class="panel-head">
+            <h2>คำขอคืนเงินรออนุมัติ (@Model.Refunds.Count)</h2>
+            @if (!isAccountant)
+            {
+                <span class="text-muted small">ฝ่ายบัญชีเป็นผู้อนุมัติ</span>
+            }
         </div>
-        <div class="col-md-3">
-            <label for="status" class="form-label">สถานะ</label>
-            <select id="status" name="status" class="form-select">
-                <option value="">ทุกสถานะ</option>
-                @foreach (var value in new[] { "Pending", "Submitted", "Paid", "Refunded", "Rejected", "Requires reconciliation", "Excluded" })
-                {
-                    <option value="@value" selected="@(Model.Status == value)">@ThaiText.Status(value)</option>
-                }
-            </select>
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th>คำขอ</th><th>การจอง</th><th>เหตุผล</th><th>ขอเมื่อ</th><th class="text-end">จำนวนเงิน</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var refund in Model.Refunds)
+                    {
+                        <tr>
+                            <td>#@refund.RefundId</td>
+                            <td>@(refund.BookingId.HasValue ? $"#{refund.BookingId}" : "-")</td>
+                            <td>@ThaiText.OrDash(refund.Reason)</td>
+                            <td class="num">@ThaiText.Time(refund.RequestedAtUtc)</td>
+                            <td class="text-end num">฿@refund.Amount.ToString("N2")</td>
+                            <td class="text-end">
+                                @if (refund.BookingId.HasValue)
+                                {
+                                    <a class="btn btn-sm @(isAccountant ? "btn-primary" : "btn-outline-primary")"
+                                       asp-action="Details" asp-route-id="@refund.BookingId">@(isAccountant ? "ตรวจและอนุมัติ" : "ดู")</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
-        <div class="col-md-3">
-            <label for="method" class="form-label">วิธีชำระเงิน</label>
-            <select id="method" name="method" class="form-select">
-                <option value="">ทุกวิธี</option>
-                @foreach (var value in new[] { "Cash", "Bank Transfer (Mock)", "PromptPay (Mock)", "PayPal (Mock)" })
-                {
-                    <option value="@value" selected="@(Model.Method == value)">@ThaiText.PaymentMethod(value)</option>
-                }
-            </select>
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">กรอง</button>
-        </div>
-    </form>
+    </section>
+}
+
+<form asp-action="Queue" method="get" class="toolbar">
+    <div>
+        <label for="search" class="form-label">ค้นหา</label>
+        <input id="search" name="search" value="@Model.Search" maxlength="100" class="form-control"
+               placeholder="เลขที่การจอง ชื่อ หรืออีเมลลูกค้า" />
+    </div>
+    <div>
+        <label for="status" class="form-label">สถานะ</label>
+        <select id="status" name="status" class="form-select" onchange="this.form.submit()">
+            <option value="">ทุกสถานะ</option>
+            @foreach (var value in new[] { "Submitted", "Pending", "Paid", "Refunded", "Rejected", "Cancelled", "Requires reconciliation", "Excluded" })
+            {
+                <option value="@value" selected="@(Model.Status == value)">@ThaiText.Status(value)</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label for="method" class="form-label">ช่องทาง</label>
+        <select id="method" name="method" class="form-select" onchange="this.form.submit()">
+            <option value="">ทุกช่องทาง</option>
+            @foreach (var value in new[] { "Cash", "Bank Transfer (Mock)", "PromptPay (Mock)", "PayPal (Mock)" })
+            {
+                <option value="@value" selected="@(Model.Method == value)">@ThaiText.PaymentMethod(value)</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">ค้นหา</button>
+    @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status) || !string.IsNullOrEmpty(Model.Method))
+    {
+        <a asp-action="Queue" class="btn btn-outline-secondary">ล้างตัวกรอง</a>
+    }
+</form>
+
+<section class="table-panel">
+    <div class="panel-head">
+        <h2>การชำระเงิน</h2>
+        <span class="text-muted small">@Model.Payments.Count รายการ · (จำลอง) = ไม่มีเงินจริง</span>
+    </div>
     @if (Model.Payments.Count == 0)
     {
-        <p>ไม่พบรายการชำระเงิน</p>
+        <p class="panel-empty">ไม่พบรายการชำระเงิน</p>
     }
     else
     {
         <div class="table-responsive">
-            <table class="table align-middle">
-                <thead><tr><th>การจอง</th><th>ลูกค้า</th><th>วิธีชำระ</th><th>จำนวนเงิน</th><th>สถานะ</th><th>วันที่ทำรายการ</th><th></th></tr></thead>
+            <table class="table table-hover">
+                <thead><tr><th>การจอง</th><th>ลูกค้า</th><th>ช่องทาง</th><th>สถานะ</th><th>วันที่ทำรายการ</th><th class="text-end">จำนวนเงิน</th><th></th></tr></thead>
                 <tbody>
-                @foreach (var item in Model.Payments)
-                {
-                    <tr>
-                        <td>@(item.Payment.BookingId.HasValue ? $"#{item.Payment.BookingId}" : "-")</td>
-                        <td>@ThaiText.OrDash(item.Customer)</td>
-                        <td>@ThaiText.PaymentMethod(item.Payment.Method)</td>
-                        <td>@(item.Payment.Amount.HasValue ? $"฿{item.Payment.Amount:N2}" : "-")</td>
-                        <td>@ThaiText.Status(item.Payment.DisplayStatus)</td>
-                        <td>@(item.TransactionAtUtc.HasValue ? ThaiText.Time(item.TransactionAtUtc) : ThaiText.Date(item.PaymentDate))</td>
-                        <td>
-                            @if (item.Payment.BookingId.HasValue)
-                            {
-                                <a asp-action="Details" asp-route-id="@item.Payment.BookingId">ดู / จัดการ</a>
-                            }
-                            else
-                            {
-                                <span>ไม่พบการจอง</span>
-                            }
-                        </td>
-                    </tr>
-                }
+                    @foreach (var item in Model.Payments)
+                    {
+                        var status = item.Payment.DisplayStatus;
+                        <tr>
+                            <td>@(item.Payment.BookingId.HasValue ? $"#{item.Payment.BookingId}" : "-")</td>
+                            <td>@ThaiText.OrDash(item.Customer)</td>
+                            <td>@ThaiText.PaymentMethod(item.Payment.Method)</td>
+                            <td><span class="badge @Badge(status)">@ThaiText.Status(status)</span></td>
+                            <td class="num">@(item.TransactionAtUtc.HasValue ? ThaiText.Time(item.TransactionAtUtc) : ThaiText.Date(item.PaymentDate))</td>
+                            <td class="text-end num">@(item.Payment.Amount.HasValue ? $"฿{item.Payment.Amount:N2}" : "-")</td>
+                            <td class="text-end">
+                                @if (item.Payment.BookingId.HasValue)
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@item.Payment.BookingId">
+                                        @(status is "Submitted" or "Pending" or "Requires reconciliation" ? "ตรวจสอบ" : "ดู")
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
                 </tbody>
             </table>
         </div>
     }
-    <h3>คำขอคืนเงิน</h3>
-    @if (Model.Refunds.Count == 0)
-    {
-        <p>ไม่มีคำขอคืนเงิน</p>
-    }
-    @foreach (var refund in Model.Refunds)
-    {
-        <p>คำขอคืนเงิน #@refund.RefundId · ชำระเงิน #@refund.PaymentId · ฿@refund.Amount.ToString("N2")
-            @if (refund.BookingId.HasValue) { <a asp-action="Details" asp-route-id="@refund.BookingId">ตรวจสอบการจอง #@refund.BookingId</a> }
-        </p>
-    }
-</div></section>
+</section>

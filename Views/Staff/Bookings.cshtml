@@ -7,8 +7,6 @@
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Front Desk</span>
-            <h2>รายการจอง</h2>
             <p class="text-muted">ค้นหาและตรวจสอบการจองของลูกค้า</p>
         </div>
 
@@ -77,7 +75,8 @@
                                     <td>
                                         @* รวมสถานะการจองกับสถานะเข้าพักเป็นป้ายเดียว *@
                                         @{
-                                            var (label, color) = isCancelled ? ("ยกเลิกแล้ว", "text-bg-secondary")
+                                            var (label, color) = isCancelled
+                                                ? (booking.CancelReason == CancelReasons.PaymentTimeout ? "ยกเลิก · หมดเวลาชำระ" : "ยกเลิกแล้ว", "text-bg-secondary")
                                                 : booking.StayStatus == "CheckedIn" ? ("เข้าพักอยู่", "text-bg-success")
                                                 : booking.StayStatus == "CheckedOut" ? ("เช็คเอาท์แล้ว", "text-bg-dark")
                                                 : ("รอเช็คอิน", "text-bg-primary");
@@ -88,6 +87,11 @@
                                         <span class="badge @(booking.PaymentLabel == PaymentService.PaidLabel ? "text-bg-success" : "text-bg-warning")">
                                             @booking.PaymentLabel
                                         </span>
+                                        @if (!isCancelled && booking.PaymentLabel == "ยังไม่จ่าย" && booking.StayStatus == null &&
+                                             PaymentDeadline.DueAtUtc(booking.CreatedAtUtc) is DateTime due)
+                                        {
+                                            <div class="small text-muted mt-1">ต้องจ่ายภายใน @ThaiText.Time(due)[11..]</div>
+                                        }
                                     </td>
                                     <td>
                                         <a asp-controller="Staff" asp-action="BookingDetails"
@@ -101,6 +105,5 @@
             }
         }
 
-        <a asp-controller="Staff" asp-action="Index" class="btn btn-outline-primary mt-4">กลับแดชบอร์ด</a>
     </div>
 </section>

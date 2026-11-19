@@ -1,144 +1,71 @@
-﻿
+﻿@{
+    var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var action = ViewContext.RouteData.Values["Action"]?.ToString() ?? "";
+    string Active(string name) => action.Equals(name, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+
+    // พนักงานที่เปิดหน้าเว็บลูกค้า: ปุ่มกลับไปหน้าทำงานของ role ตัวเอง
+    var workplace = role switch
+    {
+        "Admin" => ("Admin", "Dashboard"),
+        "Staff" => ("Staff", "Index"),
+        "Housekeeper" => ("Housekeeper", "Index"),
+        "Accountant" => ("Accountant", "Index"),
+        _ => ((string, string)?)null
+    };
+}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Good Hotel</title>
+    <title>@ViewData["Title"] · Good Hotel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Serif+Thai:wght@600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="hotel-body">
     <header class="top-header">
-        <nav class="navbar navbar-expand-lg navbar-light hotel-navbar">
+        <nav class="navbar navbar-expand-lg hotel-navbar">
             <div class="container">
-                <a class="navbar-brand hotel-brand"
-                   asp-controller="Home" asp-action="Index">
-                    <span class="brand-mark">G</span>
-                    <span>Good Hotel</span>
-                </a>
+                <a class="hotel-brand" asp-controller="Home" asp-action="Index">Good Hotel</a>
 
-                <button class="navbar-toggler" type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#mainNavbar"
-                        aria-controls="mainNavbar"
-                        aria-expanded="false"
-                        aria-label="Toggle navigation">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar"
+                        aria-controls="mainNavbar" aria-expanded="false" aria-label="เปิดเมนู">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
                 <div class="collapse navbar-collapse" id="mainNavbar">
-                    <ul class="navbar-nav mx-auto align-items-lg-center gap-lg-2">
-                        <li class="nav-item">
-                            <a class="nav-link"
-                               asp-controller="Home" asp-action="Index">หน้าแรก</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link"
-                               asp-controller="Home" asp-action="Rooms">ห้องพัก</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link"
-                               asp-controller="Home" asp-action="Promotion">โปรโมชั่น</a>
-                        </li>
-
-                        @if (User.IsInRole("Customer"))
+                    <ul class="navbar-nav ms-lg-4 me-auto">
+                        <li class="nav-item"><a class="nav-link @Active("Rooms")" asp-controller="Home" asp-action="Rooms">ห้องพัก</a></li>
+                        <li class="nav-item"><a class="nav-link @Active("Promotion")" asp-controller="Home" asp-action="Promotion">โปรโมชัน</a></li>
+                        @if (role == "Customer")
                         {
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Home" asp-action="Rooms">จองห้อง</a>
-                            </li>
+                            <li class="nav-item"><a class="nav-link @Active("MyBookings")" asp-controller="Home" asp-action="MyBookings">การจองของฉัน</a></li>
                         }
                     </ul>
 
-                    <div class="d-flex align-items-center gap-2">
-                        @if (User.Identity != null && User.Identity.IsAuthenticated)
+                    <div class="d-flex align-items-center gap-3 mt-3 mt-lg-0">
+                        @if (signedIn)
                         {
-                            <div class="dropdown">
-                                <button class="btn btn-light dropdown-toggle d-flex
-                                               align-items-center gap-2"
-                                        type="button"
-                                        id="userDropdown"
-                                        data-bs-toggle="dropdown"
-                                        aria-expanded="false">
-
-                                    <span class="text-end">
-                                        <span class="d-block fw-semibold">
-                                            @User.Identity.Name
-                                        </span>
-                                        <small class="text-muted">
-                                            @ThaiText.Status(User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value)
-                                        </small>
-                                    </span>
-                                </button>
-
-                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2"
-                                    aria-labelledby="userDropdown">
-
-                                    @if (User.IsInRole("Customer"))
-                                    {
-                                        <li>
-                                            <a class="dropdown-item py-2"
-                                               asp-controller="Home"
-                                               asp-action="MyBookings">
-                                                การจองของฉัน
-                                            </a>
-                                        </li>
-                                    }
-                                    else if (User.IsInRole("Admin"))
-                                    {
-                                        <li>
-                                            <a class="dropdown-item py-2"
-                                               asp-controller="Admin"
-                                               asp-action="Dashboard">
-                                                หน้าผู้ดูแลระบบ
-                                            </a>
-                                        </li>
-                                    }
-                                    else if (User.IsInRole("Staff") || User.IsInRole("Housekeeper"))
-                                    {
-                                        <li>
-                                            <a class="dropdown-item py-2"
-                                               asp-controller="@(User.IsInRole("Staff") ? "Staff" : "Housekeeper")"
-                                               asp-action="Index">
-                                                หน้าทำงาน
-                                            </a>
-                                        </li>
-                                    }
-                                    @if (User.IsInRole("Customer") || User.IsInRole("Admin") ||
-                                         User.IsInRole("Staff") || User.IsInRole("Housekeeper"))
-                                    {
-                                        <li>
-                                            <hr class="dropdown-divider" />
-                                        </li>
-                                    }
-
-                                    <li>
-                                        <form asp-controller="Home"
-                                              asp-action="Logout"
-                                              method="post">
-                                            <button type="submit"
-                                                    class="dropdown-item text-danger py-2">
-                                                ออกจากระบบ
-                                            </button>
-                                        </form>
-                                    </li>
-                                </ul>
+                            <div class="user-chip">
+                                <div>@User.Identity!.Name</div>
+                                <small>@ThaiText.Status(role)</small>
                             </div>
+                            @if (workplace is { } place)
+                            {
+                                <a class="btn btn-sm btn-primary" asp-controller="@place.Item1" asp-action="@place.Item2">ไปหน้าทำงาน</a>
+                            }
+                            <form asp-controller="Home" asp-action="Logout" method="post" class="m-0">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">ออกจากระบบ</button>
+                            </form>
                         }
                         else
                         {
-                            <a class="btn btn-outline-primary hotel-secondary-btn"
-                               asp-controller="Home" asp-action="Login">
-                                เข้าสู่ระบบ
-                            </a>
-
-                            <a class="btn btn-primary hotel-primary-btn"
-                               asp-controller="Home" asp-action="Register">
-                                สมัครสมาชิก
-                            </a>
+                            <a class="btn btn-sm btn-outline-primary" asp-controller="Home" asp-action="Login">เข้าสู่ระบบ</a>
+                            <a class="btn btn-sm btn-primary" asp-controller="Home" asp-action="Register">สมัครสมาชิก</a>
                         }
                     </div>
                 </div>
@@ -148,41 +75,28 @@
 
     <main>
         @RenderBody()
+        @* ปุ่มหัวหน้า (Actions) มีเฉพาะหลังบ้าน หน้าที่ลูกค้าก็เปิดได้ (เช่นการชำระเงิน) ให้ข้ามไป *@
+        @if (IsSectionDefined("Actions")) { IgnoreSection("Actions"); }
     </main>
 
     <footer class="hotel-footer">
         <div class="container">
-            <div class="row gy-4 align-items-center">
-                <div class="col-lg-4">
-                    <a class="navbar-brand hotel-brand footer-brand"
-                       asp-controller="Home" asp-action="Index">
-                        <span class="brand-mark">G</span>
-                        <span>Good Hotel</span>
-                    </a>
-
-                    <p class="footer-copy mt-3">
-                        พักผ่อนอย่างสบายใจ พร้อมบริการที่ใส่ใจ
-                        ในทุกรายละเอียด
-                    </p>
+            <div class="row gy-3">
+                <div class="col-md-4">
+                    <a class="hotel-brand" asp-controller="Home" asp-action="Index">Good Hotel</a>
+                    <p class="footer-copy mt-1">86 ถนนสุขุมวิท กรุงเทพฯ</p>
                 </div>
-
-                <div class="col-lg-4 text-lg-center">
-                    <h6>ติดต่อ</h6>
-                    <p class="footer-copy mb-1">+66 2 555 8900</p>
-                    <p class="footer-copy mb-0">hello@goodhotel.com</p>
+                <div class="col-6 col-md-4">
+                    <h6>โทรศัพท์</h6>
+                    <p class="footer-copy">02 555 8900</p>
                 </div>
-
-                <div class="col-lg-4 text-lg-end">
-                    <h6>ที่ตั้ง</h6>
-                    <p class="footer-copy mb-0">
-                        86 Sukhumvit Road, Bangkok
-                    </p>
+                <div class="col-6 col-md-4">
+                    <h6>อีเมล</h6>
+                    <p class="footer-copy">hello@goodhotel.com</p>
                 </div>
             </div>
-
             <div class="footer-bottom">
                 <span>© 2026 Good Hotel</span>
-                <span>Luxury • Comfort • Service</span>
             </div>
         </div>
     </footer>
@@ -190,7 +104,6 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
-
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

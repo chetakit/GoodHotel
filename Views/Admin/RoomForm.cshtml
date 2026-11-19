@@ -1,13 +1,11 @@
 @model GoodHotel.Models.ViewModels.RoomFormViewModel
 
 @{
-    Layout = "_AdminLayout";
     var isEdit = Model.RoomId.HasValue;
     ViewData["Title"] = isEdit ? "แก้ไขห้องพัก" : "เพิ่มห้องพัก";
 }
 
-<div class="container mt-4">
-    <h3 class="mb-3">@(isEdit ? "แก้ไขห้องพัก" : "เพิ่มห้องพัก")</h3>
+<div class="booking-panel" style="max-width: 820px">
 
     <form asp-controller="Admin"
           asp-action="@(isEdit ? "EditRoom" : "AddRoom")"

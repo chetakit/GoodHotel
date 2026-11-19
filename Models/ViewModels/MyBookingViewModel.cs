@@ -34,11 +34,18 @@ public class MyBookingViewModel
 
     public bool CanCancel { get; set; }
 
+    public DateTime? CreatedAtUtc { get; set; }
+
+    public string? CancelReason { get; set; }
+
+    // เส้นตายชำระเงิน (null = ไม่มี เช่น จ่ายแล้ว เลือกเงินสด หรือการจองเก่า)
+    public DateTime? PaymentDueAtUtc { get; set; }
+
     // true = อยู่ในแท็บ "ประวัติการเข้าพัก" (ยกเลิกแล้ว / เช็คเอาท์แล้ว / เลยวันแล้ว)
     public bool IsHistory { get; set; }
 
     public string StayLabel => BookingStatus == BookingStatuses.Cancelled
-        ? "ยกเลิกแล้ว"
+        ? (CancelReason == CancelReasons.PaymentTimeout ? "ยกเลิก · ไม่ชำระเงินตามกำหนด" : "ยกเลิกแล้ว")
         : StayStatus switch
         {
             "CheckedIn" => "กำลังเข้าพัก",

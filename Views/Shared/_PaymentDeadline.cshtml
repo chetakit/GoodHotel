@@ -1,0 +1,18 @@
+@model DateTime?
+@* แจ้งเส้นตายชำระเงิน พร้อมตัวนับถอยหลัง (site.js นับให้) ส่งค่า null = ไม่แสดง *@
+@if (Model is DateTime due)
+{
+    var remaining = due - DateTime.UtcNow;
+    var dueIso = DateTime.SpecifyKind(due, DateTimeKind.Utc).ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+    <div class="alert alert-warning payment-deadline" role="status" data-deadline="@dueIso">
+        <div data-deadline-open @(remaining <= TimeSpan.Zero ? "hidden" : null)>
+            กรุณาชำระเงินภายใน <strong>@ThaiText.Time(due)</strong>
+            (เหลือ <strong class="num" data-countdown>@($"{(int)Math.Max(0, remaining.TotalMinutes):00}:{Math.Max(0, remaining.Seconds):00}")</strong>)
+            ถ้าไม่ชำระ การจองจะถูกยกเลิกอัตโนมัติ
+            <div class="small mt-1">เลือก "เงินสดที่โรงแรม" ได้ ถ้าจะจ่ายตอนเข้าพัก</div>
+        </div>
+        <div data-deadline-closed @(remaining > TimeSpan.Zero ? "hidden" : null)>
+            <strong>หมดเวลาชำระเงินแล้ว</strong> การจองนี้จะถูกยกเลิกอัตโนมัติ กรุณาค้นหาห้องแล้วจองใหม่
+        </div>
+    </div>
+}

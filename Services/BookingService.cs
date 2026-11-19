@@ -41,13 +41,16 @@ public sealed class BookingService
     private readonly ILogger<BookingService> _logger;
     private readonly PromotionService _promotions;
     private readonly RoomAvailabilityService _availability;
+    private readonly TimeProvider _time;
 
     public BookingService(
         GoodHotelDbContext db,
         ILogger<BookingService> logger,
         PromotionService promotions,
-        RoomAvailabilityService availability)
+        RoomAvailabilityService availability,
+        TimeProvider time)
     {
+        _time = time;
         _db = db;
         _logger = logger;
         _promotions = promotions;
@@ -383,7 +386,8 @@ public sealed class BookingService
                 Guests = request.Guests,
                 ExtraBed = request.ExtraBedCount,
                 PromotionId = promotionId,
-                Amount = amount
+                Amount = amount,
+                CreatedAtUtc = _time.GetUtcNow().UtcDateTime
             });
 
             await _db.SaveChangesAsync(cancellationToken);

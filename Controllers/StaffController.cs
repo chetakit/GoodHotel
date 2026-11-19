@@ -48,7 +48,9 @@ namespace GoodHotel.Controllers
             int? Guests,
             decimal? Amount,
             string BookingStatus,
-            string? StayStatus)
+            string? StayStatus,
+            string? CancelReason,
+            DateTime? CreatedAtUtc)
         {
             public string PaymentLabel { get; init; } = "";
         }
@@ -84,13 +86,20 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> Index(CancellationToken cancellationToken)
         {
             var (start, end) = _stays.HotelDayUtcBounds();
-            var model = new StaffDashboardViewModel(
-                await _db.Bookings.CountAsync(b => b.Status != BookingStatuses.Cancelled, cancellationToken),
-                await _db.BookingStays.CountAsync(s => s.Status == "CheckedIn", cancellationToken),
-                await _db.BookingStays.CountAsync(s => s.CheckedInAtUtc >= start && s.CheckedInAtUtc < end, cancellationToken),
-                await _db.BookingStays.CountAsync(s => s.CheckedOutAtUtc >= start && s.CheckedOutAtUtc < end, cancellationToken),
-                await _db.HousekeepingTasks.CountAsync(t => t.Status == "Completed", cancellationToken),
-                await _db.MaintenanceReports.CountAsync(r => r.Status == "Open", cancellationToken));
+            // นับทุกตัวเลขใน query เดียว (แต่ละ query ไปฐานข้อมูลใช้ ~200ms)
+            // อาศัยแถวของผู้ใช้ที่ล็อกอินอยู่เป็นตัวยึด เพราะแถวนี้มีอยู่แน่นอน
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var counts = await _db.Users.Where(u => u.UserId == userId).Select(_ => new
+            {
+                Bookings = _db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
+                Staying = _db.BookingStays.Count(s => s.Status == "CheckedIn"),
+                CheckedInToday = _db.BookingStays.Count(s => s.CheckedInAtUtc >= start && s.CheckedInAtUtc < end),
+                CheckedOutToday = _db.BookingStays.Count(s => s.CheckedOutAtUtc >= start && s.CheckedOutAtUtc < end),
+                ToVerify = _db.HousekeepingTasks.Count(t => t.Status == "Completed"),
+                OpenMaintenance = _db.MaintenanceReports.Count(r => r.Status != MaintenanceReport.Resolved)
+            }).SingleAsync(cancellationToken);
+            var model = new StaffDashboardViewModel(counts.Bookings, counts.Staying, counts.CheckedInToday,
+                counts.CheckedOutToday, counts.ToVerify, counts.OpenMaintenance);
 
             var today = _availability.HotelToday();
 
@@ -101,11 +110,11 @@ namespace GoodHotel.Controllers
                 .OrderBy(b => b.Room!.Room1)
                 .Select(FrontDeskRowProjection)
                 .ToListAsync(cancellationToken);
-            var arrivalsWithPayment = new List<FrontDeskRow>();
-            foreach (var row in arrivals)
-            {
-                arrivalsWithPayment.Add(row with { IsPaid = await PaymentService.IsPaidAsync(_db, row.BookingId, cancellationToken) });
-            }
+            var arrivalLabels = await PaymentService.PaymentLabelsAsync(
+                _db, arrivals.Select(a => a.BookingId).ToList(), cancellationToken);
+            var arrivalsWithPayment = arrivals
+                .Select(row => row with { IsPaid = arrivalLabels[row.BookingId] == PaymentService.PaidLabel })
+                .ToList();
 
             // แขกที่ต้องออกวันนี้ = ยังพักอยู่ และวันออกคือวันนี้หรือเลยมาแล้ว
             var departures = await _db.BookingStays.AsNoTracking()
@@ -178,20 +187,16 @@ namespace GoodHotel.Controllers
                     booking.Amount,
                     booking.Status,
                     _db.BookingStays.Where(s => s.BookingId == booking.BookingId)
-                        .Select(s => s.Status).FirstOrDefault()))
+                        .Select(s => s.Status).FirstOrDefault(),
+                    booking.CancelReason,
+                    booking.CreatedAtUtc))
                 .ToListAsync(cancellationToken);
 
-            // เติมสถานะการจ่ายเงินให้แต่ละแถว (ข้อมูลโปรเจคไม่ใหญ่ จึง query ทีละรายการได้)
-            var withPayment = new List<BookingListItem>();
-            foreach (var booking in bookings)
-            {
-                withPayment.Add(booking with
-                {
-                    PaymentLabel = await PaymentService.PaymentLabelAsync(_db, booking.BookingId, cancellationToken)
-                });
-            }
+            // เติมสถานะการจ่ายเงินให้ทุกแถวด้วย query เดียว
+            var labels = await PaymentService.PaymentLabelsAsync(
+                _db, bookings.Select(b => b.BookingId).ToList(), cancellationToken);
 
-            return View(withPayment);
+            return View(bookings.Select(b => b with { PaymentLabel = labels[b.BookingId] }).ToList());
         }
 
         [HttpGet]

@@ -1,47 +1,14 @@
 @model IEnumerable<GoodHotel.Models.ViewModels.RoomListViewModel>
 
 @{
-    Layout = "_AdminLayout";
     ViewData["Title"] = "ห้องพัก";
 }
 
-<style>
-    .room-status {
-        white-space: nowrap;
-        background: #e9ecef;
-        color: #343a40;
-    }
+@section Actions {
+    <a asp-controller="Admin" asp-action="AddRoom" class="btn btn-primary btn-sm">เพิ่มห้อง</a>
+}
 
-    .room-status--available {
-        background: #d1e7dd;
-        color: #0f5132;
-    }
-
-    .room-status--occupied {
-        background: #f8d7da;
-        color: #842029;
-    }
-
-    .room-status--reserved {
-        background: #ffe5cc;
-        color: #804000;
-    }
-
-    .room-status--maintenance {
-        background: #e9ecef;
-        color: #343a40;
-    }
-</style>
-
-<div class="table-panel">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">จัดการห้องพัก</h4>
-        <a asp-controller="Admin"
-           asp-action="AddRoom"
-           class="btn btn-primary hotel-primary-btn">
-            + เพิ่มห้อง
-        </a>
-    </div>
+<div>
 
     @if (TempData["RoomSuccessMessage"] is string successMessage)
     {
@@ -83,11 +50,11 @@
                     {
                         var statusClass = room.Status?.Trim().ToUpperInvariant() switch
                         {
-                            "AVAILABLE" => "room-status--available",
-                            "OCCUPIED" => "room-status--occupied",
-                            "RESERVED" => "room-status--reserved",
-                            "MAINTENANCE" => "room-status--maintenance",
-                            _ => ""
+                            "AVAILABLE" => "text-bg-success",
+                            "OCCUPIED" => "text-bg-info",
+                            "RESERVED" => "text-bg-warning",
+                            "MAINTENANCE" => "text-bg-danger",
+                            _ => "text-bg-secondary"
                         };
 
                         <tr>
@@ -109,7 +76,7 @@
                                 }
                             </td>
                             <td>
-                                <span class="status-pill room-status @statusClass">@ThaiText.Status(room.Status)</span>
+                                <span class="badge @statusClass">@ThaiText.Status(room.Status)</span>
                             </td>
                             <td>@(room.Rate.HasValue ? $"฿{room.Rate.Value:N2}" : "")</td>
                             <td>

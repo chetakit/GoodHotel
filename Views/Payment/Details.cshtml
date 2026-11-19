@@ -1,148 +1,269 @@
 @model GoodHotel.Models.ViewModels.PaymentDetailsViewModel
 @{
-    if (User.IsInRole("Admin")) { Layout = "_AdminLayout"; }
-    ViewData["Title"] = "การชำระเงิน";
+    ViewData["Title"] = $"การชำระเงิน · การจอง #{Model.BookingId}";
     var confirmed = Model.Payments.Any(p => p.IsVerified);
     var pending = Model.Payments.Any(p => p.IsNew && !p.IsVerified && (p.Status == "Pending" || p.Status == "Submitted"));
-    var isStaffOrAdmin = User.IsInRole("Staff") || User.IsInRole("Admin");
-    var outstanding = Model.RequiresReconciliation || !Model.BookingAmount.HasValue
-        ? "ต้องตรวจสอบ"
-        : $"฿{Model.BookingAmount.Value - Model.ConfirmedAmount + Model.RefundedAmount:N2}";
+    var isCustomer = User.IsInRole("Customer");
+    var isStaff = User.IsInRole("Staff");
+    var canReview = isStaff || User.IsInRole("Accountant");
+    var isAccountant = User.IsInRole("Accountant");
+
+    string Badge(string status) => status switch
+    {
+        "Paid" or "Approved" => "text-bg-success",
+        "Submitted" or "Pending" or "Requested" or "Requires reconciliation" => "text-bg-warning",
+        "Rejected" => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+    string Key() => Guid.NewGuid().ToString("N");
 }
-<section class="content-section"><div class="container">
-    <h2>การชำระเงินของการจอง #@Model.BookingId</h2>
-    @if (TempData["PaymentSuccess"] is string success) { <div class="alert alert-success">@success</div> }
+
+@section Actions {
+    @if (isStaff)
+    {
+        <a class="btn btn-outline-secondary btn-sm" asp-controller="Staff" asp-action="BookingDetails" asp-route-id="@Model.BookingId">ไปที่การจอง</a>
+    }
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Queue">รายการชำระเงินทั้งหมด</a>
+}
+
+<section class="content-section">
+<div class="container">
+    @if (isCustomer)
+    {
+        <div class="section-heading">
+            <h2>การชำระเงิน · การจอง #@Model.BookingId</h2>
+        </div>
+    }
+
+    @if (TempData["PaymentSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
     @if (TempData["PaymentError"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
     @if (Model.RequiresReconciliation)
     {
-        <div class="alert alert-warning">มีข้อมูลการชำระเงินเก่าที่ต้องตรวจสอบก่อน จึงจะยืนยันยอดหรือรับชำระเพิ่มได้</div>
+        <div class="alert alert-warning">มีข้อมูลการชำระเงินเก่าที่ต้องให้ฝ่ายบัญชีตรวจก่อน จึงจะยืนยันยอดหรือรับชำระเพิ่มได้</div>
     }
 
-    <div class="booking-panel mb-4">
-        <p class="mb-1">ยอดที่ต้องชำระ: <strong>@(Model.BookingAmount.HasValue ? $"฿{Model.BookingAmount:N2}" : "-")</strong></p>
-        <p class="mb-1">ชำระแล้ว: ฿@Model.ConfirmedAmount.ToString("N2") · คืนเงินแล้ว: ฿@Model.RefundedAmount.ToString("N2")</p>
-        <p class="mb-0">ยอดคงค้าง: <strong>@outstanding</strong></p>
-        @if (confirmed) { <p class="text-muted small mt-2 mb-0">การจองนี้ชำระเงินแล้ว ไม่สามารถรับชำระซ้ำได้ (รวมถึงหลังคืนเงิน)</p> }
-    </div>
-
-    @if (User.IsInRole("Customer") && !Model.RequiresReconciliation && !confirmed && !pending && Model.BookingAmount > 0)
+    @if (!isCustomer && (Model.GuestName != null || Model.RoomNumber != null))
     {
-        <h3>ชำระเงินเต็มจำนวน</h3>
-        <partial name="~/Views/Payment/_PaymentMethodForm.cshtml" model="Model.BookingId" />
-    }
-    else if (pending && User.IsInRole("Customer"))
-    {
-        <p>มีการชำระเงินที่รอยืนยัน ถ้าชำระด้วยเงินสด พนักงานจะยืนยันเมื่อได้รับเงินที่โรงแรม</p>
-    }
-
-    <h3 class="mt-4">รายการชำระเงิน</h3>
-    @if (Model.Payments.Count == 0) { <p>ยังไม่มีรายการชำระเงิน</p> }
-    @foreach (var payment in Model.Payments)
-    {
-        <div class="booking-panel mb-3">
-            <p>ชำระเงิน #@payment.PaymentId · @ThaiText.PaymentMethod(payment.Method) · @ThaiText.Status(payment.DisplayStatus) · @(payment.Amount.HasValue ? $"฿{payment.Amount:N2}" : "-")</p>
-            @if (PaymentService.IsMockMethod(payment.Method))
-            {
-                <p class="text-muted small">การชำระเงินจำลอง ไม่มีการโอนเงินจริง</p>
-            }
-            @if (payment.HasEvidence)
-            {
-                <a asp-action="Evidence" asp-route-id="@payment.PaymentId" target="_blank" rel="noopener">ดูหลักฐานการโอน</a>
-            }
-
-            @* ข้อมูลเก่าที่ต้องตรวจสอบ (Staff/Admin) *@
-            @if (isStaffOrAdmin && payment.IsLegacy)
-            {
-                <form asp-action="Reconcile" method="post" class="mt-3">
-                    <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
-                    <input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
-                    <label class="form-label">ตรวจหลักฐานแล้ว และเหตุผล</label>
-                    <textarea name="reason" class="form-control" maxlength="2000" required></textarea>
-                    <button class="btn btn-primary mt-2" name="confirmed" value="true" type="submit">ยืนยันว่าชำระครบแล้ว</button>
-                    <button class="btn btn-outline-danger mt-2" name="confirmed" value="false" type="submit">ไม่นับ (ไม่ได้ชำระจริง)</button>
-                </form>
-            }
-
-            @* ตรวจสอบการชำระเงิน (Staff/Admin) *@
-            @if (isStaffOrAdmin && payment.IsNew && !payment.IsVerified &&
-                 (payment.Status == "Pending" || payment.Status == "Submitted"))
-            {
-                <form asp-action="Review" method="post" class="mt-3">
-                    <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
-                    <input type="hidden" name="confirm" value="true" /><input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
-                    <label class="form-label">จำนวนเงินที่ได้รับจริง (บาท)</label>
-                    <input name="received" type="number" step="0.01" min="0.01" class="form-control" required />
-                    <button class="btn btn-primary mt-2" type="submit">ยืนยันรับเงินครบ</button>
-                </form>
-                <form asp-action="Review" method="post" class="mt-3">
-                    <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
-                    <input type="hidden" name="confirm" value="false" /><input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
-                    <label class="form-label">เหตุผลที่ปฏิเสธ</label>
-                    <textarea name="reason" class="form-control" maxlength="2000" required></textarea>
-                    <button class="btn btn-outline-danger mt-2" type="submit">ปฏิเสธ</button>
-                </form>
-            }
-
-            @* ลูกค้าขอคืนเงิน *@
-            @if (User.IsInRole("Customer") && payment.IsVerified && payment.Amount > 0 &&
-                 !Model.Refunds.Any(r => r.PaymentId == payment.PaymentId && r.Status == "Requested"))
-            {
-                <form asp-action="RequestRefund" method="post" class="mt-3">
-                    <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
-                    <input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
-                    <label class="form-label">จำนวนเงินที่ขอคืน (บาท)</label>
-                    <input name="amount" type="number" min="0.01" step="0.01" class="form-control" required />
-                    <label class="form-label mt-2">เหตุผล</label>
-                    <textarea name="reason" class="form-control" maxlength="2000" required></textarea>
-                    <button class="btn btn-outline-primary mt-2" type="submit">ขอคืนเงิน</button>
-                </form>
-            }
-        </div>
-    }
-
-    <h3 class="mt-4">คำขอคืนเงิน</h3>
-    @if (Model.Refunds.Count == 0) { <p>ไม่มีคำขอคืนเงิน</p> }
-    @foreach (var refund in Model.Refunds)
-    {
-        <div class="booking-panel mb-3">
-            <p>คำขอคืนเงิน #@refund.RefundId · ชำระเงิน #@refund.PaymentId · ฿@refund.Amount.ToString("N2") · @ThaiText.Status(refund.Status)</p>
-            <p>@refund.Reason</p>
-            @if (User.IsInRole("Admin") && refund.Status == "Requested")
-            {
-                <form asp-action="ApproveRefund" method="post">
-                    <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="refundId" value="@refund.RefundId" />
-                    <input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
-                    @if (PaymentService.IsMockMethod(Model.Payments.FirstOrDefault(p => p.PaymentId == refund.PaymentId)?.Method))
-                    {
-                        <label><input type="checkbox" name="actualRefundSent" value="true" required /> ยืนยันว่าเป็นการคืนเงินจำลอง ไม่มีการโอนเงินจริง</label>
-                    }
-                    else
-                    {
-                        <label><input type="checkbox" name="actualRefundSent" value="true" required /> ยืนยันว่าโอนเงินคืนให้ลูกค้าแล้วจริง</label>
-                    }
-                    <button class="btn btn-primary mt-2" type="submit">อนุมัติและบันทึกการคืนเงิน</button>
-                </form>
-                <form asp-action="RejectRefund" method="post" class="mt-3">
-                    <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="refundId" value="@refund.RefundId" />
-                    <input type="hidden" name="key" value="@Guid.NewGuid().ToString("N")" />
-                    <label class="form-label">เหตุผลที่ปฏิเสธ</label>
-                    <textarea name="reason" class="form-control" maxlength="2000" required></textarea>
-                    <button class="btn btn-outline-danger mt-2" type="submit">ปฏิเสธคำขอคืนเงิน</button>
-                </form>
-            }
-        </div>
-    }
-
-    <h3 class="mt-4">ประวัติการชำระเงิน</h3>
-    @if (Model.Events.Count == 0) { <p>ยังไม่มีประวัติ</p> }
-    @foreach (var item in Model.Events)
-    {
-        <p class="small">
-            @ThaiText.Time(item.OccurredAtUtc) · ชำระเงิน #@item.PaymentId · @ThaiText.Status(item.EventType)
-            · ผู้ทำรายการ: @(await Users.NameAsync(item.ActorUserId))
-            @if (item.Amount.HasValue) { <span>· ฿@item.Amount.Value.ToString("N2")</span> }
-            @if (!string.IsNullOrWhiteSpace(item.Method)) { <span>· @ThaiText.PaymentMethod(item.Method)</span> }
-            @if (!string.IsNullOrWhiteSpace(item.Reason)) { <span>· @item.Reason</span> }
+        <p class="text-muted mb-3">
+            @ThaiText.OrDash(Model.GuestName?.Trim()) · ห้อง @ThaiText.OrDash(Model.RoomNumber)
+            @if (Model.IsCancelled) { <span class="badge text-bg-secondary ms-1">การจองถูกยกเลิก · @CancelReasons.Label(Model.CancelReason)</span> }
         </p>
     }
-</div></section>
+
+    <div class="figures">
+        <div class="figure">
+            <div class="label">ยอดการจอง</div>
+            <div class="value">@(Model.BookingAmount.HasValue ? ThaiText.Baht(Model.BookingAmount.Value) : "-")</div>
+        </div>
+        <div class="figure">
+            <div class="label">ชำระแล้ว</div>
+            <div class="value">@ThaiText.Baht(Model.ConfirmedAmount)</div>
+        </div>
+        <div class="figure">
+            <div class="label">คืนเงินแล้ว</div>
+            <div class="value">@ThaiText.Baht(Model.RefundedAmount)</div>
+            @if (Model.RefundedAmount > 0) { <div class="note">คงเหลือที่โรงแรมรับไว้ @ThaiText.Baht(Model.NetReceived)</div> }
+        </div>
+        <div class="figure @(Model.Outstanding > 0 ? "is-alert" : "")">
+            <div class="label">ยอดค้างชำระ</div>
+            <div class="value">@(Model.Outstanding.HasValue ? ThaiText.Baht(Model.Outstanding.Value) : "ต้องตรวจสอบ")</div>
+            @if (Model.IsCancelled) { <div class="note">ยกเลิกแล้ว ไม่ต้องชำระ</div> }
+        </div>
+    </div>
+
+    @* ---------- ลูกค้าชำระเงิน ---------- *@
+    @if (isCustomer)
+    {
+        <partial name="_PaymentDeadline" model="Model.PaymentDueAtUtc" />
+    }
+    @if (isCustomer && Model.IsCancelled && Model.CancelReason == CancelReasons.PaymentTimeout)
+    {
+        <div class="alert alert-light">
+            การจองนี้ถูกยกเลิกเพราะไม่ได้ชำระเงินภายในเวลาที่กำหนด ห้องถูกปล่อยให้คนอื่นจองแล้ว
+            <a asp-controller="Home" asp-action="Rooms">ค้นหาห้องแล้วจองใหม่</a>
+        </div>
+    }
+    @if (isCustomer && !Model.RequiresReconciliation && !confirmed && !pending && !Model.IsCancelled && Model.BookingAmount > 0 &&
+         !(Model.PaymentDueAtUtc <= DateTime.UtcNow))
+    {
+        <section class="booking-panel mb-3" data-hide-on-expire>
+            <h3 class="mt-0">ชำระเงินเต็มจำนวน</h3>
+            <partial name="~/Views/Payment/_PaymentMethodForm.cshtml" model="Model.BookingId" />
+        </section>
+    }
+    else if (pending && isCustomer)
+    {
+        <div class="alert alert-info">มีการชำระเงินที่รอยืนยัน ถ้าชำระด้วยเงินสด พนักงานจะยืนยันเมื่อได้รับเงินที่โรงแรม</div>
+    }
+
+    @* ---------- รายการชำระเงิน ---------- *@
+    <section class="table-panel mb-3">
+        <div class="panel-head">
+            <h2>รายการชำระเงิน</h2>
+            @if (confirmed) { <span class="text-muted small">ชำระครบแล้ว รับชำระซ้ำไม่ได้</span> }
+        </div>
+        @if (Model.Payments.Count == 0)
+        {
+            <p class="panel-empty">ยังไม่มีรายการชำระเงิน</p>
+        }
+        @foreach (var payment in Model.Payments)
+        {
+            var status = payment.DisplayStatus;
+            var reviewable = canReview && payment.IsNew && !payment.IsVerified && (payment.Status == "Pending" || payment.Status == "Submitted");
+            var refundable = isCustomer && payment.IsVerified && payment.Amount > 0 &&
+                             !Model.Refunds.Any(r => r.PaymentId == payment.PaymentId && r.Status == "Requested");
+
+            <div class="pay-row">
+                <div class="pay-row-main">
+                    <div>
+                        <strong>ชำระเงิน #@payment.PaymentId</strong>
+                        <span class="text-muted">· @ThaiText.PaymentMethod(payment.Method)</span>
+                        <span class="badge @Badge(status) ms-1">@ThaiText.Status(status)</span>
+                        @if (PaymentService.IsMockMethod(payment.Method)) { <span class="text-muted small ms-1">(จำลอง ไม่มีเงินจริง)</span> }
+                    </div>
+                    <div class="num fw-semibold">@(payment.Amount.HasValue ? ThaiText.Baht(payment.Amount.Value) : "-")</div>
+                </div>
+
+                @if (payment.HasEvidence)
+                {
+                    <a class="small" asp-action="Evidence" asp-route-id="@payment.PaymentId" target="_blank" rel="noopener">ดูหลักฐานการโอน</a>
+                }
+
+                @* ข้อมูลเก่าที่ต้องตรวจสอบ (ฝ่ายบัญชี) *@
+                @if (isAccountant && payment.IsLegacy)
+                {
+                    <form asp-action="Reconcile" method="post" class="pay-action">
+                        <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
+                        <input type="hidden" name="key" value="@Key()" />
+                        <label class="form-label" for="reconcile-@payment.PaymentId">ตรวจหลักฐานแล้ว ระบุเหตุผล</label>
+                        <textarea id="reconcile-@payment.PaymentId" name="reason" class="form-control" rows="2" maxlength="2000" required></textarea>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-primary" name="confirmed" value="true" type="submit">ยืนยันว่าชำระครบแล้ว</button>
+                            <button class="btn btn-outline-danger" name="confirmed" value="false" type="submit">ไม่นับ (ไม่ได้ชำระจริง)</button>
+                        </div>
+                    </form>
+                }
+
+                @* ตรวจสอบการชำระเงิน (Staff/ฝ่ายบัญชี) *@
+                @if (reviewable)
+                {
+                    <div class="pay-action row g-3">
+                        <form asp-action="Review" method="post" class="col-md-6">
+                            <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
+                            <input type="hidden" name="confirm" value="true" /><input type="hidden" name="key" value="@Key()" />
+                            <label class="form-label" for="received-@payment.PaymentId">จำนวนเงินที่ได้รับจริง (บาท)</label>
+                            <input id="received-@payment.PaymentId" name="received" type="number" step="0.01" min="0.01" class="form-control"
+                                   value="@(payment.Amount?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))" required />
+                            <button class="btn btn-primary mt-2" type="submit">ยืนยันรับเงิน</button>
+                        </form>
+                        <form asp-action="Review" method="post" class="col-md-6">
+                            <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
+                            <input type="hidden" name="confirm" value="false" /><input type="hidden" name="key" value="@Key()" />
+                            <label class="form-label" for="reject-@payment.PaymentId">เหตุผลที่ปฏิเสธ</label>
+                            <input id="reject-@payment.PaymentId" name="reason" class="form-control" maxlength="2000" required />
+                            <button class="btn btn-outline-danger mt-2" type="submit">ปฏิเสธ</button>
+                        </form>
+                    </div>
+                }
+
+                @* ลูกค้าขอคืนเงิน *@
+                @if (refundable)
+                {
+                    <details class="pay-action">
+                        <summary>ขอคืนเงินรายการนี้</summary>
+                        <form asp-action="RequestRefund" method="post" class="mt-2">
+                            <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
+                            <input type="hidden" name="key" value="@Key()" />
+                            <label class="form-label" for="refund-amount-@payment.PaymentId">จำนวนเงินที่ขอคืน (บาท)</label>
+                            <input id="refund-amount-@payment.PaymentId" name="amount" type="number" min="0.01" step="0.01" class="form-control" required />
+                            <label class="form-label mt-2" for="refund-reason-@payment.PaymentId">เหตุผล</label>
+                            <textarea id="refund-reason-@payment.PaymentId" name="reason" class="form-control" rows="2" maxlength="2000" required></textarea>
+                            <button class="btn btn-outline-primary mt-2" type="submit">ส่งคำขอคืนเงิน</button>
+                        </form>
+                    </details>
+                }
+            </div>
+        }
+    </section>
+
+    @* ---------- คำขอคืนเงิน ---------- *@
+    @if (Model.Refunds.Count > 0)
+    {
+        <section class="table-panel mb-3">
+            <div class="panel-head"><h2>คำขอคืนเงิน</h2></div>
+            @foreach (var refund in Model.Refunds)
+            {
+                var method = Model.Payments.FirstOrDefault(p => p.PaymentId == refund.PaymentId)?.Method;
+                <div class="pay-row">
+                    <div class="pay-row-main">
+                        <div>
+                            <strong>คำขอ #@refund.RefundId</strong>
+                            <span class="text-muted">· จากชำระเงิน #@refund.PaymentId · @ThaiText.Time(refund.RequestedAtUtc)</span>
+                            <span class="badge @Badge(refund.Status) ms-1">@ThaiText.Status(refund.Status)</span>
+                        </div>
+                        <div class="num fw-semibold">@ThaiText.Baht(refund.Amount)</div>
+                    </div>
+                    <div class="small">เหตุผล: @ThaiText.OrDash(refund.Reason)</div>
+
+                    @if (isAccountant && refund.Status == "Requested")
+                    {
+                        <div class="pay-action row g-3">
+                            <form asp-action="ApproveRefund" method="post" class="col-md-6">
+                                <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="refundId" value="@refund.RefundId" />
+                                <input type="hidden" name="key" value="@Key()" />
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sent-@refund.RefundId" name="actualRefundSent" value="true" required />
+                                    <label class="form-check-label" for="sent-@refund.RefundId">
+                                        @(PaymentService.IsMockMethod(method) ? "ยืนยันว่าเป็นการคืนเงินจำลอง ไม่มีการโอนเงินจริง" : "ยืนยันว่าโอนเงินคืนให้ลูกค้าแล้วจริง")
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary mt-2" type="submit">อนุมัติการคืนเงิน</button>
+                            </form>
+                            <form asp-action="RejectRefund" method="post" class="col-md-6">
+                                <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="refundId" value="@refund.RefundId" />
+                                <input type="hidden" name="key" value="@Key()" />
+                                <label class="form-label" for="refund-reject-@refund.RefundId">เหตุผลที่ปฏิเสธ</label>
+                                <input id="refund-reject-@refund.RefundId" name="reason" class="form-control" maxlength="2000" required />
+                                <button class="btn btn-outline-danger mt-2" type="submit">ปฏิเสธคำขอ</button>
+                            </form>
+                        </div>
+                    }
+                    else if (refund.Status == "Requested")
+                    {
+                        <div class="small text-muted mt-1">รอฝ่ายบัญชีอนุมัติ</div>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+    @* ---------- ประวัติ ---------- *@
+    <section class="table-panel">
+        <div class="panel-head"><h2>ประวัติการชำระเงิน</h2></div>
+        @if (Model.Events.Count == 0)
+        {
+            <p class="panel-empty">ยังไม่มีประวัติ</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>เวลา</th><th>รายการ</th><th>ผู้ทำรายการ</th><th>หมายเหตุ</th><th class="text-end">จำนวนเงิน</th></tr></thead>
+                    <tbody>
+                        @foreach (var item in Model.Events)
+                        {
+                            <tr>
+                                <td class="num">@ThaiText.Time(item.OccurredAtUtc)</td>
+                                <td>@ThaiText.Status(item.EventType)<div class="text-muted small">ชำระเงิน #@item.PaymentId · @ThaiText.PaymentMethod(item.Method)</div></td>
+                                <td>@(await Users.NameAsync(item.ActorUserId))</td>
+                                <td class="small">@ThaiText.OrDash(item.Reason)</td>
+                                <td class="text-end num">@(item.Amount.HasValue ? ThaiText.Baht(item.Amount.Value) : "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
+</section>

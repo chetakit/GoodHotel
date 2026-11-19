@@ -8,14 +8,13 @@
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Reservation</span>
             <h2>ตรวจสอบและยืนยันการจอง</h2>
         </div>
 
         @if (Model.IsSaved)
         {
             <div class="booking-panel summary-card">
-                <h4 class="mb-3 text-white">@Model.StatusMessage</h4>
+                <h4 class="mb-3">@Model.StatusMessage</h4>
                 <div class="summary-line">
                     <span>เลขที่การจอง</span>
                     <strong>@Model.SavedBookingId</strong>
@@ -35,7 +34,7 @@
                         <strong>฿@Model.RoomSubtotal.Value.ToString("N2")</strong>
                     </div>
                     <div class="summary-line">
-                        <span>ส่วนลดโปรโมชั่น</span>
+                        <span>ส่วนลดโปรโมชัน</span>
                         <strong>฿@((Model.DiscountAmount ?? 0m).ToString("N2"))</strong>
                     </div>
                     <div class="summary-line">
@@ -50,19 +49,22 @@
                 @if (Model.PromotionName != null)
                 {
                     <div class="summary-line">
-                        <span>โปรโมชั่น</span>
+                        <span>โปรโมชัน</span>
                         <strong>@Model.PromotionName</strong>
                     </div>
                 }
-                <p class="text-white-50 mt-3 mb-0">สถานะการชำระเงิน: @ThaiText.Status(Model.PaymentStatus)</p>
+                <p class="text-muted mt-3 mb-0">สถานะการชำระเงิน: @ThaiText.Status(Model.PaymentStatus)</p>
                 @if (Model.IsMockPayment)
                 {
-                    <p class="text-white-50 mb-0">การชำระเงินจำลอง ไม่มีการโอนเงินจริง</p>
+                    <p class="text-muted mb-0">การชำระเงินจำลอง ไม่มีการโอนเงินจริง</p>
                 }
             </div>
+            <div class="mt-3"><partial name="_PaymentDeadline" model="Model.PaymentDueAtUtc" /></div>
             @if (Model.CanSubmitPayment && Model.SavedBookingId.HasValue)
             {
-                <partial name="~/Views/Payment/_PaymentMethodForm.cshtml" model="Model.SavedBookingId.Value" />
+                <div data-hide-on-expire>
+                    <partial name="~/Views/Payment/_PaymentMethodForm.cshtml" model="Model.SavedBookingId.Value" />
+                </div>
             }
             else if (Model.SavedBookingId.HasValue)
             {
@@ -114,7 +116,7 @@
 
                 <div class="col-lg-5">
                     <div class="booking-panel summary-card">
-                        <h4 class="mb-3 text-white">สรุปยอด</h4>
+                        <h4 class="mb-3">สรุปยอด</h4>
                         @if (Model.RoomSubtotal.HasValue)
                         {
                             <div class="summary-line">
@@ -127,8 +129,8 @@
                             </div>
                             <div class="summary-line">
                                 <span>
-                                    ส่วนลดโปรโมชั่น
-                                    <small class="d-block text-white-50" id="booking-promotion-name">@(Model.PromotionName ?? "ไม่เข้าเงื่อนไขโปร")</small>
+                                    ส่วนลดโปรโมชัน
+                                    <small class="d-block text-muted" id="booking-promotion-name">@(Model.PromotionName ?? "ไม่เข้าเงื่อนไขโปร")</small>
                                 </span>
                                 <strong id="booking-discount">-฿@((Model.DiscountAmount ?? 0m).ToString("N2"))</strong>
                             </div>
@@ -143,7 +145,7 @@
                         }
                         else
                         {
-                            <p class="text-white-50 mb-0">
+                            <p class="text-muted mb-0">
                                 ยังไม่สามารถคำนวณยอดได้ กรุณาตรวจสอบข้อมูลการเข้าพัก
                             </p>
                         }
@@ -164,7 +166,7 @@
                                 <input type="hidden" name="Guests" value="@Model.Guests" />
 
                                 <div class="mt-4">
-                                    <label for="booking-extra-bed-count" class="form-label text-white">
+                                    <label for="booking-extra-bed-count" class="form-label">
                                         เตียงเสริม (สูงสุด 1 เตียง)
                                     </label>
                                     <select asp-for="ExtraBedCount"
@@ -173,18 +175,18 @@
                                         <option value="0">0</option>
                                         <option value="1">1</option>
                                     </select>
-                                    <small class="text-white-50">
+                                    <small class="text-muted">
                                         ฿500 / เตียง / คืน และเพิ่มความจุได้ 1 คน
                                     </small>
                                 </div>
 
                                 <div id="booking-promotion-feedback"
-                                     class="small mt-3 @(Model.PromotionName != null ? "promotion-feedback-success" : "text-white-50")"
+                                     class="small mt-3 @(Model.PromotionName != null ? "promotion-feedback-success" : "text-muted")"
                                      role="status"
                                      aria-live="polite">
                                     @(Model.PromotionName != null
-                                        ? $"ได้รับโปรโมชั่น \"{Model.PromotionName}\" อัตโนมัติ"
-                                        : "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชั่น")
+                                        ? $"ได้รับโปรโมชัน \"{Model.PromotionName}\" อัตโนมัติ"
+                                        : "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชัน")
                                 </div>
                             </form>
 
@@ -205,7 +207,7 @@
                                     <input asp-for="Guests" type="hidden" />
                                     <input asp-for="ExtraBedCount" type="hidden" />
                                     <button type="submit"
-                                            class="btn btn-light w-100 mt-3"
+                                            class="btn btn-primary w-100 mt-3"
                                             data-booking-confirm>
                                         ยืนยันการจอง
                                     </button>
@@ -213,7 +215,7 @@
                             }
                             else if (User.Identity?.IsAuthenticated == true)
                             {
-                                <p class="text-white-50 mt-3 mb-0">
+                                <p class="text-muted mt-3 mb-0">
                                     กรุณาเข้าสู่ระบบด้วยบัญชีลูกค้าเพื่อยืนยันการจอง
                                 </p>
                             }
@@ -221,19 +223,19 @@
                             {
                                 <a asp-controller="Home"
                                    asp-action="Login"
-                                   class="btn btn-light w-100 mt-3">
+                                   class="btn btn-primary w-100 mt-3">
                                     เข้าสู่ระบบเพื่อยืนยันการจอง
                                 </a>
                             }
                         }
                         else
                         {
-                            <p class="text-white-50 mb-0">
+                            <p class="text-muted mb-0">
                                 ยังไม่สามารถยืนยันการจองได้ กรุณาตรวจสอบข้อมูลหรือค้นหาห้องว่างอีกครั้ง
                             </p>
                             <a asp-controller="Home"
                                asp-action="Rooms"
-                               class="btn btn-light w-100 mt-3">
+                               class="btn btn-outline-primary w-100 mt-3">
                                 กลับไปค้นหาห้อง
                             </a>
                         }

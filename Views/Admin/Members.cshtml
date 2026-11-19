@@ -2,11 +2,10 @@
 @model IEnumerable<GoodHotel.Models.ViewModels.MemberListViewModel>
 
 @{
-    Layout = "_AdminLayout";
-    ViewData["Title"] = "สมาชิก";
+    ViewData["Title"] = "บัญชีผู้ใช้";
     const int pageSize = 10;
     const string pageCookie = "AdminMembersPage";
-    // แยกดูได้ว่า ลูกค้า หรือ พนักงาน (Staff/แม่บ้าน/Admin)
+    // แยกดูได้ว่า ลูกค้า หรือ พนักงาน (Staff/แม่บ้าน/บัญชี/Admin)
     var roleFilter = Context.Request.Query["role"].ToString();
     var members = Model
         .Where(m => roleFilter == "customer" ? m.Role == "Customer"
@@ -31,8 +30,11 @@
     });
 }
 
-<div class="container mt-4">
-    <h2 class="mb-3">สมาชิก</h2>
+@section Actions {
+    <a asp-action="AddUser" class="btn btn-primary btn-sm">เพิ่มผู้ใช้</a>
+}
+
+<div>
 
     <ul class="nav nav-pills mb-4">
         <li class="nav-item"><a class="nav-link @(roleFilter == "" ? "active" : "")" asp-action="Members" asp-route-page="1">ทั้งหมด</a></li>
@@ -95,11 +97,11 @@
                     <td>@item.Email</td>
                     <td>@item.Phone</td>
                     <td>@ThaiText.Status(item.Role)</td>
-                    <td>
+                    <td class="text-nowrap">
                     <a asp-controller="Admin"
                     asp-action="EditUser"
                     asp-route-id="@item.UserId"
-                    class="btn btn-primary">
+                    class="btn btn-sm btn-outline-primary">
                         แก้ไข
                     </a>
 
@@ -117,7 +119,7 @@
 
                         <input type="hidden" name="id" value="@item.UserId" />
 
-                        <button type="submit" class="btn btn-danger">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
                             ลบ
                         </button>
                     </form>

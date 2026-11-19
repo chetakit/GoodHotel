@@ -44,9 +44,9 @@ Check(!(await service.SubmitAsync(1, 1, "Bank Transfer", key, CancellationToken.
     !(await service.SubmitAsync(1, 1, "PayPal", key, CancellationToken.None)).Succeeded,
     "Unlabelled historical or unknown methods cannot be submitted as mock payments.");
 var review = typeof(PaymentController).GetMethod(nameof(PaymentController.Review))!;
-Check(review.GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Staff,Admin" &&
+Check(review.GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Staff,Accountant" &&
     review.IsDefined(typeof(HttpPostAttribute)) && review.IsDefined(typeof(ValidateAntiForgeryTokenAttribute)),
-    "Cash confirmation must require Staff/Admin, POST, and antiforgery protection.");
+    "Cash confirmation must require Staff/Accountant, POST, and antiforgery protection.");
 
 var now = DateTime.UtcNow;
 var payments = new[]

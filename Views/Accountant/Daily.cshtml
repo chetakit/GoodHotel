@@ -1,0 +1,58 @@
+@model GoodHotel.Models.ViewModels.DailyCloseViewModel
+@{
+    ViewData["Title"] = "ปิดยอดรายวัน";
+    var iso = System.Globalization.CultureInfo.InvariantCulture;
+    var dayText = Model.Date.ToString("yyyy-MM-dd", iso);
+}
+
+@section Actions {
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportLedger" asp-route-from="@dayText" asp-route-to="@dayText">ดาวน์โหลด CSV</a>
+}
+
+<form method="get" asp-action="Daily" class="toolbar">
+    <div>
+        <label class="form-label" for="date">วันที่</label>
+        <input id="date" name="date" type="date" class="form-control" value="@dayText" onchange="this.form.submit()" />
+    </div>
+    <a class="btn btn-outline-secondary" asp-action="Daily" asp-route-date="@Model.Date.AddDays(-1).ToString("yyyy-MM-dd", iso)">วันก่อนหน้า</a>
+    <a class="btn btn-outline-secondary" asp-action="Daily" asp-route-date="@Model.Date.AddDays(1).ToString("yyyy-MM-dd", iso)">วันถัดไป</a>
+</form>
+
+<div class="figures">
+    <div class="figure">
+        <div class="label">เงินรับ</div>
+        <div class="value">฿@Model.Total.Received.ToString("N2")</div>
+    </div>
+    <div class="figure">
+        <div class="label">เงินคืน</div>
+        <div class="value">฿@Model.Total.Refunded.ToString("N2")</div>
+    </div>
+    <div class="figure">
+        <div class="label">สุทธิ</div>
+        <div class="value">@ThaiText.Baht(Model.Total.Net)</div>
+    </div>
+    @foreach (var method in Model.ByMethod)
+    {
+        <div class="figure">
+            <div class="label">@method.Method</div>
+            <div class="value">฿@method.Amount.ToString("N0")</div>
+            <div class="note">@method.Count รายการ</div>
+        </div>
+    }
+</div>
+
+<section class="table-panel">
+    <div class="panel-head">
+        <h2>รายการวันที่ @ThaiText.Date(Model.Date)</h2>
+        <span class="text-muted small">@Model.Entries.Count รายการ</span>
+    </div>
+    @if (Model.Entries.Count == 0)
+    {
+        <p class="panel-empty">ไม่มีรายการรับหรือคืนเงินในวันนี้</p>
+    }
+    else
+    {
+        <partial name="_Ledger" model="Model.Entries" />
+    }
+</section>
+<p class="text-muted small mt-2">ตรวจว่าเงินที่รับจริงตรงกับยอดแต่ละช่องทาง ถ้ารายการไหนผิด เปิดที่เลขการจองเพื่อดูประวัติและผู้ที่ยืนยัน</p>

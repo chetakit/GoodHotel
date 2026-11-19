@@ -46,6 +46,8 @@ namespace GoodHotel.Models
                       .HasMaxLength(20)
                       .IsRequired()
                       .HasDefaultValue(BookingStatuses.Booked);
+                entity.Property(e => e.CancelReason).HasMaxLength(20);
+                entity.HasIndex(e => new { e.Status, e.CreatedAtUtc });
 
                 entity.HasOne(e => e.Promotion)
                       .WithMany(e => e.Bookings)

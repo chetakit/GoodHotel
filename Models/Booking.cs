@@ -28,6 +28,12 @@ public partial class Booking
 
     public DateTime? CancelledAtUtc { get; set; }
 
+    // เวลาที่กดจอง ใช้นับเวลาชำระเงิน (การจองก่อนมีระบบนี้เป็น null และไม่ถูกยกเลิกอัตโนมัติ)
+    public DateTime? CreatedAtUtc { get; set; }
+
+    // เหตุผลที่ยกเลิก (ดู CancelReasons) การยกเลิกก่อนมีระบบนี้เป็น null
+    public string? CancelReason { get; set; }
+
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual Promotion? Promotion { get; set; }
@@ -41,4 +47,20 @@ public static class BookingStatuses
 {
     public const string Booked = "Booked";
     public const string Cancelled = "Cancelled";
+}
+
+public static class CancelReasons
+{
+    public const string Customer = "Customer";
+    public const string Staff = "Staff";
+    public const string PaymentTimeout = "PaymentTimeout";
+
+    /// <summary>ข้อความสั้นสำหรับป้ายสถานะ</summary>
+    public static string Label(string? reason) => reason switch
+    {
+        Customer => "ลูกค้ายกเลิก",
+        Staff => "พนักงานยกเลิก",
+        PaymentTimeout => "หมดเวลาชำระเงิน",
+        _ => "ยกเลิกแล้ว"
+    };
 }

@@ -42,8 +42,11 @@ public class HomeController : Controller
         _availability = availability;
     }
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index([FromServices] ParallelReader reader)
     {
+        // โปรโมชันดึงพร้อมกันกับห้องพัก (คนละ connection)
+        var promotionsTask = reader.Run(LoadOpenPromotionsAsync);
+
         var featuredRooms = await _db.Rooms
             .AsNoTracking()
             .Where(room => room.Status == "Available")
@@ -70,27 +73,23 @@ public class HomeController : Controller
         var model = new HomeViewModel
         {
             FeaturedRooms = featuredRooms,
-            Promotions = await LoadOpenPromotionsAsync()
+            Promotions = await promotionsTask
         };
 
         return View(model);
     }
 
     /// <summary>โปรที่เปิดอยู่และยังไม่หมดเขต สำหรับแสดงให้ลูกค้าเห็น</summary>
-    private async Task<List<PromotionListViewModel>> LoadOpenPromotionsAsync()
+    private Task<List<PromotionListViewModel>> LoadOpenPromotionsAsync() => LoadOpenPromotionsAsync(_db);
+
+    private async Task<List<PromotionListViewModel>> LoadOpenPromotionsAsync(GoodHotelDbContext db)
     {
         var today = _availability.HotelToday();
-        var promotions = await _db.Promotions.AsNoTracking()
+        var promotions = await db.Promotions.AsNoTracking()
             .Where(p => p.IsActive && p.RuleType != null && (p.EndDate == null || p.EndDate >= today))
             .OrderBy(p => p.PromotionId)
             .ToListAsync();
         return promotions.Select(PromotionListViewModel.From).ToList();
-    }
-
-    public IActionResult UserList()
-    {
-        var userList = _db.Users.ToList();
-        return View(userList);
     }
 
     [HttpGet]
@@ -343,6 +342,8 @@ public class HomeController : Controller
                 Guests = booking.Guests,
                 Amount = booking.Amount,
                 BookingStatus = booking.Status,
+                CreatedAtUtc = booking.CreatedAtUtc,
+                CancelReason = booking.CancelReason,
                 StayStatus = _db.BookingStays
                     .Where(stay => stay.BookingId == booking.BookingId)
                     .Select(stay => stay.Status)
@@ -379,8 +380,14 @@ public class HomeController : Controller
             var paid = confirmedPayment?.Amount ?? 0m;
             var refunded = refunds.Where(r => r.BookingId == booking.BookingId &&
                 r.PaymentId == confirmedPayment?.PaymentId).Sum(r => r.Amount);
+            // การคืนเงินไม่ทำให้ลูกค้าค้างจ่ายเพิ่ม (เดิมบวกยอดคืนกลับเข้าไป)
             booking.OutstandingAmount = needsReview || !booking.Amount.HasValue
-                ? null : booking.Amount.Value - paid + refunded;
+                ? null : Math.Max(0m, booking.Amount.Value - paid);
+            var hasPending = records.Any(p => p.SubmittedAtUtc != null && p.VerifiedAtUtc == null &&
+                (p.PaymentStatus == "Pending" || p.PaymentStatus == "Submitted"));
+            booking.PaymentDueAtUtc = booking.BookingStatus == BookingStatuses.Booked && booking.StayStatus == null &&
+                confirmedPayment == null && !hasPending
+                    ? PaymentDeadline.DueAtUtc(booking.CreatedAtUtc) : null;
             booking.IsMockPayment = confirmedPayment != null && PaymentService.IsMockMethod(confirmedPayment.PaymentMethod);
             booking.PaymentStatus = needsReview ? "Requires reconciliation" :
                 confirmedPayment != null ? (paid > 0 && refunded >= paid ? "Refunded" : "Paid") :
@@ -491,8 +498,8 @@ public class HomeController : Controller
 
     private static string PromotionMessage(string? promotionName) =>
         promotionName == null
-            ? "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชั่น"
-            : $"ได้รับโปรโมชั่น \"{promotionName}\" อัตโนมัติ";
+            ? "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชัน"
+            : $"ได้รับโปรโมชัน \"{promotionName}\" อัตโนมัติ";
 
     private int? CurrentCustomerId() =>
         User.IsInRole("Customer") && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0
@@ -602,6 +609,9 @@ public class HomeController : Controller
                     : paymentRows.Where(payment => payment.SubmittedAtUtc != null)
                         .OrderByDescending(payment => payment.PaymentId)
                         .Select(payment => payment.PaymentStatus).FirstOrDefault() ?? "Not submitted";
+            var createdAtUtc = await _db.Bookings.AsNoTracking().Where(b => b.BookingId == result.BookingId)
+                .Select(b => b.CreatedAtUtc).FirstOrDefaultAsync(cancellationToken);
+            var dueAtUtc = confirmed == null && !pending ? PaymentDeadline.DueAtUtc(createdAtUtc) : null;
             return View(new BookingConfirmationViewModel
             {
                 IsSaved = true,
@@ -609,7 +619,9 @@ public class HomeController : Controller
                 PaymentStatus = paymentStatus,
                 IsMockPayment = confirmed != null && PaymentService.IsMockMethod(confirmed.PaymentMethod),
                 CanSubmitPayment = result.BookingId.HasValue && result.Amount > 0 &&
-                    !needsReview && confirmed == null && !pending,
+                    !needsReview && confirmed == null && !pending &&
+                    !(dueAtUtc <= DateTime.UtcNow),
+                PaymentDueAtUtc = dueAtUtc,
                 EstimatedAmount = result.Amount,
                 RoomSubtotal = result.RoomSubtotal,
                 DiscountAmount = result.DiscountAmount,
@@ -718,6 +730,9 @@ public class HomeController : Controller
             if (User.IsInRole("Housekeeper"))
                 return RedirectToAction("Index", "Housekeeper");
 
+            if (User.IsInRole("Accountant"))
+                return RedirectToAction("Index", "Accountant");
+
             if (User.IsInRole("Customer"))
                 return RedirectToAction("Index", "Home");
         }
@@ -796,6 +811,7 @@ public class HomeController : Controller
             "Customer",
             "Staff",
             "Housekeeper",
+            "Accountant",
             "Admin"
         };
 
@@ -840,6 +856,7 @@ public class HomeController : Controller
             "Customer" => RedirectToAction("Index", "Home"),
             "Staff" => RedirectToAction("Index", "Staff"),
             "Housekeeper" => RedirectToAction("Index", "Housekeeper"),
+            "Accountant" => RedirectToAction("Index", "Accountant"),
             _ => RedirectToAction("Login")
         };
     }
@@ -1045,10 +1062,6 @@ public class HomeController : Controller
         return RedirectToAction("Login");
     }
 
-    public IActionResult Privacy()
-    {
-        return View();
-    }
 
     [ResponseCache(
         Duration = 0,

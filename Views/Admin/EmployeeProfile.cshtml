@@ -1,11 +1,10 @@
 @model GoodHotel.Models.ViewModels.EmployeeProfileViewModel
 
 @{
-    Layout = "_AdminLayout";
     ViewData["Title"] = "ข้อมูลพนักงาน";
 }
 
-<div class="container mt-4">
+<div>
     @if (TempData["EmployeeSuccess"] is string success)
     {
         <div class="alert alert-success" role="status">@success</div>

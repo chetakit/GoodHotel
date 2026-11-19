@@ -1,0 +1,94 @@
+@model GoodHotel.Models.ViewModels.AccountantDashboardViewModel
+@{
+    ViewData["Title"] = "ภาพรวมการเงิน";
+}
+
+@section Actions {
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Daily">ปิดยอดวันนี้</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Reports">รายงานเดือนนี้</a>
+}
+
+<div class="figures">
+    <div class="figure">
+        <div class="label">รายได้สุทธิวันนี้</div>
+        <div class="value">@ThaiText.Baht(Model.Today.Net)</div>
+        <div class="note">รับ ฿@Model.Today.Received.ToString("N0") · คืน ฿@Model.Today.Refunded.ToString("N0")</div>
+    </div>
+    <div class="figure">
+        <div class="label">รายได้สุทธิเดือนนี้</div>
+        <div class="value">@ThaiText.Baht(Model.ThisMonth.Net)</div>
+        <div class="note">รับ ฿@Model.ThisMonth.Received.ToString("N0") · คืน ฿@Model.ThisMonth.Refunded.ToString("N0")</div>
+    </div>
+    <div class="figure">
+        <div class="label">รายได้สุทธิทั้งหมด</div>
+        <div class="value">@ThaiText.Baht(Model.AllTime.Net)</div>
+        <div class="note">ตั้งแต่เปิดระบบ</div>
+    </div>
+</div>
+
+<div class="figures">
+    <div class="figure @(Model.RefundRequests > 0 ? "is-alert" : "")">
+        <a asp-controller="Payment" asp-action="Queue">
+            <div class="label">คำขอคืนเงินรออนุมัติ</div>
+            <div class="value">@Model.RefundRequests</div>
+            <div class="note">ฝ่ายบัญชีเป็นผู้อนุมัติ</div>
+        </a>
+    </div>
+    <div class="figure @(Model.AwaitingReview > 0 ? "is-alert" : "")">
+        <a asp-controller="Payment" asp-action="Queue" asp-route-status="Submitted">
+            <div class="label">สลิปรอตรวจ</div>
+            <div class="value">@Model.AwaitingReview</div>
+            <div class="note">พนักงานต้อนรับหรือฝ่ายบัญชีตรวจได้</div>
+        </a>
+    </div>
+    <div class="figure @(Model.LegacyToReconcile > 0 ? "is-alert" : "")">
+        <a asp-controller="Payment" asp-action="Queue" asp-route-status="Requires reconciliation">
+            <div class="label">ข้อมูลเก่ารอกระทบยอด</div>
+            <div class="value">@Model.LegacyToReconcile</div>
+            <div class="note">รายการก่อนมีระบบตรวจสลิป</div>
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <section class="table-panel">
+            <div class="panel-head">
+                <h2>รายการเงินวันนี้</h2>
+                <a asp-action="Daily">ดูสมุดรายวัน</a>
+            </div>
+            @if (Model.TodayLedger.Count == 0)
+            {
+                <p class="panel-empty">วันนี้ยังไม่มีรายการรับหรือคืนเงิน</p>
+            }
+            else
+            {
+                <partial name="_Ledger" model="Model.TodayLedger" />
+            }
+        </section>
+    </div>
+    <div class="col-lg-4">
+        <section class="table-panel">
+            <div class="panel-head"><h2>เงินรับเดือนนี้ตามช่องทาง</h2></div>
+            @if (Model.MonthByMethod.Count == 0)
+            {
+                <p class="panel-empty">ยังไม่มีรายการ</p>
+            }
+            else
+            {
+                <table class="table">
+                    <tbody>
+                        @foreach (var method in Model.MonthByMethod)
+                        {
+                            <tr>
+                                <td>@method.Method <span class="text-muted small">(@method.Count)</span></td>
+                                <td class="text-end num">฿@method.Amount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+        <p class="text-muted small mt-2 mb-0">ยอดรวมการชำระเงินจำลอง (Mock) ด้วย ไม่ใช่เงินจริง</p>
+    </div>
+</div>

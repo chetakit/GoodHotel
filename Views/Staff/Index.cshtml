@@ -1,121 +1,138 @@
 @model GoodHotel.Models.ViewModels.StaffDashboardViewModel
 @{
-    ViewData["Title"] = "แดชบอร์ดพนักงานต้อนรับ";
+    ViewData["Title"] = "หน้าหลัก";
+    var today = (DateOnly)ViewBag.Today;
 }
-<section class="content-section">
-    <div class="container">
-        <div class="section-heading"><span class="eyebrow text-dark">Front Desk</span><h2>แดชบอร์ดพนักงานต้อนรับ</h2></div>
 
-        @if (TempData["StaffSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
-        @if (TempData["StaffError"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+@section Actions {
+    <a asp-action="WalkIn" class="btn btn-primary btn-sm">รับลูกค้า Walk-in</a>
+}
 
-        <nav class="d-flex flex-wrap gap-2 mb-4">
-            <a asp-action="WalkIn" class="btn btn-primary">+ รับลูกค้า Walk-in</a>
-            <a asp-action="Bookings" class="btn btn-outline-primary">ค้นหาการจอง</a>
-            <a asp-action="RoomStatus" class="btn btn-outline-primary">สถานะห้อง</a>
-            <a asp-action="VerificationTasks" class="btn btn-outline-primary">
-                ตรวจงานทำความสะอาด
-                @if (Model.AwaitingVerification > 0) { <span class="badge text-bg-danger ms-1">@Model.AwaitingVerification</span> }
-            </a>
-        </nav>
+@if (TempData["StaffSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+@if (TempData["StaffError"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
 
-        @* ---------- แขกที่จะเข้าพักวันนี้ ---------- *@
-        <div class="booking-panel mb-4">
-            <h4 class="mb-3">แขกที่จะเข้าพักวันนี้ <span class="badge text-bg-primary">@Model.Arrivals.Count</span></h4>
-            @if (Model.Arrivals.Count == 0)
-            {
-                <p class="text-muted mb-0">ไม่มีแขกที่รอเช็คอินวันนี้</p>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead><tr><th>การจอง</th><th>ลูกค้า</th><th>ห้อง</th><th>วันออก</th><th>ผู้เข้าพัก</th><th>การชำระเงิน</th><th></th></tr></thead>
-                        <tbody>
-                            @foreach (var row in Model.Arrivals)
-                            {
-                                <tr>
-                                    <td><a asp-action="BookingDetails" asp-route-id="@row.BookingId">#@row.BookingId</a></td>
-                                    <td>@ThaiText.OrDash(row.GuestName)<br /><small class="text-muted">@row.Phone</small></td>
-                                    <td>@ThaiText.OrDash(row.RoomNumber)</td>
-                                    <td>@ThaiText.Date(row.CheckOut)</td>
-                                    <td>@(row.Guests?.ToString() ?? "-")</td>
-                                    <td>
-                                        <span class="badge @(row.IsPaid ? "text-bg-success" : "text-bg-warning")">
-                                            @(row.IsPaid ? "จ่ายแล้ว" : "ยังไม่จ่าย")
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        @if (row.IsPaid)
-                                        {
-                                            <form asp-action="CheckIn" method="post" class="d-inline">
-                                                <input type="hidden" name="bookingId" value="@row.BookingId" />
-                                                <input type="hidden" name="fromDashboard" value="true" />
-                                                <button type="submit" class="btn btn-sm btn-primary">เช็คอิน</button>
-                                            </form>
-                                        }
-                                        else
-                                        {
-                                            <a asp-controller="Payment" asp-action="Details" asp-route-id="@row.BookingId"
-                                               class="btn btn-sm btn-outline-primary">รับชำระเงิน</a>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
-
-        @* ---------- แขกที่ต้องเช็คเอาท์วันนี้ ---------- *@
-        <div class="booking-panel mb-4">
-            <h4 class="mb-3">แขกที่ต้องเช็คเอาท์วันนี้ <span class="badge text-bg-primary">@Model.Departures.Count</span></h4>
-            @if (Model.Departures.Count == 0)
-            {
-                <p class="text-muted mb-0">ไม่มีแขกที่ต้องเช็คเอาท์วันนี้</p>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead><tr><th>การจอง</th><th>ลูกค้า</th><th>ห้อง</th><th>วันออก</th><th></th></tr></thead>
-                        <tbody>
-                            @foreach (var row in Model.Departures)
-                            {
-                                var today = (DateOnly)ViewBag.Today;
-                                <tr>
-                                    <td><a asp-action="BookingDetails" asp-route-id="@row.BookingId">#@row.BookingId</a></td>
-                                    <td>@ThaiText.OrDash(row.GuestName)<br /><small class="text-muted">@row.Phone</small></td>
-                                    <td>@ThaiText.OrDash(row.RoomNumber)</td>
-                                    <td>
-                                        @ThaiText.Date(row.CheckOut)
-                                        @if (row.CheckOut < today) { <span class="badge text-bg-danger ms-1">เลยกำหนด</span> }
-                                    </td>
-                                    <td class="text-end">
-                                        <form asp-action="CheckOut" method="post" class="d-inline"
-                                              onsubmit="return confirm('เช็คเอาท์การจอง #@row.BookingId ?');">
-                                            <input type="hidden" name="bookingId" value="@row.BookingId" />
-                                            <input type="hidden" name="fromDashboard" value="true" />
-                                            <button type="submit" class="btn btn-sm btn-primary">เช็คเอาท์</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
-
-        @* ---------- ตัวเลขภาพรวม ---------- *@
-        <div class="row g-3">
-            <div class="col-6 col-md-4"><div class="card p-3">แขกที่เข้าพักอยู่ตอนนี้ <strong>@Model.CheckedInStays</strong></div></div>
-            <div class="col-6 col-md-4"><div class="card p-3">เช็คอินไปแล้ววันนี้ <strong>@Model.TodayCheckIns</strong></div></div>
-            <div class="col-6 col-md-4"><div class="card p-3">เช็คเอาท์ไปแล้ววันนี้ <strong>@Model.TodayCheckOuts</strong></div></div>
-            <div class="col-6 col-md-4"><div class="card p-3">การจองทั้งหมด (ไม่นับที่ยกเลิก) <strong>@Model.TotalBookings</strong></div></div>
-            <div class="col-6 col-md-4"><div class="card p-3">งานทำความสะอาดรอตรวจ <strong>@Model.AwaitingVerification</strong></div></div>
-            <div class="col-6 col-md-4"><div class="card p-3"><a asp-action="MaintenanceReports">งานซ่อมที่ยังไม่เสร็จ</a> <strong>@Model.OpenMaintenanceReports</strong></div></div>
-        </div>
+<div class="figures">
+    <div class="figure">
+        <div class="label">รอเช็คอินวันนี้</div>
+        <div class="value">@Model.Arrivals.Count</div>
+        <div class="note">เช็คอินไปแล้ว @Model.TodayCheckIns</div>
     </div>
+    <div class="figure @(Model.Departures.Count > 0 ? "is-alert" : "")">
+        <div class="label">ต้องเช็คเอาท์</div>
+        <div class="value">@Model.Departures.Count</div>
+        <div class="note">เช็คเอาท์ไปแล้ว @Model.TodayCheckOuts</div>
+    </div>
+    <div class="figure">
+        <a asp-action="RoomStatus">
+            <div class="label">แขกที่เช็คอินอยู่</div>
+            <div class="value">@Model.CheckedInStays</div>
+        </a>
+    </div>
+    <div class="figure @(Model.AwaitingVerification > 0 ? "is-alert" : "")">
+        <a asp-action="VerificationTasks">
+            <div class="label">ห้องรอตรวจ</div>
+            <div class="value">@Model.AwaitingVerification</div>
+            <div class="note">แม่บ้านทำเสร็จแล้ว</div>
+        </a>
+    </div>
+    <div class="figure">
+        <a asp-controller="Maintenance" asp-action="Index">
+            <div class="label">งานซ่อมที่ยังไม่เสร็จ</div>
+            <div class="value">@Model.OpenMaintenanceReports</div>
+        </a>
+    </div>
+</div>
+
+@* ---------- แขกที่จะเข้าพักวันนี้ ---------- *@
+<section class="table-panel mb-3">
+    <div class="panel-head">
+        <h2>แขกที่จะเข้าพักวันนี้</h2>
+        <a asp-action="Bookings" asp-route-when="today">ดูการจองทั้งหมดของวันนี้</a>
+    </div>
+    @if (Model.Arrivals.Count == 0)
+    {
+        <p class="panel-empty">ไม่มีแขกที่รอเช็คอินวันนี้</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th>การจอง</th><th>ลูกค้า</th><th>ห้อง</th><th>วันออก</th><th>ผู้เข้าพัก</th><th>การชำระเงิน</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var row in Model.Arrivals)
+                    {
+                        <tr>
+                            <td><a asp-action="BookingDetails" asp-route-id="@row.BookingId">#@row.BookingId</a></td>
+                            <td>@ThaiText.OrDash(row.GuestName)<div class="text-muted small">@row.Phone</div></td>
+                            <td>@ThaiText.OrDash(row.RoomNumber)</td>
+                            <td class="num">@ThaiText.Date(row.CheckOut)</td>
+                            <td>@(row.Guests?.ToString() ?? "-")</td>
+                            <td>
+                                <span class="badge @(row.IsPaid ? "text-bg-success" : "text-bg-warning")">
+                                    @(row.IsPaid ? "จ่ายแล้ว" : "ยังไม่จ่าย")
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                @if (row.IsPaid)
+                                {
+                                    <form asp-action="CheckIn" method="post" class="d-inline">
+                                        <input type="hidden" name="bookingId" value="@row.BookingId" />
+                                        <input type="hidden" name="fromDashboard" value="true" />
+                                        <button type="submit" class="btn btn-sm btn-primary">เช็คอิน</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <a asp-controller="Payment" asp-action="Details" asp-route-id="@row.BookingId"
+                                       class="btn btn-sm btn-outline-primary">รับชำระเงิน</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@* ---------- แขกที่ต้องเช็คเอาท์ ---------- *@
+<section class="table-panel">
+    <div class="panel-head">
+        <h2>แขกที่ต้องเช็คเอาท์</h2>
+        <span class="text-muted small">วันออกคือวันนี้ หรือเลยกำหนดแล้ว</span>
+    </div>
+    @if (Model.Departures.Count == 0)
+    {
+        <p class="panel-empty">ไม่มีแขกที่ต้องเช็คเอาท์วันนี้</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th>การจอง</th><th>ลูกค้า</th><th>ห้อง</th><th>วันออก</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var row in Model.Departures)
+                    {
+                        <tr>
+                            <td><a asp-action="BookingDetails" asp-route-id="@row.BookingId">#@row.BookingId</a></td>
+                            <td>@ThaiText.OrDash(row.GuestName)<div class="text-muted small">@row.Phone</div></td>
+                            <td>@ThaiText.OrDash(row.RoomNumber)</td>
+                            <td class="num">
+                                @ThaiText.Date(row.CheckOut)
+                                @if (row.CheckOut < today) { <span class="badge text-bg-danger ms-1">เลยกำหนด</span> }
+                            </td>
+                            <td class="text-end">
+                                <form asp-action="CheckOut" method="post" class="d-inline"
+                                      onsubmit="return confirm('เช็คเอาท์การจอง #@row.BookingId ห้อง @row.RoomNumber ?');">
+                                    <input type="hidden" name="bookingId" value="@row.BookingId" />
+                                    <input type="hidden" name="fromDashboard" value="true" />
+                                    <button type="submit" class="btn btn-sm btn-primary">เช็คเอาท์</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </section>

@@ -17,7 +17,6 @@
             <div class="room-body h-100 d-flex flex-column">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                     <div>
-                        <span class="eyebrow text-dark">การจอง #@booking.BookingId</span>
                         <h3 class="h4 mt-2 mb-1">@(booking.RoomType ?? "ห้องพัก")</h3>
                         <span class="text-muted">@(booking.RoomNumber ?? "ไม่ระบุ")</span>
                     </div>
@@ -49,6 +48,7 @@
                         <small>ยอดรวม</small>
                     </div>
                     <p class="mt-2 mb-1">การชำระเงิน: @ThaiText.Status(booking.PaymentStatus)</p>
+                    <partial name="_PaymentDeadline" model="booking.PaymentDueAtUtc" />
                     @if (booking.IsMockPayment)
                     {
                         <p>การชำระเงินจำลอง ไม่มีการโอนเงินจริง</p>

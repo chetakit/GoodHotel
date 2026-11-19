@@ -27,6 +27,8 @@ builder.Services.AddScoped<RoomStatusService>();
 builder.Services.AddScoped<WalkInService>();
 builder.Services.AddScoped<UserDirectory>();
 builder.Services.AddScoped<PromotionService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<UserAccessCache>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 
@@ -44,6 +46,12 @@ builder.Services.AddDbContext<GoodHotelDbContext>(
         serverVersion
     )
 );
+// factory สำหรับ ParallelReader (สร้าง DbContext แยกเพื่อยิง query พร้อมกัน)
+builder.Services.AddDbContextFactory<GoodHotelDbContext>(
+    options => options.UseMySql(connectionString, serverVersion),
+    ServiceLifetime.Scoped);
+builder.Services.AddScoped<ParallelReader>();
+builder.Services.AddScoped<FinanceLedger>();
 
 
 // Password Hashing
@@ -70,9 +78,9 @@ builder.Services.AddAuthentication(
             return;
         }
 
-        var db = context.HttpContext.RequestServices.GetRequiredService<GoodHotelDbContext>();
-        var currentUser = await db.Users.AsNoTracking().Where(u => u.UserId == userId)
-            .Select(u => new { u.Role, u.IsActive }).SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+        var services = context.HttpContext.RequestServices;
+        var currentUser = await services.GetRequiredService<UserAccessCache>().GetAsync(
+            services.GetRequiredService<GoodHotelDbContext>(), userId, context.HttpContext.RequestAborted);
         if (currentUser == null || !currentUser.IsActive ||
             !string.Equals(currentUser.Role, role, StringComparison.Ordinal))
         {
@@ -84,6 +92,10 @@ builder.Services.AddAuthentication(
 
 builder.Services.AddAuthorization();
 
+// กำหนดเวลาชำระเงินหลังจอง (ค่าเริ่มต้น 15 นาที) และตัวยกเลิกการจองที่หมดเวลาทุก 30 วินาที
+PaymentDeadline.Configure(builder.Configuration);
+builder.Services.AddHostedService<PaymentDeadlineSweeper>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -94,6 +106,18 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// เปิด connection ฐานข้อมูลค้างไว้ตลอด 1 request
+// ปกติ EF เปิด/ปิด connection ทุก query และทุกครั้งที่หยิบจาก pool ต้อง reset
+// ทำให้แต่ละ query ใช้ ~370ms (ไปกลับ Railway 2 รอบ) เปิดค้างไว้เหลือ ~200ms ต่อ query
+// (ลองใช้ interceptor กันไม่ให้ EF ปิดแล้ว ช้ากว่าเดิม จึงใช้วิธีนี้)
+app.Use(async (context, next) =>
+{
+    var db = context.RequestServices.GetRequiredService<GoodHotelDbContext>();
+    await db.Database.OpenConnectionAsync(context.RequestAborted);
+    try { await next(); }
+    finally { await db.Database.CloseConnectionAsync(); }
+});
 
 app.UseRouting();
 

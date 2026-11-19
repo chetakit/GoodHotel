@@ -9,7 +9,6 @@
 <section class="content-section">
     <div class="container">
         <div class="section-heading">
-            <span class="eyebrow text-dark">Your Stay</span>
             <h2>การจองของฉัน</h2>
             <p>รายการห้องพักที่จองไว้กับ Good Hotel</p>
         </div>
@@ -52,7 +51,10 @@
                 <div class="tab-pane fade show active" id="tab-upcoming" role="tabpanel">
                     @if (upcoming.Count == 0)
                     {
-                        <p class="text-muted">ไม่มีการจองที่กำลังจะมาถึง</p>
+                        <div class="feature-box">
+                            <p class="mb-2">ไม่มีการจองที่กำลังจะมาถึง</p>
+                            <a asp-controller="Home" asp-action="Rooms" class="btn btn-primary btn-sm">ค้นหาห้องว่าง</a>
+                        </div>
                     }
                     <div class="row g-4">
                         @foreach (var booking in upcoming)
@@ -65,7 +67,7 @@
                 <div class="tab-pane fade" id="tab-history" role="tabpanel">
                     @if (history.Count == 0)
                     {
-                        <p class="text-muted">ยังไม่มีประวัติการเข้าพัก</p>
+                        <div class="feature-box text-muted">ยังไม่มีประวัติการเข้าพัก</div>
                     }
                     <div class="row g-4">
                         @foreach (var booking in history)
@@ -74,10 +76,6 @@
                         }
                     </div>
                 </div>
-            </div>
-
-            <div class="mt-4 text-center">
-                <a asp-controller="Home" asp-action="Rooms" class="btn btn-primary hotel-primary-btn">ค้นหาห้องพักเพิ่มเติม</a>
             </div>
         }
     </div>

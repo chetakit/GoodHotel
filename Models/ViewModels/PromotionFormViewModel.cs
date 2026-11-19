@@ -8,7 +8,7 @@ public class PromotionFormViewModel
 {
     public int? PromotionId { get; set; }
 
-    [Required(ErrorMessage = "กรุณากรอกชื่อโปรโมชั่น")]
+    [Required(ErrorMessage = "กรุณากรอกชื่อโปรโมชัน")]
     [StringLength(100)]
     public string? PromotionName { get; set; }
 

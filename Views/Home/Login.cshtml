@@ -5,7 +5,7 @@
 <section class="content-section">
     <div class="container">
         <div class="auth-card">
-            <ul class="nav nav-pills mb-4 justify-content-center">
+            <ul class="nav nav-pills nav-fill mb-4">
                 <li class="nav-item">
                     <a class="nav-link active" asp-controller="Home" asp-action="Login">เข้าสู่ระบบ</a>
                 </li>
@@ -14,52 +14,33 @@
                 </li>
             </ul>
 
-            <div class="row g-4 align-items-center">
-                <div class="col-lg-6">
-                    <h2 class="mb-3">ยินดีต้อนรับกลับมา</h2>
-                    @if (TempData["RegisterSuccessMessage"] is string successMessage)
-                    {
-                        <div class="alert alert-success" role="alert">@successMessage</div>
-                    }
-                    @if (ViewBag.Status != null)
-                    {
-                        <div class="alert alert-danger">
-                            @ViewBag.Status
-                        </div>
-                    }
-                    <p class="text-muted">เข้าสู่ระบบเพื่อจัดการการจอง ตรวจสอบสถานะห้องพัก และดูประวัติการเข้าพัก</p>
-                    <form asp-controller="Home" asp-action="Login" method="post">
-                        <div class="col-12">
-                            <label class="form-label">อีเมล</label>
-                            <input type="email" name="Email" class="form-control" placeholder="guest@gmail.com" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">รหัสผ่าน</label>
-                            <input type="password" name="Password"class="form-control" placeholder="กรอกรหัสผ่าน" />
-                        </div>
-                        <div class="col-12 d-flex justify-content-between">
-                            @* <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="rememberMe" />
-                                <label class="form-check-label" for="rememberMe">จดจำฉันไว้</label>
-                            </div> *@
-                            @* <a href="#" class="text-decoration-none">Forgot password?</a> *@
-                        </div>
-                        <button type="submit" class="btn btn-primary hotel-primary-btn w-100">
-                             เข้าสู่ระบบ
-                        </button>
-                    </form>
-                </div>
+            <h2 class="h4 mb-1">เข้าสู่ระบบ</h2>
+            <p class="text-muted small mb-3">ลูกค้าและพนักงานใช้หน้านี้เหมือนกัน ระบบจะพาไปหน้าของแต่ละคนเอง</p>
 
-                <div class="col-lg-6">
-                    <div class="summary-card h-100">
-                        <h4 class="text-white mb-3">สิทธิ์ของสมาชิก</h4>
-                        <div class="summary-line"><span>จองได้รวดเร็ว</span><strong>✓</strong></div>
-                        <div class="summary-line"><span>รับโปรโมชั่นอัตโนมัติ</span><strong>✓</strong></div>
-                        <div class="summary-line"><span>ยกเลิกการจองออนไลน์ได้</span><strong>✓</strong></div>
-                        <div class="summary-line"><span>ดูประวัติการเข้าพัก</span><strong>✓</strong></div>
-                    </div>
+            @if (TempData["RegisterSuccessMessage"] is string successMessage)
+            {
+                <div class="alert alert-success" role="status">@successMessage</div>
+            }
+            @if (ViewBag.Status != null)
+            {
+                <div class="alert alert-danger" role="alert">@ViewBag.Status</div>
+            }
+
+            <form asp-controller="Home" asp-action="Login" method="post">
+                <div class="mb-3">
+                    <label class="form-label" for="login-email">อีเมล</label>
+                    <input id="login-email" type="email" name="Email" class="form-control" autocomplete="username" required />
                 </div>
-            </div>
+                <div class="mb-4">
+                    <label class="form-label" for="login-password">รหัสผ่าน</label>
+                    <input id="login-password" type="password" name="Password" class="form-control" autocomplete="current-password" required />
+                </div>
+                <button type="submit" class="btn btn-primary w-100">เข้าสู่ระบบ</button>
+            </form>
+
+            <p class="text-muted small text-center mt-3 mb-0">
+                ยังไม่มีบัญชี? <a asp-controller="Home" asp-action="Register">สมัครสมาชิก</a>
+            </p>
         </div>
     </div>
 </section>

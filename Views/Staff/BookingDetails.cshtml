@@ -1,18 +1,13 @@
 @model GoodHotel.Controllers.StaffController.BookingDetailsModel
 
 @{
-    ViewData["Title"] = "รายละเอียดการจอง";
+    ViewData["Title"] = $"การจอง #{Model.BookingId}";
     var customerName = $"{Model.FirstName} {Model.LastName}".Trim();
     var isPaid = Model.PaymentLabel == PaymentService.PaidLabel;
 }
 
 <section class="content-section">
     <div class="container">
-        <div class="section-heading">
-            <span class="eyebrow text-dark">Front Desk</span>
-            <h2>รายละเอียดการจอง #@Model.BookingId</h2>
-        </div>
-
         @if (TempData["StaffSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
         @if (TempData["StaffError"] is string error) { <div class="alert alert-warning" role="alert">@error</div> }
 
@@ -30,7 +25,7 @@
                 <dd class="col-sm-7 col-lg-8">@(Model.Guests?.ToString() ?? "-")</dd>
                 <dt class="col-sm-5 col-lg-4">เตียงเสริม</dt>
                 <dd class="col-sm-7 col-lg-8">@(Model.ExtraBed?.ToString() ?? "0")</dd>
-                <dt class="col-sm-5 col-lg-4">โปรโมชั่น</dt>
+                <dt class="col-sm-5 col-lg-4">โปรโมชัน</dt>
                 <dd class="col-sm-7 col-lg-8">@ThaiText.OrDash(Model.PromotionName)</dd>
                 <dt class="col-sm-5 col-lg-4">ยอดรวม</dt>
                 <dd class="col-sm-7 col-lg-8">@(Model.Amount.HasValue ? $"฿{Model.Amount:N2}" : "-")</dd>

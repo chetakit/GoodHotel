@@ -1,227 +1,107 @@
 @model GoodHotel.Models.ViewModels.AdminReportsViewModel
 
 @{
-    Layout = "_AdminLayout";
     ViewData["Title"] = "รายงาน";
 
-    string StatusClass(string? status) => status?.Trim().ToLowerInvariant() switch
+    string Badge(string? status) => status switch
     {
-        "paid" or "resolved" or "verified" => "reports-status-success",
-        "pending" or "open" or "submitted" => "reports-status-warning",
-        "accepted" or "inprogress" or "in progress" or "completed" => "reports-status-info",
-        "rejected" or "cancelled" or "canceled" => "reports-status-danger",
-        _ => "reports-status-neutral"
+        "Resolved" or "Verified" => "text-bg-success",
+        "Open" or "Pending" => "text-bg-warning",
+        "In Progress" or "Accepted" or "InProgress" or "Completed" => "text-bg-info",
+        _ => "text-bg-secondary"
     };
+    var maxPromo = Model.PromotionUsage.Select(p => p.BookingCount).DefaultIfEmpty(0).Max();
 }
 
-<style>
-    .reports-page { color: var(--hotel-ink); }
-    .reports-intro { color: var(--hotel-muted); margin: 0 0 1.25rem; }
-    .reports-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-    @@media (min-width: 768px) {
-        .reports-grid { grid-auto-rows: 1fr; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    @@media (min-width: 1200px) {
-        .reports-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    }
-    .reports-card {
-        background: #fff;
-        border: 1px solid var(--hotel-border);
-        border-radius: 1rem;
-        box-shadow: 0 6px 18px rgba(17, 38, 61, 0.04);
-        height: 100%;
-        padding: 1.4rem;
-    }
-    .reports-card h3, .reports-panel h3 {
-        color: var(--hotel-navy);
-        font-size: 1rem;
-        font-weight: 700;
-        margin: 0;
-    }
-    .reports-value {
-        color: var(--hotel-navy);
-        font-size: clamp(1.6rem, 3vw, 2rem);
-        font-weight: 800;
-        line-height: 1.2;
-        margin: 1rem 0 0.5rem;
-        overflow-wrap: anywhere;
-    }
-    .reports-note { color: #596575; font-size: 0.875rem; line-height: 1.5; margin: 0; }
-    .reports-simulation { color: #795116; font-weight: 700; margin-top: 0.5rem; }
-    .reports-status-list { margin: 0.75rem 0 0; }
-    .reports-status-row {
-        align-items: center;
-        border-top: 1px solid var(--hotel-border);
-        display: flex;
-        gap: 0.75rem;
-        justify-content: space-between;
-        padding: 0.6rem 0;
-    }
-    .reports-status-row dt, .reports-status-row dd { margin: 0; }
-    .reports-status-row dd { color: var(--hotel-navy); font-weight: 700; }
-    .reports-status {
-        border-radius: 999px;
-        display: inline-block;
-        font-size: 0.78rem;
-        font-weight: 700;
-        line-height: 1.35;
-        padding: 0.3rem 0.65rem;
-    }
-    .reports-status-success { background: #e3f3eb; color: #17613f; }
-    .reports-status-warning { background: #fff2d6; color: #805100; }
-    .reports-status-info { background: #e7f0fa; color: #24577c; }
-    .reports-status-danger { background: #fbe9e9; color: #9c3333; }
-    .reports-status-neutral { background: #edf0f3; color: #465361; }
-    .reports-panel { height: auto; margin-top: 1.25rem; }
-    .reports-table { margin-bottom: 0; min-width: 460px; }
-    .reports-table th {
-        color: #596575;
-        font-size: 0.78rem;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        white-space: nowrap;
-    }
-    .reports-table td, .reports-table th { padding: 0.9rem 0.75rem; vertical-align: middle; }
-    .reports-table tbody tr:last-child > * { border-bottom: 0; }
-    .reports-empty { color: var(--hotel-muted); padding: 1rem 0 0; }
-</style>
+@section Actions {
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportBookings">การจอง CSV</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportMaintenanceReports">งานซ่อม CSV</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportHousekeepingTasks">งานทำความสะอาด CSV</a>
+}
 
-<div class="reports-page">
-    <p class="reports-intro">ภาพรวมการจอง การชำระเงิน และงานของโรงแรมตั้งแต่เปิดระบบ</p>
+<div class="figures">
+    <div class="figure">
+        <div class="label">การจอง</div>
+        <div class="value">@Model.BookingCount.ToString("N0")</div>
+        <div class="note">ยกเลิกแล้ว @Model.CancelledBookingCount.ToString("N0") รายการ</div>
+    </div>
+    <div class="figure">
+        <div class="label">ยกเลิกเพราะไม่ชำระตามกำหนด</div>
+        <div class="value">@Model.PaymentTimeoutCount.ToString("N0")</div>
+        <div class="note">ระบบยกเลิกอัตโนมัติ @PaymentDeadline.Window.TotalMinutes นาทีหลังจอง</div>
+    </div>
+    <div class="figure">
+        <div class="label">ระยะเวลาเข้าพักเฉลี่ย</div>
+        <div class="value">@(Model.AverageActualStayNights.HasValue ? $"{Model.AverageActualStayNights.Value:N1} คืน" : "-")</div>
+        <div class="note">จากการเข้าพักที่เช็คเอาท์แล้ว @Model.CompletedStaysWithValidDates ครั้ง</div>
+    </div>
+</div>
 
-    <div class="reports-grid">
-            <section class="reports-card" aria-labelledby="report-bookings">
-                <h3 id="report-bookings">การจองทั้งหมด</h3>
-                <p class="reports-value">@Model.BookingCount.ToString("N0")</p>
-                <p class="reports-note">ไม่นับที่ยกเลิก (ยกเลิกแล้ว @Model.CancelledBookingCount.ToString("N0") รายการ)</p>
-            </section>
-            <section class="reports-card" aria-labelledby="report-booking-value">
-                <h3 id="report-booking-value">มูลค่าการจอง (บาท)</h3>
-                <p class="reports-value">@(Model.BookingAmount?.ToString("N2") ?? "N/A")</p>
-                <p class="reports-note">ยอดรวมของการจองที่ไม่ได้ยกเลิก</p>
-            </section>
-            <section class="reports-card" aria-labelledby="report-revenue">
-                <h3 id="report-revenue">รายได้ (บาท)</h3>
-                <p class="reports-value">@(Model.Revenue?.ToString("N2") ?? "N/A")</p>
-                <p class="reports-note">เงินที่ยืนยันแล้ว หักยอดคืนเงินที่อนุมัติ</p>
-                <p class="reports-note reports-simulation">รวมการชำระเงินจำลอง (ไม่ใช่เงินจริง)</p>
-            </section>
-            <section class="reports-card" aria-labelledby="report-stay">
-                <h3 id="report-stay">ระยะเวลาเข้าพักเฉลี่ย</h3>
-                <p class="reports-value">@(Model.AverageActualStayNights.HasValue ? $"{Model.AverageActualStayNights.Value:N2} คืน" : "N/A")</p>
-                <p class="reports-note">คิดจากการเข้าพักที่เช็คเอาท์แล้ว @Model.CompletedStaysWithValidDates ครั้ง (เวลาไทย)</p>
-            </section>
-            <section class="reports-card" aria-labelledby="report-maintenance">
-                <h3 id="report-maintenance">งานซ่อม</h3>
-                @if (Model.MaintenanceByStatus.Count == 0)
-                {
-                    <p class="reports-note reports-empty">ยังไม่มีงานซ่อม</p>
-                }
-                else
-                {
-                    <dl class="reports-status-list">
-                        @foreach (var item in Model.MaintenanceByStatus)
-                        {
-                            <div class="reports-status-row">
-                                <dt><span class="reports-status @StatusClass(item.Status)">@ThaiText.Status(item.Status)</span></dt>
-                                <dd>@item.Count</dd>
-                            </div>
-                        }
-                    </dl>
-                }
-            </section>
-            <section class="reports-card" aria-labelledby="report-housekeeping">
-                <h3 id="report-housekeeping">งานทำความสะอาด</h3>
-                @if (Model.HousekeepingByStatus.Count == 0)
-                {
-                    <p class="reports-note reports-empty">ยังไม่มีงานทำความสะอาด</p>
-                }
-                else
-                {
-                    <dl class="reports-status-list">
+<div class="row g-3">
+    <div class="col-lg-6">
+        <section class="table-panel h-100">
+            <div class="panel-head"><h2>งานทำความสะอาด</h2></div>
+            @if (Model.HousekeepingByStatus.Count == 0)
+            {
+                <p class="panel-empty">ยังไม่มีงาน</p>
+            }
+            else
+            {
+                <table class="table">
+                    <tbody>
                         @foreach (var item in Model.HousekeepingByStatus)
                         {
-                            <div class="reports-status-row">
-                                <dt><span class="reports-status @StatusClass(item.Status)">@ThaiText.Status(item.Status)</span></dt>
-                                <dd>@item.Count</dd>
-                            </div>
+                            <tr><td><span class="badge @Badge(item.Status)">@ThaiText.Status(item.Status)</span></td><td class="text-end num">@item.Count</td></tr>
                         }
-                    </dl>
-                }
-            </section>
+                    </tbody>
+                </table>
+            }
+        </section>
     </div>
-
-    <section class="reports-card reports-panel" aria-labelledby="report-promotions">
-        <h3 id="report-promotions">การใช้โปรโมชั่น</h3>
-        <p class="reports-note mt-2">นับเฉพาะการจองที่ไม่ได้ยกเลิก</p>
-        @if (Model.PromotionUsage.Count == 0)
-        {
-            <p class="reports-note reports-empty">ยังไม่มีการจองที่ใช้โปรโมชั่น</p>
-        }
-        else
-        {
-            <div class="table-responsive mt-3">
-                <table class="table reports-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">โปรโมชั่น</th>
-                            <th scope="col" class="text-end">จำนวนการจอง</th>
-                            <th scope="col" class="text-end">ยอดจองรวม (บาท)</th>
-                        </tr>
-                    </thead>
+    <div class="col-lg-6">
+        <section class="table-panel h-100">
+            <div class="panel-head"><h2>งานซ่อม</h2></div>
+            @if (Model.MaintenanceByStatus.Count == 0)
+            {
+                <p class="panel-empty">ยังไม่มีงานซ่อม</p>
+            }
+            else
+            {
+                <table class="table">
                     <tbody>
-                        @foreach (var promotion in Model.PromotionUsage)
+                        @foreach (var item in Model.MaintenanceByStatus)
                         {
-                            <tr>
-                                <td>@promotion.PromotionName</td>
-                                <td class="text-end">@promotion.BookingCount</td>
-                                <td class="text-end">@promotion.BookingAmount.ToString("N2")</td>
-                            </tr>
+                            <tr><td><span class="badge @Badge(item.Status)">@ThaiText.Status(item.Status)</span></td><td class="text-end num">@item.Count</td></tr>
                         }
                     </tbody>
                 </table>
+            }
+        </section>
+    </div>
+    <div class="col-12">
+        <section class="table-panel">
+            <div class="panel-head">
+                <h2>การใช้โปรโมชัน</h2>
+                <a asp-action="Promotion">จัดการโปรโมชัน</a>
             </div>
-        }
-    </section>
-
-    <section class="reports-card reports-panel" aria-labelledby="report-payments">
-        <h3 id="report-payments">ยอดชำระเงินแยกตามสถานะ</h3>
-        <p class="reports-note mt-2">มีรายการชำระเงินทั้งหมด @Model.PaymentCount รายการ (ตัวเลขด้านล่างเป็นยอดตามที่บันทึก ไม่ใช่รายได้ที่ยืนยันแล้ว)</p>
-        @if (Model.PaymentsByStatus.Count == 0)
-        {
-            <p class="reports-note reports-empty">ยังไม่มีรายการชำระเงิน</p>
-        }
-        else
-        {
-            <div class="table-responsive mt-3">
-                <table class="table reports-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">สถานะ</th>
-                            <th scope="col" class="text-end">จำนวนรายการ</th>
-                            <th scope="col" class="text-end">ยอดเงิน (บาท)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var payment in Model.PaymentsByStatus)
-                        {
-                            <tr>
-                                <td><span class="reports-status @StatusClass(payment.Status)">@ThaiText.Status(payment.Status)</span></td>
-                                <td class="text-end">@payment.Count</td>
-                                <td class="text-end">@(payment.Amount?.ToString("N2") ?? "N/A")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </section>
-
-    <section class="reports-card reports-panel" aria-labelledby="report-scope">
-        <h3 id="report-scope">ขอบเขตของรายงาน</h3>
-        <p class="reports-note mt-2">
-            รายได้รวมการชำระเงินจำลอง ไม่ใช่เงินที่ได้รับจริง
-            ไม่นับข้อมูลการชำระเงินเก่าที่ยังไม่ได้ตรวจสอบ และระยะเวลาเข้าพักคิดเฉพาะการเข้าพักที่เช็คเอาท์แล้ว
-        </p>
-    </section>
+            @if (Model.PromotionUsage.Count == 0)
+            {
+                <p class="panel-empty">ยังไม่มีการจองที่ใช้โปรโมชัน</p>
+            }
+            else
+            {
+                <div class="p-3">
+                    @foreach (var promotion in Model.PromotionUsage)
+                    {
+                        <div class="bar-row">
+                            <span>@promotion.PromotionName</span>
+                            <div class="bar-track"><div class="bar-fill" style="width: @(maxPromo == 0 ? 0 : promotion.BookingCount * 100 / maxPromo)%"></div></div>
+                            <span class="text-end num">@promotion.BookingCount การจอง</span>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
 </div>
+<p class="text-muted small mt-2">ตัวเลขรายได้และการชำระเงินย้ายไปอยู่ที่หน้าฝ่ายบัญชี</p>

@@ -28,7 +28,7 @@ public sealed record RoomStatusItem(
 /// ช่อง Room.Status ในฐานข้อมูลถูกแก้โดย Admin/งานซ่อมเท่านั้น
 /// สถานะจริงจึงต้องรวมจาก การเข้าพัก + งานทำความสะอาด + งานซ่อม + การจองของวันนี้
 /// </summary>
-public sealed class RoomStatusService(GoodHotelDbContext db, RoomAvailabilityService availability)
+public sealed class RoomStatusService(RoomAvailabilityService availability, ParallelReader reader)
 {
     /// <summary>ชื่อสถานะภาษาไทย (ใช้ทั้งหน้า Staff Room Status และ Admin Dashboard)</summary>
     public static string Label(RoomLiveStatus status) => status switch
@@ -45,11 +45,12 @@ public sealed class RoomStatusService(GoodHotelDbContext db, RoomAvailabilitySer
     {
         var today = availability.HotelToday();
 
-        var rooms = await db.Rooms.AsNoTracking()
+        // 5 query นี้ไม่ขึ้นต่อกัน ยิงพร้อมกันได้
+        var roomsTask = reader.Run(db => db.Rooms.AsNoTracking()
             .OrderBy(r => r.Room1)
-            .ToListAsync(ct);
+            .ToListAsync(ct));
 
-        var activeStays = await db.BookingStays.AsNoTracking()
+        var staysTask = reader.Run(db => db.BookingStays.AsNoTracking()
             .Where(s => s.Status == "CheckedIn" && s.Booking.RoomId != null)
             .Select(s => new
             {
@@ -58,20 +59,20 @@ public sealed class RoomStatusService(GoodHotelDbContext db, RoomAvailabilitySer
                 s.Booking.CheckOut,
                 GuestName = s.Booking.User == null ? null : s.Booking.User.FirstName + " " + s.Booking.User.LastName
             })
-            .ToListAsync(ct);
+            .ToListAsync(ct));
 
-        var cleaningTasks = await db.HousekeepingTasks.AsNoTracking()
+        var cleaningTask = reader.Run(db => db.HousekeepingTasks.AsNoTracking()
             .Where(t => t.TaskType == "CheckoutCleaning" && t.Status != "Verified")
             .Select(t => new { t.RoomId, t.Status })
-            .ToListAsync(ct);
+            .ToListAsync(ct));
 
-        var maintenanceRoomIds = await db.MaintenanceReports.AsNoTracking()
+        var maintenanceTask = reader.Run(db => db.MaintenanceReports.AsNoTracking()
             .Where(r => r.Status != MaintenanceReport.Resolved)
             .Select(r => r.RoomId)
             .Distinct()
-            .ToListAsync(ct);
+            .ToListAsync(ct));
 
-        var arrivalsToday = await db.Bookings.AsNoTracking()
+        var arrivalsTask = reader.Run(db => db.Bookings.AsNoTracking()
             .Where(b => b.Status == BookingStatuses.Booked &&
                         b.RoomId != null &&
                         b.CheckIn == today &&
@@ -82,7 +83,14 @@ public sealed class RoomStatusService(GoodHotelDbContext db, RoomAvailabilitySer
                 b.BookingId,
                 GuestName = b.User == null ? null : b.User.FirstName + " " + b.User.LastName
             })
-            .ToListAsync(ct);
+            .ToListAsync(ct));
+
+        await Task.WhenAll(roomsTask, staysTask, cleaningTask, maintenanceTask, arrivalsTask);
+        var rooms = roomsTask.Result;
+        var activeStays = staysTask.Result;
+        var cleaningTasks = cleaningTask.Result;
+        var maintenanceRoomIds = maintenanceTask.Result;
+        var arrivalsToday = arrivalsTask.Result;
 
         return rooms.Select(room =>
         {
@@ -96,8 +104,12 @@ public sealed class RoomStatusService(GoodHotelDbContext db, RoomAvailabilitySer
                     $"{stay.GuestName} · ออก {stay.CheckOut?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}",
                     stay.BookingId);
 
-            if (room.Status == "Maintenance" || maintenanceRoomIds.Contains(room.RoomId))
+            if (maintenanceRoomIds.Contains(room.RoomId))
                 return Item(room, RoomLiveStatus.Maintenance, "มีรายการแจ้งซ่อมที่ยังไม่เสร็จ");
+
+            // ไม่มีงานซ่อมค้าง แต่ Admin ตั้งห้องเป็นซ่อมบำรุงไว้ (หรือปิดงานซ่อมแล้วยังไม่ได้เปิดห้อง)
+            if (room.Status == "Maintenance")
+                return Item(room, RoomLiveStatus.Maintenance, "Admin ตั้งเป็นซ่อมบำรุงไว้ (ไม่มีงานซ่อมค้าง) เปิดห้องได้ที่หน้าจัดการห้อง");
 
             if (cleaning != null)
                 return Item(room, RoomLiveStatus.Cleaning, $"งานทำความสะอาด: {ThaiText.Status(cleaning.Status)}");

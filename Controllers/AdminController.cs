@@ -31,6 +31,8 @@ namespace GoodHotel.Controllers
         private readonly HousekeepingService _housekeeping;
         private readonly RoomAvailabilityService _availability;
         private readonly RoomStatusService _roomStatus;
+        private readonly UserAccessCache _userAccess;
+        private readonly ParallelReader _reader;
 
         public AdminController(
             GoodHotelDbContext db,
@@ -39,9 +41,13 @@ namespace GoodHotel.Controllers
             IWebHostEnvironment environment,
             HousekeepingService housekeeping,
             RoomAvailabilityService availability,
-            RoomStatusService roomStatus)
+            RoomStatusService roomStatus,
+            UserAccessCache userAccess,
+            ParallelReader reader)
         {
             _roomStatus = roomStatus;
+            _userAccess = userAccess;
+            _reader = reader;
             _db = db;
             _passwordHasher = passwordHasher;
             _logger = logger;
@@ -53,7 +59,40 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> Dashboard(CancellationToken ct)
         {
             // สถานะห้องจริง (ดูจากการเข้าพัก/งานทำความสะอาด/งานซ่อม) ให้ตรงกับหน้า Room Status ของ Staff
-            var roomBoard = await _roomStatus.GetRoomBoardAsync(ct);
+            // ยิงพร้อมกัน 3 ชุด: สถานะห้อง, ตัวเลขสรุป (query เดียว), การจองล่าสุด
+            var boardTask = _roomStatus.GetRoomBoardAsync(ct);
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var countsTask = _reader.Run(db => db.Users.Where(u => u.UserId == userId).Select(_ => new
+            {
+                // ใส่เงื่อนไขไว้ ไม่งั้น EF แยก Count() เปล่าๆ ไปยิงเป็น query ต่างหากก่อน
+                Rooms = db.Rooms.Count(r => r.RoomId > 0),
+                Users = db.Users.Count(x => x.UserId > 0),
+                Bookings = db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
+                OpenMaintenance = db.MaintenanceReports.Count(r => r.Status == "Open"),
+                PendingHousekeeping = db.HousekeepingTasks.Count(t => t.Status == "Pending"),
+                AwaitingVerification = db.HousekeepingTasks.Count(t => t.Status == "Completed")
+            }).SingleAsync(ct));
+            var revenueTask = _reader.Run(db => RevenueAsync(db, ct));
+            var recentTask = _reader.Run(db => db.Bookings
+                .Where(booking => booking.CheckIn.HasValue && booking.Status != BookingStatuses.Cancelled)
+                .OrderByDescending(booking => booking.CheckIn)
+                .ThenByDescending(booking => booking.BookingId)
+                .Take(5)
+                .Select(booking => new DashboardBookingViewModel
+                {
+                    BookingId = booking.BookingId,
+                    GuestName = booking.User == null
+                        ? null
+                        : (booking.User.FirstName ?? "") + " " + (booking.User.LastName ?? ""),
+                    RoomNumber = booking.Room == null ? null : booking.Room.Room1,
+                    CheckIn = booking.CheckIn,
+                    Amount = booking.Amount
+                })
+                .ToListAsync(ct));
+            await Task.WhenAll(boardTask, countsTask, revenueTask, recentTask);
+
+            var roomBoard = boardTask.Result;
+            var counts = countsTask.Result;
             var liveRoomCounts = roomBoard
                 .GroupBy(room => room.Status)
                 .OrderBy(group => group.Key)
@@ -64,42 +103,30 @@ namespace GoodHotel.Controllers
                 })
                 .ToList();
 
-            var confirmedPayments = PaymentService.ConfirmedForRevenue(_db.Payments);
             var model = new AdminDashboardViewModel
             {
-                RoomCount = _db.Rooms.Count(),
-                UserCount = _db.Users.Count(),
-                BookingCount = _db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
-                Revenue = (confirmedPayments.Sum(p => p.Amount) ?? 0m) -
-                    (_db.PaymentRefunds.Where(r => r.Status == "Approved" &&
-                        confirmedPayments.Any(payment => payment.PaymentId == r.PaymentId))
-                        .Sum(r => (decimal?)r.Amount) ?? 0m),
-                OpenMaintenanceCount = _db.MaintenanceReports.Count(r => r.Status == "Open"),
-                PendingHousekeepingCount = _db.HousekeepingTasks.Count(t => t.Status == "Pending"),
-                AwaitingVerificationCount = _db.HousekeepingTasks.Count(t => t.Status == "Completed"),
+                RoomCount = counts.Rooms,
+                UserCount = counts.Users,
+                BookingCount = counts.Bookings,
+                Revenue = revenueTask.Result,
+                OpenMaintenanceCount = counts.OpenMaintenance,
+                PendingHousekeepingCount = counts.PendingHousekeeping,
+                AwaitingVerificationCount = counts.AwaitingVerification,
                 RoomStatusCounts = liveRoomCounts,
-                BookingsByCheckInDate = _db.Bookings
-                    .Where(booking => booking.CheckIn.HasValue && booking.Status != BookingStatuses.Cancelled)
-                    .OrderByDescending(booking => booking.CheckIn)
-                    .ThenByDescending(booking => booking.BookingId)
-                    .Take(5)
-                    .Select(booking => new DashboardBookingViewModel
-                    {
-                        BookingId = booking.BookingId,
-                        GuestName = booking.User == null
-                            ? null
-                            : (booking.User.FirstName ?? "") + " " +
-                              (booking.User.LastName ?? ""),
-                        RoomNumber = booking.Room == null
-                            ? null
-                            : booking.Room.Room1,
-                        CheckIn = booking.CheckIn,
-                        Amount = booking.Amount
-                    })
-                    .ToList()
+                BookingsByCheckInDate = recentTask.Result
             };
 
             return View(model);
+        }
+
+        /// <summary>รายได้สุทธิ = ยอดชำระที่ยืนยันแล้ว - เงินที่อนุมัติคืน (query เดียว)</summary>
+        internal static async Task<decimal> RevenueAsync(GoodHotelDbContext db, CancellationToken ct)
+        {
+            var confirmed = PaymentService.ConfirmedForRevenue(db.Payments);
+            return await confirmed
+                .Select(p => (p.Amount ?? 0m) -
+                    (p.Refunds.Where(r => r.Status == "Approved").Sum(r => (decimal?)r.Amount) ?? 0m))
+                .SumAsync(ct);
         }
 
         public async Task<IActionResult> Rooms(CancellationToken ct)
@@ -653,7 +680,7 @@ namespace GoodHotel.Controllers
             var promotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionId == id, ct);
             if (promotion == null)
             {
-                TempData["PromotionErrorMessage"] = "ไม่พบโปรโมชั่นนี้";
+                TempData["PromotionErrorMessage"] = "ไม่พบโปรโมชันนี้";
                 return RedirectToAction(nameof(Promotion));
             }
 
@@ -819,7 +846,7 @@ namespace GoodHotel.Controllers
                         ModelState.AddModelError(nameof(data.Email), "อีเมลนี้ถูกใช้งานแล้ว");
                 }
                 if (data.Role != "Customer" && data.Role != "Staff" &&
-                    data.Role != "Housekeeper" && data.Role != "Admin")
+                    data.Role != "Housekeeper" && data.Role != "Accountant" && data.Role != "Admin")
                     ModelState.AddModelError(nameof(data.Role), "กรุณาเลือก Role ที่ถูกต้อง");
                 if (string.IsNullOrWhiteSpace(data.Phone))
                 {
@@ -864,6 +891,7 @@ namespace GoodHotel.Controllers
                 user.Role = data.Role;
 
                 _db.SaveChanges();
+                _userAccess.Forget(user.UserId);
 
                 return RedirectToAction(
                     "Members",
@@ -908,6 +936,7 @@ namespace GoodHotel.Controllers
                 {
                     _db.SaveChanges();
                     transaction.Commit();
+                    _userAccess.Forget(id);
                 }
                 catch (DbUpdateException exception)
                 {
@@ -991,6 +1020,7 @@ namespace GoodHotel.Controllers
                 !(data.Role == "Customer" ||
                   data.Role == "Staff" ||
                   data.Role == "Housekeeper" ||
+                  data.Role == "Accountant" ||
                   data.Role == "Admin"))
             {
                 ModelState.AddModelError(
@@ -1035,7 +1065,7 @@ namespace GoodHotel.Controllers
         {
             var employees = _db.Users
                 .Where(user => user.Role == "Staff" ||
-                               user.Role == "Housekeeper")
+                               user.Role == "Housekeeper" || user.Role == "Accountant")
                 .OrderBy(user => user.UserId)
                 .Select(user => new EmployeeListViewModel
                 {
@@ -1057,7 +1087,7 @@ namespace GoodHotel.Controllers
             var employee = _db.Users
                 .Where(user => user.UserId == id &&
                                (user.Role == "Staff" ||
-                                user.Role == "Housekeeper"))
+                                user.Role == "Housekeeper" || user.Role == "Accountant"))
                 .Select(user => new EmployeeProfileViewModel
                 {
                     UserId = user.UserId,
@@ -1090,7 +1120,7 @@ namespace GoodHotel.Controllers
             if (!await HousekeepingService.LockUserAsync(_db, id, ct)) return NotFound();
 
             var user = await _db.Users.SingleOrDefaultAsync(u => u.UserId == id, ct);
-            if (user == null || (user.Role != "Staff" && user.Role != "Housekeeper")) return NotFound();
+            if (user == null || (user.Role != "Staff" && user.Role != "Housekeeper" && user.Role != "Accountant")) return NotFound();
 
             if (!isActive.Value && user.IsActive &&
                 await _db.HousekeepingTasks.AnyAsync(t => t.AssignedToUserId == id &&
@@ -1104,6 +1134,7 @@ namespace GoodHotel.Controllers
             user.IsActive = isActive.Value;
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            _userAccess.Forget(id);
             TempData["EmployeeSuccess"] = isActive.Value ? "เปิดการใช้งานพนักงานแล้ว" : "ปิดการใช้งานพนักงานแล้ว";
             return RedirectToAction(nameof(EmployeeProfile), new { id });
         }
@@ -1180,66 +1211,44 @@ namespace GoodHotel.Controllers
                 : RedirectToAction("Index", "Maintenance");
         }
 
-        public IActionResult Reports()
+        /// <summary>รายงานงานโรงแรม (ตัวเลขเงินย้ายไปอยู่ที่ฝ่ายบัญชีแล้ว)</summary>
+        public async Task<IActionResult> Reports(CancellationToken ct)
         {
-            var confirmedPayments = PaymentService.ConfirmedForRevenue(_db.Payments);
-            var stayDates = _db.BookingStays
+            var bookingsTask = _reader.Run(db => db.Bookings
+                .GroupBy(b => new { Cancelled = b.Status == BookingStatuses.Cancelled, Timeout = b.CancelReason == CancelReasons.PaymentTimeout })
+                .Select(g => new { g.Key.Cancelled, g.Key.Timeout, Count = g.Count() }).ToListAsync(ct));
+            var staysTask = _reader.Run(db => db.BookingStays
                 .Where(stay => stay.Status == "CheckedOut" && stay.CheckedOutAtUtc.HasValue &&
                     stay.CheckedOutAtUtc >= stay.CheckedInAtUtc)
-                .Select(stay => new
-                {
-                    stay.CheckedInAtUtc,
-                    stay.CheckedOutAtUtc
-                })
-                .ToList();
+                .Select(stay => new { stay.CheckedInAtUtc, CheckedOutAtUtc = stay.CheckedOutAtUtc!.Value })
+                .ToListAsync(ct));
+            var promotionsTask = _reader.Run(db => db.Bookings
+                .Where(b => b.Status != BookingStatuses.Cancelled && b.Promotion != null)
+                .GroupBy(b => b.Promotion!.PromotionName)
+                .Select(g => new PromotionUsageViewModel(g.Key ?? "-", g.Count(), g.Sum(b => b.Amount) ?? 0m))
+                .ToListAsync(ct));
+            var housekeepingTask = _reader.Run(db => db.HousekeepingTasks.GroupBy(t => t.Status)
+                .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToListAsync(ct));
+            var maintenanceTask = _reader.Run(db => db.MaintenanceReports.GroupBy(r => r.Status)
+                .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToListAsync(ct));
+            await Task.WhenAll(bookingsTask, staysTask, promotionsTask, housekeepingTask, maintenanceTask);
 
-            var hotelTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Bangkok");
-            var stayNights = stayDates
-                .Select(stay =>
-                    (TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(stay.CheckedOutAtUtc!.Value, DateTimeKind.Utc), hotelTimeZone).Date -
-                     TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(stay.CheckedInAtUtc, DateTimeKind.Utc), hotelTimeZone).Date).Days)
-                .ToList();
-
-            var paymentStatusSummaries = _db.Payments
-                .GroupBy(payment => payment.PaymentStatus)
-                .Select(group => new PaymentStatusSummaryViewModel
-                {
-                    Status = group.Key,
-                    Count = group.Count(),
-                    Amount = group.Sum(payment => payment.Amount)
-                })
-                .OrderBy(summary => summary.Status)
+            // จำนวนคืนที่พักจริง นับตามวันที่เวลาไทย
+            var stayNights = staysTask.Result
+                .Select(stay => RoomAvailabilityService.HotelDate(stay.CheckedOutAtUtc)
+                    .DayNumber - RoomAvailabilityService.HotelDate(stay.CheckedInAtUtc).DayNumber)
                 .ToList();
 
             var model = new AdminReportsViewModel
             {
-                BookingCount = _db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
-                CancelledBookingCount = _db.Bookings.Count(b => b.Status == BookingStatuses.Cancelled),
-                PromotionUsage = _db.Bookings
-                    .Where(b => b.Status != BookingStatuses.Cancelled && b.Promotion != null)
-                    .GroupBy(b => b.Promotion!.PromotionName)
-                    .Select(g => new PromotionUsageViewModel(
-                        g.Key ?? "-", g.Count(), g.Sum(b => b.Amount) ?? 0m))
-                    .ToList()
-                    .OrderByDescending(p => p.BookingCount)
-                    .ToList(),
-                BookingAmount = _db.Bookings
-                    .Where(booking => booking.Status != BookingStatuses.Cancelled)
-                    .Sum(booking => booking.Amount),
+                BookingCount = bookingsTask.Result.Where(g => !g.Cancelled).Sum(g => g.Count),
+                CancelledBookingCount = bookingsTask.Result.Where(g => g.Cancelled).Sum(g => g.Count),
+                PaymentTimeoutCount = bookingsTask.Result.Where(g => g.Cancelled && g.Timeout).Sum(g => g.Count),
+                PromotionUsage = promotionsTask.Result.OrderByDescending(p => p.BookingCount).ToList(),
                 CompletedStaysWithValidDates = stayNights.Count,
-                AverageActualStayNights = stayNights.Count == 0
-                    ? null
-                    : (decimal)stayNights.Average(),
-                PaymentCount = _db.Payments.Count(),
-                Revenue = (confirmedPayments.Sum(p => p.Amount) ?? 0m) -
-                    (_db.PaymentRefunds.Where(r => r.Status == "Approved" &&
-                        confirmedPayments.Any(payment => payment.PaymentId == r.PaymentId))
-                        .Sum(r => (decimal?)r.Amount) ?? 0m),
-                PaymentsByStatus = paymentStatusSummaries,
-                HousekeepingByStatus = _db.HousekeepingTasks.GroupBy(t => t.Status)
-                    .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToList(),
-                MaintenanceByStatus = _db.MaintenanceReports.GroupBy(r => r.Status)
-                    .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToList()
+                AverageActualStayNights = stayNights.Count == 0 ? null : (decimal)stayNights.Average(),
+                HousekeepingByStatus = housekeepingTask.Result,
+                MaintenanceByStatus = maintenanceTask.Result
             };
 
             return View(model);
@@ -1260,19 +1269,6 @@ namespace GoodHotel.Controllers
                 rows.Select(b => new[] { Format(b.BookingId), Format(b.UserId), Format(b.RoomId),
                     Format(b.CheckIn), Format(b.CheckOut), Format(b.Guests), Format(b.Amount),
                     b.Status, b.Promotion }));
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> ExportPayments(CancellationToken ct)
-        {
-            var rows = await _db.Payments.AsNoTracking().OrderBy(p => p.PaymentId)
-                .Select(p => new { p.PaymentId, p.BookingId, p.PaymentDate, p.PaymentMethod, p.PaymentStatus, p.Amount,
-                    p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition })
-                .ToListAsync(ct);
-            return Csv("payments.csv", new[] { "PaymentId", "BookingId", "PaymentDate", "PaymentMethod", "PaymentStatus", "Amount", "VerifiedAtUtc", "LegacyDisposition" },
-                rows.Select(p => new[] { Format(p.PaymentId), Format(p.BookingId), Format(p.PaymentDate),
-                    p.PaymentMethod, p.PaymentStatus, Format(p.Amount), Format(p.VerifiedAtUtc),
-                    p.SubmittedAtUtc == null ? p.LegacyDisposition ?? "Requires reconciliation" : null }));
         }
 
         [HttpGet]
@@ -1301,37 +1297,9 @@ namespace GoodHotel.Controllers
                     t.Status, Format(t.AssignedToUserId), Format(t.CreatedAtUtc) }));
         }
 
-        private FileContentResult Csv(string filename, string[] headers, IEnumerable<string?[]> rows)
-        {
-            var builder = new StringBuilder();
-            void AppendRow(IEnumerable<string?> values) =>
-                builder.AppendJoin(",", values.Select(EscapeCsv)).Append("\r\n");
-            AppendRow(headers);
-            foreach (var row in rows) AppendRow(row);
-            var encoding = new UTF8Encoding(true);
-            var content = encoding.GetPreamble().Concat(encoding.GetBytes(builder.ToString())).ToArray();
-            return File(content, "text/csv; charset=utf-8", filename);
-        }
+        private FileContentResult Csv(string filename, string[] headers, IEnumerable<string?[]> rows) =>
+            File(CsvExport.Build(headers, rows), "text/csv; charset=utf-8", filename);
 
-        private static string EscapeCsv(string? value)
-        {
-            value ??= string.Empty;
-            var trimmed = value.TrimStart();
-            if (value.StartsWith('\t') || value.StartsWith('\r') || value.StartsWith('\n') ||
-                (trimmed.Length > 0 && "=+-@".Contains(trimmed[0])))
-                value = "'" + value;
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        }
-
-        private static string? Format(object? value) => value switch
-        {
-            null => null,
-            bool boolean => boolean ? "true" : "false",
-            DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            DateTime dateTime => dateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-            _ => throw new ArgumentException("Unsupported CSV value.", nameof(value))
-        };
-
+        private static string? Format(object? value) => CsvExport.Format(value);
     }
 }

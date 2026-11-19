@@ -3,11 +3,9 @@
 
 @{
     ViewData["Title"] = "แก้ไขผู้ใช้";
-    Layout = "_AdminLayout";
 }
 
-<div class="container mt-4">
-    <h2>แก้ไขผู้ใช้</h2>
+<div class="booking-panel" style="max-width: 720px">
 
     <form asp-controller="Admin" asp-action="EditUser" method="post">
         <input type="hidden" asp-for="UserId" />
@@ -53,6 +51,7 @@
                 <option value="Customer">ลูกค้า</option>
                 <option value="Staff">พนักงานต้อนรับ</option>
                 <option value="Housekeeper">แม่บ้าน</option>
+                        <option value="Accountant">ฝ่ายบัญชี</option>
                 <option value="Admin">ผู้ดูแลระบบ</option>
             </select>
             <span asp-validation-for="Role" class="text-danger"></span>

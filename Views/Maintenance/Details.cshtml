@@ -1,19 +1,11 @@
 @model GoodHotel.Models.ViewModels.MaintenanceDetailsViewModel
 
 @{
-    if (User.IsInRole("Admin")) { Layout = "_AdminLayout"; }
-    ViewData["Title"] = "รายละเอียดงานซ่อม";
+    ViewData["Title"] = $"งานซ่อม #{Model.ReportId}";
 }
 
 <section class="content-section">
     <div class="container">
-        <div class="section-heading">
-            <span class="eyebrow text-dark">Maintenance</span>
-            <h2>งานซ่อม #@Model.ReportId</h2>
-        </div>
-        <div class="alert alert-warning" role="status">
-            ห้องที่มีงานซ่อมค้างอยู่จะถูกปิดไม่ให้จอง (การจองที่มีอยู่แล้วจะไม่ถูกยกเลิก)
-        </div>
         @if (TempData["MaintenanceSuccess"] is string success)
         {
             <div class="alert alert-success" role="status">@success</div>

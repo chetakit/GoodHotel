@@ -1,33 +1,57 @@
 @model GoodHotel.Models.ViewModels.HousekeepingDashboardViewModel
 @{
-    ViewData["Title"] = "แดชบอร์ดแม่บ้าน";
+    ViewData["Title"] = "หน้าหลัก";
 }
-<section class="content-section">
-    <div class="container">
-        <div class="section-heading">
-            <span class="eyebrow text-dark">Housekeeping</span>
-            <h2>แดชบอร์ดแม่บ้าน</h2>
-        </div>
-        <div class="row g-3 mb-4">
-            <div class="col-md-3"><div class="card p-3">งานที่รอคนรับ <strong>@Model.AvailableCount</strong></div></div>
-            <div class="col-md-3"><div class="card p-3">งานที่ฉันรับแล้ว <strong>@Model.AcceptedCount</strong></div></div>
-            <div class="col-md-3"><div class="card p-3">งานที่ฉันกำลังทำ <strong>@Model.InProgressCount</strong></div></div>
-            <div class="col-md-3"><div class="card p-3">ทำเสร็จวันนี้ <strong>@Model.CompletedTodayCount</strong></div></div>
-        </div>
-        <h3>งานล่าสุดของฉัน</h3>
-        @if (Model.RecentTasks.Count == 0)
-        {
-            <p>ยังไม่มีงาน</p>
-        }
-        else
-        {
-            <ul>
+
+@section Actions {
+    <a asp-action="Tasks" class="btn btn-primary btn-sm">ไปที่งานทำความสะอาด</a>
+}
+
+<div class="figures">
+    <div class="figure @(Model.AvailableCount > 0 ? "is-alert" : "")">
+        <a asp-action="Tasks">
+            <div class="label">งานรอคนรับ</div>
+            <div class="value">@Model.AvailableCount</div>
+        </a>
+    </div>
+    <div class="figure">
+        <div class="label">ฉันรับแล้ว ยังไม่เริ่ม</div>
+        <div class="value">@Model.AcceptedCount</div>
+    </div>
+    <div class="figure">
+        <div class="label">กำลังทำ</div>
+        <div class="value">@Model.InProgressCount</div>
+    </div>
+    <div class="figure">
+        <div class="label">ทำเสร็จวันนี้</div>
+        <div class="value">@Model.CompletedTodayCount</div>
+    </div>
+</div>
+
+<section class="table-panel">
+    <div class="panel-head">
+        <h2>งานล่าสุดของฉัน</h2>
+        <a asp-action="History">ประวัติทั้งหมด</a>
+    </div>
+    @if (Model.RecentTasks.Count == 0)
+    {
+        <p class="panel-empty">ยังไม่มีงาน งานจะเข้ามาเองเมื่อพนักงานต้อนรับเช็คเอาท์ลูกค้า</p>
+    }
+    else
+    {
+        <table class="table table-hover">
+            <thead><tr><th>งาน</th><th>ห้อง</th><th>สถานะ</th><th></th></tr></thead>
+            <tbody>
                 @foreach (var task in Model.RecentTasks)
                 {
-                    <li><a asp-action="TaskDetails" asp-route-id="@task.TaskId">งาน #@task.TaskId</a> — @ThaiText.OrDash(task.RoomNumber) — @ThaiText.Status(task.Status)</li>
+                    <tr>
+                        <td>#@task.TaskId</td>
+                        <td>@ThaiText.OrDash(task.RoomNumber)</td>
+                        <td>@ThaiText.Status(task.Status)</td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="TaskDetails" asp-route-id="@task.TaskId">เปิด</a></td>
+                    </tr>
                 }
-            </ul>
-        }
-        <a asp-action="Tasks" class="btn btn-primary">ดูงานทำความสะอาด</a>
-    </div>
+            </tbody>
+        </table>
+    }
 </section>

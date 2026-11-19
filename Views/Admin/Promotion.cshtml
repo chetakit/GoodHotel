@@ -1,15 +1,14 @@
 @model IReadOnlyList<GoodHotel.Models.ViewModels.PromotionListViewModel>
 
 @{
-    Layout = "_AdminLayout";
-    ViewData["Title"] = "โปรโมชั่น";
+    ViewData["Title"] = "โปรโมชัน";
 }
 
-<div class="table-panel">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <h4 class="mb-0">จัดการโปรโมชั่น</h4>
-        <a asp-action="AddPromotion" class="btn btn-primary hotel-primary-btn">+ เพิ่มโปรโมชั่น</a>
-    </div>
+@section Actions {
+    <a asp-action="AddPromotion" class="btn btn-primary btn-sm">เพิ่มโปรโมชัน</a>
+}
+
+<div>
     <p class="text-muted small mb-3">
         1 การจองใช้ได้ 1 โปร ระบบจะเลือกโปรที่ลดได้มากที่สุดให้ลูกค้าอัตโนมัติ · ส่วนลดคิดจากค่าห้อง (ไม่รวมเตียงเสริม)
     </p>
@@ -25,7 +24,7 @@
 
     @if (Model.Count == 0)
     {
-        <p class="text-center text-muted mb-0">ยังไม่มีโปรโมชั่น</p>
+        <p class="text-center text-muted mb-0">ยังไม่มีโปรโมชัน</p>
     }
     else
     {
@@ -33,7 +32,7 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
-                        <th>โปรโมชั่น</th>
+                        <th>โปรโมชัน</th>
                         <th>เงื่อนไข</th>
                         <th>ส่วนลด</th>
                         <th>สถานะ</th>
