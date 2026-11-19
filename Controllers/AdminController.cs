@@ -89,7 +89,51 @@ namespace GoodHotel.Controllers
                     Amount = booking.Amount
                 })
                 .ToListAsync(ct));
-            await Task.WhenAll(boardTask, countsTask, revenueTask, recentTask);
+
+            // ข้อมูลกราฟ (ยิงพร้อมกับชุดอื่น)
+            var today = _availability.HotelToday();
+            var chartFrom = today.AddDays(-13);
+            var chartTo = today.AddDays(14);
+            var nightsEnd = today.AddDays(14);
+            var byDayTask = _reader.Run(db => db.Bookings
+                .Where(b => b.Status != BookingStatuses.Cancelled && b.CheckIn >= chartFrom && b.CheckIn <= chartTo)
+                .GroupBy(b => b.CheckIn)
+                .Select(g => new { Day = g.Key, Count = g.Count() })
+                .ToListAsync(ct));
+            // ห้องที่ถูกใช้แต่ละคืน: การจองที่ยังไม่ยกเลิกและแขกยังไม่เช็คเอาท์
+            // รวมแขกที่ยังพักอยู่แม้เลยวันออกแล้ว (นับเป็นคืนนี้)
+            var staysTask = _reader.Run(db => db.Bookings
+                .Where(b => b.Status != BookingStatuses.Cancelled && b.RoomId != null &&
+                            b.CheckIn < nightsEnd &&
+                            !db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedOut") &&
+                            (b.CheckOut > today ||
+                             db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedIn")))
+                .Select(b => new { RoomId = b.RoomId!.Value, b.CheckIn, b.CheckOut })
+                .ToListAsync(ct));
+
+            await Task.WhenAll(boardTask, countsTask, revenueTask, recentTask, byDayTask, staysTask);
+
+            var thaiCulture = new CultureInfo("th-TH");
+            string DayLabel(DateOnly d) => d.Day.ToString(CultureInfo.InvariantCulture);
+            string DayTip(DateOnly d) => d.ToString("ddd d MMM", thaiCulture);
+
+            var byDay = byDayTask.Result.Where(x => x.Day.HasValue).ToDictionary(x => x.Day!.Value, x => x.Count);
+            var bookingsByDay = Enumerable.Range(0, chartTo.DayNumber - chartFrom.DayNumber + 1)
+                .Select(i => chartFrom.AddDays(i))
+                .Select(d => new ChartPoint(DayLabel(d), byDay.GetValueOrDefault(d),
+                    $"{DayTip(d)} · เข้าพัก {byDay.GetValueOrDefault(d)} การจอง", d == today))
+                .ToList();
+
+            var stays = staysTask.Result;
+            var nightlyOccupancy = Enumerable.Range(0, 14)
+                .Select(i => today.AddDays(i))
+                .Select(d =>
+                {
+                    var rooms = stays.Where(s => s.CheckIn <= d && (s.CheckOut > d || (d == today && s.CheckOut <= today)))
+                        .Select(s => s.RoomId).Distinct().Count();
+                    return new ChartPoint(DayLabel(d), rooms, $"คืน{DayTip(d)} · มีแขก {rooms} ห้อง", d == today);
+                })
+                .ToList();
 
             var roomBoard = boardTask.Result;
             var counts = countsTask.Result;
@@ -113,7 +157,9 @@ namespace GoodHotel.Controllers
                 PendingHousekeepingCount = counts.PendingHousekeeping,
                 AwaitingVerificationCount = counts.AwaitingVerification,
                 RoomStatusCounts = liveRoomCounts,
-                BookingsByCheckInDate = recentTask.Result
+                BookingsByCheckInDate = recentTask.Result,
+                BookingsByDay = bookingsByDay,
+                NightlyOccupancy = nightlyOccupancy
             };
 
             return View(model);
@@ -845,6 +891,10 @@ namespace GoodHotel.Controllers
                     else if (_db.Users.Any(u => u.UserId != data.UserId && u.Email == data.Email))
                         ModelState.AddModelError(nameof(data.Email), "อีเมลนี้ถูกใช้งานแล้ว");
                 }
+                // Admin เปลี่ยนบทบาทของตัวเองไม่ได้ (กันลดสิทธิ์ตัวเองจนเข้าหน้า Admin ไม่ได้อีก)
+                // ใช้ค่าเดิมจากฐานข้อมูลเสมอ ไม่เชื่อค่าที่ส่งมาจากฟอร์ม
+                if (User.FindFirstValue(ClaimTypes.NameIdentifier) == user.UserId.ToString())
+                    data.Role = user.Role;
                 if (data.Role != "Customer" && data.Role != "Staff" &&
                     data.Role != "Housekeeper" && data.Role != "Accountant" && data.Role != "Admin")
                     ModelState.AddModelError(nameof(data.Role), "กรุณาเลือก Role ที่ถูกต้อง");

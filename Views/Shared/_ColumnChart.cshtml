@@ -1,0 +1,74 @@
+@model GoodHotel.Models.ViewModels.ColumnChartModel
+@*
+    กราฟแท่งแนวตั้ง 1 ชุดข้อมูล วาดด้วย HTML/CSS (ไม่ต้องโหลดไลบรารี)
+    - ชี้หรือกด Tab ที่แท่ง = แสดงรายละเอียด
+    - มีปุ่มดูเป็นตาราง สำหรับคนที่อ่านกราฟไม่สะดวก
+*@
+@{
+    var max = Model.Points.Count == 0 ? 0 : Model.Points.Max(p => p.Value);
+    // แกน Y ปัดเป็นเลขลงตัว: ถ้าไม่กำหนด ใช้ค่าสูงสุดปัดขึ้นเป็นเลขคู่ (อย่างน้อย 2)
+    var axisMax = Model.AxisMax ?? Math.Max(2, max % 2 == 0 ? max : max + 1);
+    if (axisMax <= 0) axisMax = 1;
+    var ticks = axisMax % 2 == 0 ? new[] { axisMax, axisMax / 2, 0 } : new[] { axisMax, 0 };
+    var peak = Model.Points.Where(p => p.Value > 0).OrderByDescending(p => p.Value).FirstOrDefault();
+
+    // ป้ายวันใต้กราฟ: แสดงวันนี้ + ทุก ๆ 7 วัน (กราฟยาว) หรือทุก 2 วัน (กราฟสั้น) นับจากวันนี้
+    // ไม่แสดงป้ายที่ติดกับ "วันนี้" เพราะคำยาวกว่าจะทับกัน
+    var todayIndex = Model.Points.ToList().FindIndex(p => p.IsToday);
+    var step = Model.Points.Count > 14 ? 7 : 2;
+    bool ShowLabel(int i)
+    {
+        if (todayIndex < 0) return i % step == 0;
+        var distance = Math.Abs(i - todayIndex);
+        return distance == 0 || (distance >= 2 && distance % step == 0);
+    }
+}
+
+<div class="cchart" role="img" aria-label="@string.Join(", ", Model.Points.Select(p => p.Tip))">
+    <div class="cchart-y" aria-hidden="true">
+        @foreach (var t in ticks)
+        {
+            <span style="bottom: @(t * 100.0 / axisMax)%">@t</span>
+        }
+    </div>
+    <div class="cchart-plot">
+        @foreach (var t in ticks)
+        {
+            <div class="cchart-grid" style="bottom: @(t * 100.0 / axisMax)%" aria-hidden="true"></div>
+        }
+        <div class="cchart-cols">
+            @foreach (var p in Model.Points)
+            {
+                var h = p.Value * 100.0 / axisMax;
+                <div class="cchart-col" tabindex="0" data-tip="@p.Tip">
+                    <div class="cchart-bar @(p.Value == 0 ? "is-zero" : "")" style="height: @(h.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%">
+                        @if (peak != null && ReferenceEquals(p, peak))
+                        {
+                            <span class="cchart-peak">@p.Value</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="cchart-x" aria-hidden="true">
+        @for (var i = 0; i < Model.Points.Count; i++)
+        {
+            var p = Model.Points[i];
+            <span class="@(p.IsToday ? "is-today" : "")">@(ShowLabel(i) ? (p.IsToday ? "วันนี้" : p.Label) : "")</span>
+        }
+    </div>
+</div>
+
+<details class="cchart-table">
+    <summary>ดูเป็นตาราง</summary>
+    <table class="table table-sm mt-2">
+        <thead><tr><th>วัน</th><th class="text-end">@Model.ValueHeader</th></tr></thead>
+        <tbody>
+            @foreach (var p in Model.Points)
+            {
+                <tr><td>@p.Tip.Split(" · ")[0]</td><td class="text-end num">@p.Value</td></tr>
+            }
+        </tbody>
+    </table>
+</details>

@@ -844,3 +844,76 @@ label.card:has(input:checked) { border-color: var(--accent); background: var(--a
 .hotel-body .figures { margin-top: .25rem; }
 .auth-card-wide { max-width: 640px; }
 .table .btn { white-space: nowrap; }
+
+/* ---------- กราฟแท่ง (Views/Shared/_ColumnChart.cshtml) ----------
+   สีกราฟผ่านการตรวจความต่างสี/ความเข้มบนพื้นขาวแล้ว (โทนเดียวกับสีหลัก แต่สดพอให้อ่านเป็นข้อมูล) */
+:root { --chart-1: #008a72; --chart-grid: #ece8e2; }
+.cchart {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    grid-template-rows: 180px auto;
+    gap: .35rem .5rem;
+    padding: 1rem 1.1rem .5rem;
+}
+.cchart-y { position: relative; font-size: .72rem; color: var(--muted); }
+.cchart-y span { position: absolute; right: 0; transform: translateY(50%); font-variant-numeric: tabular-nums; }
+.cchart-plot { position: relative; }
+.cchart-grid { position: absolute; left: 0; right: 0; height: 1px; background: var(--chart-grid); }
+.cchart-cols { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
+.cchart-col {
+    position: relative;
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    outline: none;
+}
+.cchart-bar {
+    position: relative;
+    width: 100%;
+    max-width: 24px;
+    background: var(--chart-1);
+    border-radius: 4px 4px 0 0;
+    transition: opacity .12s;
+}
+.cchart-bar.is-zero { height: 0 !important; }
+.cchart-peak {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translate(-50%, -2px);
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+.cchart-cols:hover .cchart-col:not(:hover) .cchart-bar { opacity: .45; }
+.cchart-col:focus-visible .cchart-bar { outline: 2px solid var(--ink); outline-offset: 2px; }
+.cchart-col:hover::after, .cchart-col:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: var(--ink);
+    color: #fff;
+    font-size: .78rem;
+    padding: .3rem .55rem;
+    border-radius: 4px;
+    z-index: 5;
+    pointer-events: none;
+}
+.cchart-col:first-child:hover::after, .cchart-col:first-child:focus-visible::after { left: 0; transform: none; }
+.cchart-col:last-child:hover::after, .cchart-col:last-child:focus-visible::after { left: auto; right: 0; transform: none; }
+.cchart-x { grid-column: 2; display: flex; gap: 2px; font-size: .68rem; color: var(--muted); }
+.cchart-x span { flex: 1; text-align: center; font-variant-numeric: tabular-nums; }
+.cchart-x span { min-width: 0; overflow: visible; white-space: nowrap; }
+.cchart-x span.is-today { color: var(--ink); font-weight: 600; }
+.cchart-table { padding: 0 1.1rem .8rem; font-size: .85rem; }
+.cchart-table summary { cursor: pointer; color: var(--muted); }
+
+/* แถบนับจำนวนแนวนอน (สถานะห้อง) */
+.hbar-row { display: grid; grid-template-columns: 7.5rem 1fr 2rem; gap: .6rem; align-items: center; padding: .4rem 1.1rem; font-size: .9rem; }
+.hbar-track { height: 10px; background: var(--chart-grid); border-radius: 0 4px 4px 0; }
+.hbar-fill { height: 100%; background: var(--chart-1); border-radius: 0 4px 4px 0; min-width: 2px; }

@@ -44,6 +44,27 @@
     </div>
 </div>
 
+<div class="row g-3 mb-3">
+    <div class="col-xl-7">
+        <section class="table-panel h-100">
+            <div class="panel-head">
+                <h2>การจองตามวันเข้าพัก</h2>
+                <span class="text-muted small">ย้อนหลัง 2 สัปดาห์ ถึงล่วงหน้า 2 สัปดาห์</span>
+            </div>
+            <partial name="_ColumnChart" model="@(new GoodHotel.Models.ViewModels.ColumnChartModel("bookings", Model.BookingsByDay, "การจอง"))" />
+        </section>
+    </div>
+    <div class="col-xl-5">
+        <section class="table-panel h-100">
+            <div class="panel-head">
+                <h2>ห้องที่มีแขกพัก 14 คืนข้างหน้า</h2>
+                <span class="text-muted small">จาก @Model.RoomCount ห้อง</span>
+            </div>
+            <partial name="_ColumnChart" model="@(new GoodHotel.Models.ViewModels.ColumnChartModel("occupancy", Model.NightlyOccupancy, "ห้องที่มีแขก", Math.Max(1, Model.RoomCount)))" />
+        </section>
+    </div>
+</div>
+
 <div class="row g-3">
     <div class="col-xl-8">
         <section class="table-panel">
@@ -87,17 +108,20 @@
             }
             else
             {
-                <table class="table">
-                    <tbody>
-                        @foreach (var item in Model.RoomStatusCounts)
-                        {
-                            <tr>
-                                <td>@ThaiText.OrDash(item.Status)</td>
-                                <td class="text-end num fw-semibold">@item.Count</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                @* แท่งแนวนอน 1 สี: ความยาว = จำนวนห้องเทียบกับห้องทั้งหมด ชื่อและตัวเลขเขียนกำกับทุกแถว *@
+                <div class="py-2">
+                    @foreach (var item in Model.RoomStatusCounts.OrderByDescending(i => i.Count))
+                    {
+                        var pct = Model.RoomCount == 0 ? 0 : item.Count * 100.0 / Model.RoomCount;
+                        <div class="hbar-row">
+                            <span>@ThaiText.OrDash(item.Status)</span>
+                            <div class="hbar-track" title="@item.Status @item.Count จาก @Model.RoomCount ห้อง">
+                                <div class="hbar-fill" style="width: @(pct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                            </div>
+                            <span class="text-end num fw-semibold">@item.Count</span>
+                        </div>
+                    }
+                </div>
             }
         </section>
     </div>

@@ -47,13 +47,23 @@
 
         <div class="mb-3">
             <label asp-for="Role" class="form-label">บทบาท</label>
-            <select asp-for="Role" class="form-select">
-                <option value="Customer">ลูกค้า</option>
-                <option value="Staff">พนักงานต้อนรับ</option>
-                <option value="Housekeeper">แม่บ้าน</option>
-                        <option value="Accountant">ฝ่ายบัญชี</option>
-                <option value="Admin">ผู้ดูแลระบบ</option>
-            </select>
+            @if (User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value == Model.UserId.ToString())
+            {
+                @* แก้บัญชีตัวเอง: เปลี่ยนบทบาทไม่ได้ (เซิร์ฟเวอร์ก็บังคับใช้ค่าเดิมอยู่แล้ว) *@
+                <input type="hidden" asp-for="Role" />
+                <input class="form-control" value="@ThaiText.Status(Model.Role)" disabled />
+                <div class="form-text">เปลี่ยนบทบาทของบัญชีตัวเองไม่ได้ ให้ Admin คนอื่นเปลี่ยนให้</div>
+            }
+            else
+            {
+                <select asp-for="Role" class="form-select">
+                    <option value="Customer">ลูกค้า</option>
+                    <option value="Staff">พนักงานต้อนรับ</option>
+                    <option value="Housekeeper">แม่บ้าน</option>
+                    <option value="Accountant">ฝ่ายบัญชี</option>
+                    <option value="Admin">ผู้ดูแลระบบ</option>
+                </select>
+            }
             <span asp-validation-for="Role" class="text-danger"></span>
         </div>
 
