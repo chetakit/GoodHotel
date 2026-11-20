@@ -13,7 +13,7 @@
 
 <div class="figures">
     <div class="figure">
-        <div class="label">รอเช็คอินวันนี้</div>
+        <div class="label">รอเช็คอิน</div>
         <div class="value">@Model.Arrivals.Count</div>
         <div class="note">เช็คอินไปแล้ว @Model.TodayCheckIns</div>
     </div>
@@ -46,7 +46,7 @@
 @* ---------- แขกที่จะเข้าพักวันนี้ ---------- *@
 <section class="table-panel mb-3">
     <div class="panel-head">
-        <h2>แขกที่จะเข้าพักวันนี้</h2>
+        <h2>แขกที่รอเช็คอิน</h2>
         <a asp-action="Bookings" asp-route-when="today">ดูการจองทั้งหมดของวันนี้</a>
     </div>
     @if (Model.Arrivals.Count == 0)
@@ -63,7 +63,14 @@
                     {
                         <tr>
                             <td><a asp-action="BookingDetails" asp-route-id="@row.BookingId">#@row.BookingId</a></td>
-                            <td>@ThaiText.OrDash(row.GuestName)<div class="text-muted small">@row.Phone</div></td>
+                            <td>
+                                @ThaiText.OrDash(row.GuestName)
+                                @if (row.CheckIn < today)
+                                {
+                                    <span class="badge text-bg-warning ms-1" title="วันเข้าพักที่จองไว้ @ThaiText.Date(row.CheckIn)">มาช้ากว่ากำหนด</span>
+                                }
+                                <div class="text-muted small">@row.Phone</div>
+                            </td>
                             <td>@ThaiText.OrDash(row.RoomNumber)</td>
                             <td class="num">@ThaiText.Date(row.CheckOut)</td>
                             <td>@(row.Guests?.ToString() ?? "-")</td>

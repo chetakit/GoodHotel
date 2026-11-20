@@ -492,6 +492,27 @@ namespace GoodHotel.Controllers
             }
 
             TempData["RoomSuccessMessage"] = "บันทึกข้อมูลห้องแล้ว";
+
+            // ปิดขายห้อง (ไม่ใช่ "ว่าง") ทั้งที่มีการจองล่วงหน้าอยู่: ลูกค้ากลุ่มนี้จะเช็คอินห้องนี้ไม่ได้
+            // แจ้ง Admin ว่าการจองไหนได้รับผลกระทบ จะได้ติดต่อลูกค้าหรือเปิดห้องคืนก่อนถึงวัน
+            if (data.Status != "Available")
+            {
+                var today = _availability.HotelToday();
+                var affected = await _db.Bookings.AsNoTracking()
+                    .Where(b => b.RoomId == data.RoomId && b.Status != BookingStatuses.Cancelled &&
+                                b.CheckOut > today && !_db.BookingStays.Any(s => s.BookingId == b.BookingId))
+                    .OrderBy(b => b.CheckIn)
+                    .Select(b => new { b.BookingId, b.CheckIn })
+                    .ToListAsync(HttpContext.RequestAborted);
+                if (affected.Count > 0)
+                {
+                    TempData["RoomErrorMessage"] =
+                        $"ห้องนี้ยังมีการจองที่ยังไม่เข้าพัก {affected.Count} รายการ " +
+                        $"({string.Join(", ", affected.Take(5).Select(b => $"#{b.BookingId} เข้า {ThaiText.Date(b.CheckIn)}"))}" +
+                        $"{(affected.Count > 5 ? " …" : "")}) ลูกค้ากลุ่มนี้จะเช็คอินไม่ได้จนกว่าห้องจะกลับมา \"ว่าง\"";
+                }
+            }
+
             return RedirectToAction(nameof(Rooms));
         }
 

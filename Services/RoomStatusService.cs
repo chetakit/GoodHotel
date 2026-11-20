@@ -34,7 +34,7 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
     public static string Label(RoomLiveStatus status) => status switch
     {
         RoomLiveStatus.Available => "ว่าง",
-        RoomLiveStatus.ArrivingToday => "รอเช็คอินวันนี้",
+        RoomLiveStatus.ArrivingToday => "รอเช็คอิน",
         RoomLiveStatus.Occupied => "มีผู้เข้าพัก",
         RoomLiveStatus.Cleaning => "รอทำความสะอาด",
         RoomLiveStatus.Maintenance => "ซ่อมบำรุง",
@@ -75,12 +75,14 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
         var arrivalsTask = reader.Run(db => db.Bookings.AsNoTracking()
             .Where(b => b.Status == BookingStatuses.Booked &&
                         b.RoomId != null &&
-                        b.CheckIn == today &&
+                        // รวมแขกที่มาช้ากว่าวันเข้าพัก: ห้องยังถูกจองอยู่ ห้ามขึ้นว่าว่าง
+                        b.CheckIn <= today && b.CheckOut > today &&
                         !db.BookingStays.Any(s => s.BookingId == b.BookingId))
             .Select(b => new
             {
                 RoomId = b.RoomId!.Value,
                 b.BookingId,
+                IsLate = b.CheckIn < today,
                 GuestName = b.User == null ? null : b.User.FirstName + " " + b.User.LastName
             })
             .ToListAsync(ct));
@@ -122,7 +124,8 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
                 return Item(room, RoomLiveStatus.Closed, $"Admin ตั้งสถานะเป็น {room.Status}");
 
             if (arrival != null)
-                return Item(room, RoomLiveStatus.ArrivingToday, $"{arrival.GuestName} · รอเช็คอิน", arrival.BookingId);
+                return Item(room, RoomLiveStatus.ArrivingToday,
+                    $"{arrival.GuestName} · {(arrival.IsLate ? "มาช้ากว่าวันเข้าพัก ยังรอเช็คอิน" : "รอเช็คอิน")}", arrival.BookingId);
 
             return Item(room, RoomLiveStatus.Available, null);
         }).ToList();

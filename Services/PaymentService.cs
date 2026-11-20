@@ -209,6 +209,9 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
                 return Error("คุณชำระเงินการจองนี้ไม่ได้");
             if (booking.Status == BookingStatuses.Cancelled)
                 return Error("การจองนี้ถูกยกเลิกแล้ว");
+            // เลยวันออกแล้ว (แขกไม่ได้มาพัก): ไม่รับชำระ ไม่งั้นลูกค้าจ่ายเงินให้คืนที่ผ่านไปแล้ว
+            if (booking.CheckOut <= RoomAvailabilityService.HotelDate(time.GetUtcNow().UtcDateTime))
+                return Error("เลยวันเข้าพักของการจองนี้แล้ว ชำระเงินไม่ได้");
             var keyError = await ValidateKeyAsync(key, ct);
             if (keyError != null) return Error(keyError);
             if (!ValidAmount(booking.Amount)) return Error("ยอดเงินของการจองนี้ต้องตรวจสอบก่อน");

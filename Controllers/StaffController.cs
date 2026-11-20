@@ -103,9 +103,10 @@ namespace GoodHotel.Controllers
 
             var today = _availability.HotelToday();
 
-            // แขกที่จะเข้าวันนี้ = จองเข้าวันนี้ ไม่ได้ยกเลิก และยังไม่มีการเช็คอิน
+            // แขกที่รอเช็คอิน = ไม่ได้ยกเลิก ยังไม่เช็คอิน และวันนี้อยู่ในช่วงที่จองไว้
+            // รวมแขกที่มาช้ากว่าวันเข้าพัก (ระบบยังให้เช็คอินได้จนถึงวันออก) ไม่งั้นจะหายไปจากหน้านี้
             var arrivals = await _db.Bookings.AsNoTracking()
-                .Where(b => b.Status != BookingStatuses.Cancelled && b.CheckIn == today &&
+                .Where(b => b.Status != BookingStatuses.Cancelled && b.CheckIn <= today && b.CheckOut > today &&
                     !_db.BookingStays.Any(s => s.BookingId == b.BookingId))
                 .OrderBy(b => b.Room!.Room1)
                 .Select(FrontDeskRowProjection)
