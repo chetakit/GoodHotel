@@ -116,12 +116,9 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
             if (cleaning != null)
                 return Item(room, RoomLiveStatus.Cleaning, $"งานทำความสะอาด: {ThaiText.Status(cleaning.Status)}");
 
-            // Admin ตั้งสถานะห้องเองในหน้าจัดการห้อง
-            if (room.Status == "Occupied")
-                return Item(room, RoomLiveStatus.Occupied, "Admin ตั้งสถานะว่ามีผู้เข้าพัก");
-
+            // Admin ปิดขายห้องไว้ (รวมค่า Occupied เก่าที่เคยให้ Admin ตั้งเอง: ไม่มีแขกจริง จึงถือเป็นปิดขาย)
             if (room.Status != "Available")
-                return Item(room, RoomLiveStatus.Closed, $"Admin ตั้งสถานะเป็น {room.Status}");
+                return Item(room, RoomLiveStatus.Closed, "Admin ปิดขายไว้");
 
             if (arrival != null)
                 return Item(room, RoomLiveStatus.ArrivingToday,

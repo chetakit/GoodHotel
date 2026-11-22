@@ -22,7 +22,7 @@ public record PaymentDetailsViewModel(int BookingId, decimal? BookingAmount, dec
     decimal RefundedAmount, bool RequiresReconciliation, IReadOnlyList<PaymentListItem> Payments,
     IReadOnlyList<PaymentHistoryItem> Events, IReadOnlyList<PaymentRefundItem> Refunds,
     string? BookingStatus = null, string? GuestName = null, string? RoomNumber = null,
-    DateTime? CreatedAtUtc = null, string? CancelReason = null)
+    DateTime? CreatedAtUtc = null, string? CancelReason = null, bool CanCancel = false, bool CanRequestRefund = false)
 {
     public bool IsCancelled => BookingStatus == BookingStatuses.Cancelled;
 
@@ -48,3 +48,38 @@ public record PaymentManagementItem(PaymentListItem Payment, string? Customer, D
 
 public record PaymentQueueViewModel(IReadOnlyList<PaymentManagementItem> Payments,
     IReadOnlyList<PaymentRefundItem> Refunds, string? Search, string? Status, string? Method);
+
+/// <summary>
+/// ใบเสร็จรับเงินของการจองที่ชำระแล้ว
+/// ค่าเตียงเสริมคิดตายตัว ฿500/เตียง/คืน จึงแยกจากยอดจองได้แน่นอน ส่วนที่เหลือคือค่าห้องหลังหักส่วนลดโปร
+/// </summary>
+public record ReceiptViewModel(
+    int PaymentId,
+    int BookingId,
+    DateTime PaidAtUtc,
+    string? Method,
+    decimal PaidAmount,
+    decimal RefundedAmount,
+    string? ReceivedBy,
+    string? GuestName,
+    string? GuestEmail,
+    string? GuestPhone,
+    string? RoomNumber,
+    string? RoomType,
+    DateOnly? CheckIn,
+    DateOnly? CheckOut,
+    int? Guests,
+    int ExtraBeds,
+    string? PromotionName,
+    decimal BookingAmount,
+    bool IsCancelled)
+{
+    public const decimal ExtraBedPerNight = 500m;
+
+    public string ReceiptNumber => $"RC-{PaymentId:D6}";
+    public int Nights => CheckIn.HasValue && CheckOut.HasValue ? Math.Max(0, CheckOut.Value.DayNumber - CheckIn.Value.DayNumber) : 0;
+    public decimal ExtraBedAmount => ExtraBedPerNight * ExtraBeds * Nights;
+    public decimal RoomAmount => BookingAmount - ExtraBedAmount;
+    public decimal NetPaid => PaidAmount - RefundedAmount;
+    public bool IsMock => PaymentService.IsMockMethod(Method);
+}

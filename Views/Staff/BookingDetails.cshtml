@@ -35,14 +35,20 @@
                 <dd class="col-sm-7 col-lg-8">@(Model.StayStatus == null ? "ยังไม่เช็คอิน" : ThaiText.Status(Model.StayStatus))</dd>
                 <dt class="col-sm-5 col-lg-4">การชำระเงิน</dt>
                 <dd class="col-sm-7 col-lg-8">
-                    <span class="badge @(isPaid ? "text-bg-success" : "text-bg-warning")">@Model.PaymentLabel</span>
+                    <span class="badge @(isPaid ? "text-bg-success" : Model.PaymentLabel == PaymentService.RefundedLabel ? "text-bg-secondary" : "text-bg-warning")">@Model.PaymentLabel</span>
                 </dd>
             </dl>
         </div>
 
+        @if (Model.RefundPending && Model.StayStatus == null)
+        {
+            <div class="alert alert-warning mt-3">
+                ลูกค้ามีคำขอคืนเงินรอฝ่ายบัญชีพิจารณา ถ้าลูกค้ามาเช็คอิน คำขอนี้จะถูกปิดอัตโนมัติ (ไม่คืนเงิน)
+            </div>
+        }
         @if (Model.BookingStatus == BookingStatuses.Cancelled)
         {
-            <div class="alert alert-secondary mt-3">การจองนี้ถูกยกเลิกแล้ว</div>
+            <div class="alert alert-secondary mt-3">การจองนี้ถูกยกเลิกแล้ว@(Model.PaymentLabel == PaymentService.RefundedLabel ? " และคืนเงินให้ลูกค้าแล้ว" : "")</div>
         }
         else if (Model.StayStatus == null && !isPaid)
         {
@@ -79,6 +85,10 @@
 
         <nav class="d-flex flex-wrap gap-2 mt-4">
             <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">การชำระเงิน</a>
+            @if (isPaid)
+            {
+                <a asp-controller="Payment" asp-action="Receipt" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">ใบเสร็จ</a>
+            }
             <a asp-action="GuestDetails" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-primary">ข้อมูลลูกค้า</a>
             <a asp-action="Bookings" class="btn btn-outline-primary">กลับไปรายการจอง</a>
         </nav>

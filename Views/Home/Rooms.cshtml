@@ -13,6 +13,11 @@
             <p>เลือกห้องพักที่ใช่ แล้วตรวจสอบวันว่างจากปฏิทินการจองจริง</p>
         </div>
 
+        @if (TempData["BookingSuccess"] is string cancelled)
+        {
+            <div class="alert alert-success" role="status">@cancelled เลือกห้องใหม่สำหรับวันเดิมได้จากรายการด้านล่าง</div>
+        }
+
         @if (Model.HasSearchCriteria && !ViewData.ModelState.IsValid)
         {
             <div class="feature-box mb-4">

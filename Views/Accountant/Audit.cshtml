@@ -1,0 +1,98 @@
+@model GoodHotel.Models.ViewModels.AuditViewModel
+@{
+    ViewData["Title"] = "ตรวจสอบย้อนหลัง (Audit)";
+    var iso = System.Globalization.CultureInfo.InvariantCulture;
+    var fromText = Model.From.ToString("yyyy-MM-dd", iso);
+    var toText = Model.To.ToString("yyyy-MM-dd", iso);
+
+    string Tone(string type) => type switch
+    {
+        "RefundApproved" or "BookingCancelled" or "Rejection" or "RefundRejected" or "LegacyExcluded" => "text-bg-danger",
+        "RefundRequested" or "Submission" => "text-bg-warning",
+        "Confirmation" or "MockConfirmed" or "DeskCashReceived" or "LegacyConfirmed" => "text-bg-success",
+        _ => "text-bg-secondary"
+    };
+}
+
+@section Actions {
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportAudit" asp-route-from="@fromText" asp-route-to="@toText"
+       asp-route-type="@Model.Type" asp-route-bookingId="@Model.BookingId" asp-route-actor="@Model.Actor">ดาวน์โหลด CSV</a>
+}
+
+<form method="get" asp-action="Audit" class="toolbar">
+    <div>
+        <label class="form-label" for="from">ตั้งแต่</label>
+        <input id="from" name="from" type="date" class="form-control" value="@fromText" />
+    </div>
+    <div>
+        <label class="form-label" for="to">ถึง</label>
+        <input id="to" name="to" type="date" class="form-control" value="@toText" />
+    </div>
+    <div>
+        <label class="form-label" for="type">เหตุการณ์</label>
+        <select id="type" name="type" class="form-select">
+            <option value="">ทั้งหมด</option>
+            @foreach (var t in Model.Types)
+            {
+                <option value="@t.Key" selected="@(t.Key == Model.Type)">@t.Value</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="form-label" for="bookingId">เลขที่การจอง</label>
+        <input id="bookingId" name="bookingId" type="number" min="1" class="form-control" value="@Model.BookingId" />
+    </div>
+    <div>
+        <label class="form-label" for="actor">ผู้ทำรายการ</label>
+        <input id="actor" name="actor" class="form-control" value="@Model.Actor" placeholder="ชื่อ" />
+    </div>
+    <button class="btn btn-primary" type="submit">กรอง</button>
+    <a class="btn btn-outline-secondary" asp-action="Audit">ล้าง</a>
+</form>
+
+<section class="table-panel">
+    <div class="panel-head">
+        <h2>เหตุการณ์ @ThaiText.Date(Model.From) – @ThaiText.Date(Model.To)</h2>
+        <span class="text-muted small">@Model.Entries.Count รายการ@(Model.Truncated ? " (แสดงล่าสุด 1,000 รายการ ช่วงวันที่ให้แคบลง)" : "")</span>
+    </div>
+    @if (Model.Entries.Count == 0)
+    {
+        <p class="panel-empty">ไม่มีเหตุการณ์ตามเงื่อนไขนี้</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr><th>เวลา</th><th>เหตุการณ์</th><th>การจอง</th><th>ผู้ทำรายการ</th><th>หมายเหตุ</th><th class="text-end">จำนวนเงิน</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Model.Entries)
+                    {
+                        <tr>
+                            <td class="num text-nowrap">@ThaiText.Time(e.OccurredAtUtc)</td>
+                            <td>
+                                <span class="badge @Tone(e.Type)">@e.TypeLabel</span>
+                                @if (e.PaymentId.HasValue)
+                                {
+                                    <div class="text-muted small">ชำระเงิน #@e.PaymentId · @ThaiText.PaymentMethod(e.Method)</div>
+                                }
+                            </td>
+                            <td>
+                                @if (e.BookingId.HasValue)
+                                {
+                                    <a asp-controller="Payment" asp-action="Details" asp-route-id="@e.BookingId">#@e.BookingId</a>
+                                }
+                                else { <span>-</span> }
+                            </td>
+                            <td>@ThaiText.OrDash(e.Actor)@if (e.ActorRole != null) {<div class="text-muted small">@e.ActorRole</div>}</td>
+                            <td class="small">@ThaiText.OrDash(e.Detail)</td>
+                            <td class="text-end num">@(e.Amount.HasValue ? ThaiText.Baht(e.Amount.Value) : "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+<p class="text-muted small mt-2">ทุกการรับเงิน คำขอ/อนุมัติ/ปฏิเสธคืนเงิน และการยกเลิกการจอง ถูกบันทึกพร้อมผู้ทำรายการและเหตุผล แก้ไขหรือลบย้อนหลังไม่ได้</p>

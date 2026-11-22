@@ -27,18 +27,22 @@
 </div>
 
 <div class="figures">
+    @* ตอนนี้ชำระออนไลน์เท่านั้น (ยืนยันทันที) จะเหลือเฉพาะรายการเงินสดเก่าที่ยังค้าง จึงแสดงเมื่อมีเท่านั้น *@
+    @if (Model.AwaitingReview > 0)
+    {
+        <div class="figure is-alert">
+            <a asp-controller="Payment" asp-action="Queue" asp-route-status="Pending">
+                <div class="label">การชำระเงินเก่ารอยืนยัน</div>
+                <div class="value">@Model.AwaitingReview</div>
+                <div class="note">รายการเงินสดจากก่อนเปลี่ยนเป็นชำระออนไลน์อย่างเดียว</div>
+            </a>
+        </div>
+    }
     <div class="figure @(Model.RefundRequests > 0 ? "is-alert" : "")">
-        <a asp-controller="Payment" asp-action="Queue">
-            <div class="label">คำขอคืนเงินรออนุมัติ</div>
+        <a asp-controller="Payment" asp-action="Queue" asp-fragment="refunds">
+            <div class="label">คำขอคืนเงินรอพิจารณา</div>
             <div class="value">@Model.RefundRequests</div>
-            <div class="note">ฝ่ายบัญชีเป็นผู้อนุมัติ</div>
-        </a>
-    </div>
-    <div class="figure @(Model.AwaitingReview > 0 ? "is-alert" : "")">
-        <a asp-controller="Payment" asp-action="Queue" asp-route-status="Submitted">
-            <div class="label">สลิปรอตรวจ</div>
-            <div class="value">@Model.AwaitingReview</div>
-            <div class="note">พนักงานต้อนรับหรือฝ่ายบัญชีตรวจได้</div>
+            <div class="note">อนุมัติแล้วการจองถูกยกเลิกอัตโนมัติ</div>
         </a>
     </div>
     <div class="figure @(Model.LegacyToReconcile > 0 ? "is-alert" : "")">

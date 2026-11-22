@@ -34,6 +34,11 @@ public class MyBookingViewModel
 
     public bool CanCancel { get; set; }
 
+    public bool CanRequestRefund { get; set; }
+
+    // คำขอคืนเงินล่าสุด: null = ไม่เคยขอ, Requested / Approved / Rejected / Closed
+    public string? RefundStatus { get; set; }
+
     public DateTime? CreatedAtUtc { get; set; }
 
     public string? CancelReason { get; set; }

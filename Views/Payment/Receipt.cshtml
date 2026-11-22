@@ -1,0 +1,101 @@
+@model GoodHotel.Models.ViewModels.ReceiptViewModel
+@{
+    ViewData["Title"] = $"ใบเสร็จ {Model.ReceiptNumber}";
+}
+
+<section class="content-section">
+<div class="container">
+    <div class="receipt-tools no-print">
+        <a asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-outline-secondary btn-sm">กลับไปหน้าการชำระเงิน</a>
+        <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
+    </div>
+
+    <article class="receipt" aria-label="ใบเสร็จรับเงิน @Model.ReceiptNumber">
+        <header class="receipt-head">
+            <div>
+                <div class="receipt-hotel">Good Hotel</div>
+                <div class="receipt-muted">86 ถนนสุขุมวิท กรุงเทพฯ · โทร 02 555 8900</div>
+            </div>
+            <div class="receipt-title">
+                <h2>ใบเสร็จรับเงิน</h2>
+                <div class="receipt-muted">เลขที่ <strong class="text-body">@Model.ReceiptNumber</strong></div>
+                <div class="receipt-muted">วันที่ @ThaiText.Time(Model.PaidAtUtc)</div>
+            </div>
+        </header>
+
+        <div class="receipt-parties">
+            <div>
+                <div class="receipt-label">ได้รับเงินจาก</div>
+                <div class="fw-semibold">@ThaiText.OrDash(Model.GuestName?.Trim())</div>
+                @if (!string.IsNullOrWhiteSpace(Model.GuestPhone)) { <div class="receipt-muted">โทร @Model.GuestPhone</div> }
+                @if (!string.IsNullOrWhiteSpace(Model.GuestEmail)) { <div class="receipt-muted">@Model.GuestEmail</div> }
+            </div>
+            <div>
+                <div class="receipt-label">การเข้าพัก</div>
+                <div>การจอง #@Model.BookingId · ห้อง @ThaiText.OrDash(Model.RoomNumber) (@ThaiText.OrDash(Model.RoomType))</div>
+                <div class="receipt-muted">
+                    @ThaiText.Date(Model.CheckIn) – @ThaiText.Date(Model.CheckOut) · @Model.Nights คืน · ผู้เข้าพัก @(Model.Guests?.ToString() ?? "-") คน
+                </div>
+            </div>
+        </div>
+
+        <table class="table receipt-lines">
+            <thead><tr><th>รายการ</th><th class="text-end">จำนวนเงิน (บาท)</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>
+                        ค่าห้องพัก @Model.Nights คืน
+                        @if (Model.PromotionName != null)
+                        {
+                            <div class="receipt-muted small">หักส่วนลดโปรโมชัน "@Model.PromotionName" แล้ว</div>
+                        }
+                    </td>
+                    <td class="text-end num">@Model.RoomAmount.ToString("N2")</td>
+                </tr>
+                @if (Model.ExtraBeds > 0)
+                {
+                    <tr>
+                        <td>เตียงเสริม @Model.ExtraBeds เตียง × @Model.Nights คืน (฿@GoodHotel.Models.ViewModels.ReceiptViewModel.ExtraBedPerNight.ToString("N0")/เตียง/คืน)</td>
+                        <td class="text-end num">@Model.ExtraBedAmount.ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="receipt-total">
+                    <td>ยอดรวม</td>
+                    <td class="text-end num">@Model.BookingAmount.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td>ชำระแล้ว · @ThaiText.PaymentMethod(Model.Method)</td>
+                    <td class="text-end num">@Model.PaidAmount.ToString("N2")</td>
+                </tr>
+                @if (Model.RefundedAmount > 0)
+                {
+                    <tr>
+                        <td>คืนเงินแล้ว</td>
+                        <td class="text-end num">−@Model.RefundedAmount.ToString("N2")</td>
+                    </tr>
+                    <tr class="receipt-total">
+                        <td>ยอดสุทธิที่โรงแรมได้รับ</td>
+                        <td class="text-end num">@Model.NetPaid.ToString("N2")</td>
+                    </tr>
+                }
+            </tfoot>
+        </table>
+
+        @if (Model.IsCancelled)
+        {
+            <p class="receipt-note">การจองนี้ถูกยกเลิกแล้ว@(Model.RefundedAmount > 0 ? " และคืนเงินตามรายการข้างต้น" : " หลังชำระเงิน โดยลูกค้ายกเลิกเอง จึงไม่คืนเงินตามเงื่อนไขการจอง")</p>
+        }
+        @if (Model.IsMock)
+        {
+            <p class="receipt-note">การชำระเงินจำลองเพื่อสาธิตระบบ ไม่มีการโอนเงินจริง</p>
+        }
+
+        <footer class="receipt-foot">
+            <div class="receipt-muted">ผู้รับเงิน / ยืนยันการชำระ: @ThaiText.OrDash(Model.ReceivedBy?.Trim())</div>
+            <div class="receipt-muted">เอกสารนี้ไม่ใช่ใบกำกับภาษี</div>
+        </footer>
+    </article>
+</div>
+</section>

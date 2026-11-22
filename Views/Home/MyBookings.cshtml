@@ -21,6 +21,12 @@
         {
             <div class="alert alert-warning" role="alert">@error</div>
         }
+        @if (ViewData["RefundNotices"] is int refundNotices && refundNotices > 0)
+        {
+            <div class="alert alert-info" role="status">
+                ฝ่ายบัญชีพิจารณาคำขอคืนเงินของคุณแล้ว @refundNotices รายการ ดูผลได้ที่การ์ดการจองด้านล่าง
+            </div>
+        }
 
         @if (Model.Count == 0)
         {

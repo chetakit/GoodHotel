@@ -13,13 +13,14 @@ public sealed record PromotionContext(
 public sealed record AppliedPromotion(int PromotionId, string Name, decimal DiscountAmount);
 
 /// <summary>
-/// หาโปรที่ลูกค้าได้รับอัตโนมัติ
-/// กติกา: 1 การจองใช้ได้ 1 โปร และระบบเลือกโปรที่ลดได้มากที่สุดให้
+/// โปรโมชันของการจอง
+/// กติกา: 1 การจองใช้ได้ 1 โปร ลูกค้าเลือกเองจากโปรที่เข้าเงื่อนไข (ค่าเริ่มต้น = โปรที่ลดได้มากที่สุด)
 /// ส่วนลดคิดจากค่าห้องเท่านั้น (ไม่รวมเตียงเสริม)
 /// </summary>
 public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityService availability)
 {
-    public async Task<AppliedPromotion?> FindBestAsync(PromotionContext booking, CancellationToken ct)
+    /// <summary>โปรทั้งหมดที่การจองนี้ใช้ได้ เรียงจากลดมากไปน้อย</summary>
+    public async Task<IReadOnlyList<AppliedPromotion>> FindEligibleAsync(PromotionContext booking, CancellationToken ct)
     {
         var candidates = await db.Promotions.AsNoTracking()
             .Where(p => p.IsActive && p.RuleType != null && p.DiscountType != null && p.DiscountValue > 0)
@@ -33,7 +34,25 @@ public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityServ
             .Select(p => new AppliedPromotion(p.PromotionId, p.PromotionName ?? "Promotion", CalculateDiscount(p, booking.RoomSubtotal)))
             .Where(p => p.DiscountAmount > 0)
             .OrderByDescending(p => p.DiscountAmount)
-            .FirstOrDefault();
+            .ThenBy(p => p.PromotionId)
+            .ToList();
+    }
+
+    public async Task<AppliedPromotion?> FindBestAsync(PromotionContext booking, CancellationToken ct) =>
+        (await FindEligibleAsync(booking, ct)).FirstOrDefault();
+
+    /// <summary>
+    /// โปรที่จะใช้จริง: ถ้าลูกค้าเลือกโปรที่ใช้ได้ ใช้โปรนั้น ไม่งั้น (ไม่ได้เลือก/เลือกโปรที่ใช้ไม่ได้) ใช้โปรที่ดีที่สุด
+    /// ตรวจจากฝั่ง server ทุกครั้ง ไม่เชื่อค่าที่ส่งมาจากหน้าเว็บ
+    /// </summary>
+    public async Task<(AppliedPromotion? Chosen, IReadOnlyList<AppliedPromotion> Eligible)> ResolveAsync(
+        PromotionContext booking, int? selectedPromotionId, CancellationToken ct)
+    {
+        var eligible = await FindEligibleAsync(booking, ct);
+        var chosen = (selectedPromotionId.HasValue
+            ? eligible.FirstOrDefault(p => p.PromotionId == selectedPromotionId.Value)
+            : null) ?? eligible.FirstOrDefault();
+        return (chosen, eligible);
     }
 
     public static decimal CalculateDiscount(Promotion promotion, decimal roomSubtotal)

@@ -129,10 +129,12 @@ public sealed class BookingService
         model.RoomSubtotal = subtotal;
         model.ExtraBedCount = request.ExtraBedCount;
 
-        // ระบบเลือกโปรที่ดีที่สุดให้อัตโนมัติ
-        var promotion = await _promotions.FindBestAsync(
+        // โปรที่ลูกค้าเลือก (ถ้าเลือกโปรที่ใช้ไม่ได้ หรือยังไม่เลือก ใช้โปรที่ลดได้มากที่สุด)
+        var (promotion, eligible) = await _promotions.ResolveAsync(
             new PromotionContext(customerId, request.CheckIn!.Value, request.CheckOut!.Value, subtotal),
+            request.PromotionId,
             cancellationToken);
+        model.AvailablePromotions = eligible;
         model.PromotionId = promotion?.PromotionId;
         model.PromotionName = promotion?.Name;
         model.DiscountAmount = promotion?.DiscountAmount ?? 0m;
@@ -322,9 +324,10 @@ public sealed class BookingService
                     Message: "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
             }
 
-            // คำนวณโปรใหม่ตอนบันทึกจริง (ไม่เชื่อค่าจากหน้าเว็บ)
-            var promotion = await _promotions.FindBestAsync(
+            // คำนวณโปรใหม่ตอนบันทึกจริง: ตรวจว่าโปรที่ลูกค้าเลือกยังใช้ได้ (ไม่เชื่อส่วนลดจากหน้าเว็บ)
+            var (promotion, _) = await _promotions.ResolveAsync(
                 new PromotionContext(userId, request.CheckIn.Value, request.CheckOut.Value, roomSubtotal),
+                request.PromotionId,
                 cancellationToken);
             var promotionId = promotion?.PromotionId;
             var discountAmount = promotion?.DiscountAmount ?? 0m;

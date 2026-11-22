@@ -9,7 +9,6 @@
             กรุณาชำระเงินภายใน <strong>@ThaiText.Time(due)</strong>
             (เหลือ <strong class="num" data-countdown>@($"{(int)Math.Max(0, remaining.TotalMinutes):00}:{Math.Max(0, remaining.Seconds):00}")</strong>)
             ถ้าไม่ชำระ การจองจะถูกยกเลิกอัตโนมัติ
-            <div class="small mt-1">เลือก "เงินสดที่โรงแรม" ได้ ถ้าจะจ่ายตอนเข้าพัก</div>
         </div>
         <div data-deadline-closed @(remaining > TimeSpan.Zero ? "hidden" : null)>
             <strong>หมดเวลาชำระเงินแล้ว</strong> การจองนี้จะถูกยกเลิกอัตโนมัติ กรุณาค้นหาห้องแล้วจองใหม่

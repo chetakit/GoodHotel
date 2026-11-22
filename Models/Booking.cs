@@ -54,6 +54,7 @@ public static class CancelReasons
     public const string Customer = "Customer";
     public const string Staff = "Staff";
     public const string PaymentTimeout = "PaymentTimeout";
+    public const string Refund = "RefundApproved";
 
     /// <summary>ข้อความสั้นสำหรับป้ายสถานะ</summary>
     public static string Label(string? reason) => reason switch
@@ -61,6 +62,7 @@ public static class CancelReasons
         Customer => "ลูกค้ายกเลิก",
         Staff => "พนักงานยกเลิก",
         PaymentTimeout => "หมดเวลาชำระเงิน",
+        Refund => "ยกเลิกเพราะอนุมัติคืนเงิน",
         _ => "ยกเลิกแล้ว"
     };
 }

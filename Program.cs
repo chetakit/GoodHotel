@@ -29,6 +29,7 @@ builder.Services.AddScoped<UserDirectory>();
 builder.Services.AddScoped<PromotionService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<UserAccessCache>();
+builder.Services.AddSingleton<RefundNotices>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 

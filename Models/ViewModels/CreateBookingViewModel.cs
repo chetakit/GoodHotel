@@ -19,4 +19,7 @@ public class CreateBookingViewModel
 
     [Range(0, 1, ErrorMessage = "จำนวนเตียงเสริมต้องเป็น 0 หรือ 1")]
     public int ExtraBedCount { get; set; }
+
+    // โปรที่ลูกค้าเลือกจาก dropdown (null = ให้ระบบเลือกโปรที่ลดได้มากที่สุด)
+    public int? PromotionId { get; set; }
 }

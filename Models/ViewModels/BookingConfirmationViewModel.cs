@@ -16,8 +16,11 @@ public class BookingConfirmationViewModel : CreateBookingViewModel
 
     public decimal? RoomSubtotal { get; set; }
 
-    // โปรที่ระบบเลือกให้อัตโนมัติ (null = ไม่เข้าเงื่อนไขโปรไหนเลย)
+    // โปรที่ใช้กับการจองนี้ (ลูกค้าเลือก หรือโปรที่ดีที่สุด; null = ไม่เข้าเงื่อนไขโปรไหนเลย)
     public string? PromotionName { get; set; }
+
+    // โปรทั้งหมดที่การจองนี้ใช้ได้ (ตัวเลือกใน dropdown) เรียงจากลดมากไปน้อย
+    public IReadOnlyList<GoodHotel.Services.AppliedPromotion> AvailablePromotions { get; set; } = [];
 
     public decimal? DiscountAmount { get; set; }
 
@@ -25,7 +28,7 @@ public class BookingConfirmationViewModel : CreateBookingViewModel
 
     public decimal? TotalAmount { get; set; }
 
-    public int? PromotionId { get; set; }
+    // PromotionId (โปรที่ใช้จริง) สืบทอดมาจาก CreateBookingViewModel
 
     public bool CanConfirm { get; set; }
 

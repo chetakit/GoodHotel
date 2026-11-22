@@ -28,8 +28,8 @@
                     <th>ห้อง</th>
                     <th>ประเภท</th>
                     <th>รับได้</th>
-                    <th>สถานะตอนนี้</th>
-                    <th title="ค่าที่ Admin ตั้งเอง ใช้ปิดขายห้องหรือตั้งเป็นซ่อมบำรุง">สถานะที่ตั้งไว้</th>
+                    <th title="คำนวณจากการจอง การเข้าพัก งานทำความสะอาด และงานซ่อมจริง">สถานะจริงตอนนี้</th>
+                    <th title="ค่าที่ Admin ตั้งเอง: เปิดให้ลูกค้าจอง หรือปิดขายห้องไว้">การเปิดขาย (Admin ตั้ง)</th>
                     <th>ราคา/คืน</th>
                     <th></th>
                 </tr>
@@ -51,8 +51,7 @@
                         var statusClass = room.Status?.Trim().ToUpperInvariant() switch
                         {
                             "AVAILABLE" => "text-bg-success",
-                            "OCCUPIED" => "text-bg-info",
-                            "RESERVED" => "text-bg-warning",
+                            "OCCUPIED" or "RESERVED" => "text-bg-warning",
                             "MAINTENANCE" => "text-bg-danger",
                             _ => "text-bg-secondary"
                         };
@@ -76,7 +75,14 @@
                                 }
                             </td>
                             <td>
-                                <span class="badge @statusClass">@ThaiText.Status(room.Status)</span>
+                                @* แสดงเป็น "เปิดขาย/ปิดขาย" ไม่ใช่ "ว่าง" เพื่อไม่ให้ขัดกับสถานะจริง (เช่น มีแขกพักอยู่แต่ Admin เปิดขายไว้) *@
+                                <span class="badge @statusClass">@(room.Status?.Trim().ToUpperInvariant() switch
+                                {
+                                    "AVAILABLE" => "เปิดขาย",
+                                    "MAINTENANCE" => "ปิด · ซ่อมบำรุง",
+                                    "RESERVED" or "OCCUPIED" => "ปิดขาย",
+                                    _ => ThaiText.Status(room.Status)
+                                })</span>
                             </td>
                             <td>@(room.Rate.HasValue ? $"฿{room.Rate.Value:N2}" : "")</td>
                             <td>

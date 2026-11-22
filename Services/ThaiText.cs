@@ -49,7 +49,7 @@ public static class ThaiText
         // ห้องพัก (ค่าที่ Admin ตั้ง)
         ["Available"] = "ว่าง",
         ["Occupied"] = "มีผู้เข้าพัก",
-        ["Reserved"] = "จองไว้",
+        ["Reserved"] = "ปิดขาย",
         ["Maintenance"] = "ซ่อมบำรุง",
 
         // ประวัติการชำระเงิน
@@ -61,6 +61,8 @@ public static class ThaiText
         ["RefundRequested"] = "ขอคืนเงิน",
         ["RefundApproved"] = "อนุมัติคืนเงิน",
         ["RefundRejected"] = "ปฏิเสธการคืนเงิน",
+        ["RefundClosed"] = "ปิดคำขอคืนเงิน (เช็คอินแล้ว)",
+        ["Closed"] = "ปิดแล้ว",
         ["LegacyConfirmed"] = "ยืนยันข้อมูลเก่า",
         ["LegacyExcluded"] = "ไม่นับข้อมูลเก่า",
 

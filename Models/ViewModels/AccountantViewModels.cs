@@ -26,8 +26,8 @@ public sealed record AccountantDashboardViewModel(
     MoneyTotal ThisMonth,
     MoneyTotal AllTime,
     int AwaitingReview,
-    int RefundRequests,
     int LegacyToReconcile,
+    int RefundRequests,
     IReadOnlyList<MethodTotal> MonthByMethod,
     IReadOnlyList<LedgerEntry> TodayLedger);
 
@@ -46,6 +46,29 @@ public sealed record FinanceReportViewModel(
     IReadOnlyList<MethodTotal> ByMethod,
     IReadOnlyList<DailyRow> Daily,
     IReadOnlyList<PromotionUsageViewModel> Promotions);
+
+/// <summary>หนึ่งเหตุการณ์ในหน้า Audit: การกระทำเรื่องเงิน (payment_events) หรือการยกเลิกการจอง</summary>
+public sealed record AuditEntry(
+    DateTime OccurredAtUtc,
+    string Type,
+    string TypeLabel,
+    int? BookingId,
+    int? PaymentId,
+    string? Actor,
+    string? ActorRole,
+    decimal? Amount,
+    string? Method,
+    string? Detail);
+
+public sealed record AuditViewModel(
+    DateOnly From,
+    DateOnly To,
+    string? Type,
+    int? BookingId,
+    string? Actor,
+    IReadOnlyList<AuditEntry> Entries,
+    IReadOnlyList<KeyValuePair<string, string>> Types,
+    bool Truncated);
 
 public sealed record DailyRow(DateOnly Date, decimal Received, decimal Refunded)
 {

@@ -7,11 +7,14 @@
     <label for="payment-method" class="form-label">วิธีชำระเงิน</label>
     <select id="payment-method" name="method" class="form-select" required>
         <option value="">-- เลือกวิธีชำระเงิน --</option>
-        @foreach (var method in new[] { "Bank Transfer (Mock)", "PromptPay (Mock)", "PayPal (Mock)", "Cash" })
+        @foreach (var method in new[] { "Bank Transfer (Mock)", "PromptPay (Mock)", "PayPal (Mock)" })
         {
             <option value="@method">@ThaiText.PaymentMethod(method)</option>
         }
     </select>
-    <p class="small text-muted mt-2">ถ้าเลือกเงินสด สถานะจะเป็น "รอดำเนินการ" จนกว่าพนักงานจะยืนยันว่าได้รับเงินแล้ว</p>
+    <p class="small text-muted mt-2">ชำระออนไลน์เท่านั้น ชำระแล้วยืนยันการจองทันที</p>
+    <div class="alert alert-warning small py-2">
+        <strong>เงื่อนไขการยกเลิก:</strong> ชำระเงินแล้วขอคืนเงินได้ 1 ครั้งก่อนเช็คอิน (ฝ่ายบัญชีพิจารณา อนุมัติแล้วยกเลิกการจองให้อัตโนมัติ) · ยกเลิกเอง<strong>ไม่คืนเงิน</strong>
+    </div>
     <button type="submit" class="btn btn-primary">ยืนยันการชำระเงิน</button>
 </form>

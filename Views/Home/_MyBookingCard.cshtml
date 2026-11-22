@@ -57,17 +57,46 @@
                     {
                         <p>ยอดคงค้าง: @(booking.OutstandingAmount.HasValue ? $"฿{booking.OutstandingAmount:N2}" : "ต้องตรวจสอบ")</p>
                     }
+                    @switch (booking.RefundStatus)
+                    {
+                        case "Requested":
+                            <p class="text-warning-emphasis mb-2">คำขอคืนเงิน: รอฝ่ายบัญชีพิจารณา (การจองยังอยู่ตามเดิม)</p>
+                            break;
+                        case "Rejected":
+                            <p class="text-danger mb-2">คำขอคืนเงินถูกปฏิเสธ · ดูเหตุผลที่หน้าการชำระเงิน · ยังมาพักได้ตามปกติ หรือยกเลิกเองแบบไม่คืนเงิน</p>
+                            break;
+                        case "Approved":
+                            <p class="text-success mb-2">อนุมัติคืนเงินแล้ว การจองถูกยกเลิกให้อัตโนมัติ</p>
+                            break;
+                        case "Closed":
+                            <p class="text-muted mb-2">คำขอคืนเงินถูกปิด เพราะเช็คอินเข้าพักแล้ว</p>
+                            break;
+                    }
 
                     <div class="d-flex flex-wrap gap-2">
                         <a asp-controller="Payment" asp-action="Details" asp-route-id="@booking.BookingId"
                            class="btn btn-outline-primary">ดูการชำระเงิน</a>
+                        @if (booking.PaymentStatus is "Paid" or "Refunded")
+                        {
+                            <a asp-controller="Payment" asp-action="Receipt" asp-route-id="@booking.BookingId"
+                               class="btn btn-outline-primary">ใบเสร็จ</a>
+                        }
 
+                        @if (booking.CanRequestRefund)
+                        {
+                            <a asp-controller="Payment" asp-action="Details" asp-route-id="@booking.BookingId"
+                               asp-fragment="refund" class="btn btn-outline-primary">ขอคืนเงิน</a>
+                        }
                         @if (booking.CanCancel)
                         {
+                            @* จ่ายแล้วยกเลิกเองได้แต่ไม่คืนเงิน: เตือนให้ชัดก่อนกด *@
+                            var paidAlready = booking.PaymentStatus == "Paid";
                             <form asp-controller="Home" asp-action="CancelBooking" method="post"
-                                  onsubmit="return confirm('ยืนยันยกเลิกการจอง #@booking.BookingId ?');">
+                                  onsubmit="return confirm('@(paidAlready
+                                      ? $"การจอง #{booking.BookingId} ชำระเงินแล้ว ยกเลิกเองจะไม่ได้รับเงินคืน{(booking.CanRequestRefund ? " (ถ้าต้องการเงินคืน ให้กดขอคืนเงินแทน)" : "")} ยืนยันยกเลิก?"
+                                      : $"ยืนยันยกเลิกการจอง #{booking.BookingId} ?")');">
                                 <input type="hidden" name="bookingId" value="@booking.BookingId" />
-                                <button type="submit" class="btn btn-outline-danger">ยกเลิกการจอง</button>
+                                <button type="submit" class="btn btn-outline-danger">@(paidAlready ? "ยกเลิก (ไม่คืนเงิน)" : "ยกเลิกการจอง")</button>
                             </form>
                         }
                     </div>

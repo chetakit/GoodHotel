@@ -16,10 +16,11 @@ namespace GoodHotel.Controllers
     [Authorize(Roles = "Admin")]
     public class AdminController : Controller
     {
+        // Admin เลือกได้แค่ เปิดขาย / ปิดขาย / ซ่อมบำรุง
+        // "มีผู้เข้าพัก" ต้องมาจากการเช็คอินจริงเท่านั้น (ค่า Occupied เก่าในฐานข้อมูลถือเป็นปิดขาย)
         private static readonly string[] AllowedRoomStatuses =
         {
             "Available",
-            "Occupied",
             "Reserved",
             "Maintenance"
         };

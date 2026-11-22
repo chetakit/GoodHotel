@@ -43,6 +43,8 @@ Check(!PaymentService.IsMockMethod("Bank Transfer") && !PaymentService.IsMockMet
 Check(!(await service.SubmitAsync(1, 1, "Bank Transfer", key, CancellationToken.None)).Succeeded &&
     !(await service.SubmitAsync(1, 1, "PayPal", key, CancellationToken.None)).Succeeded,
     "Unlabelled historical or unknown methods cannot be submitted as mock payments.");
+Check(!(await service.SubmitAsync(1, 1, "Cash", key, CancellationToken.None)).Succeeded,
+    "Online bookings cannot be paid in cash (cash is desk/walk-in only).");
 var review = typeof(PaymentController).GetMethod(nameof(PaymentController.Review))!;
 Check(review.GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Staff,Accountant" &&
     review.IsDefined(typeof(HttpPostAttribute)) && review.IsDefined(typeof(ValidateAntiForgeryTokenAttribute)),
@@ -148,5 +150,26 @@ Check(numericSql.Contains("= 7;", StringComparison.Ordinal) &&
     numericWhere.Contains("`p`.`PaymentId` =", StringComparison.Ordinal) &&
     numericWhere.Contains("`p`.`PaymentMethod` =", StringComparison.Ordinal),
     "Numeric search and method filtering must translate together to MySQL with ID 7.");
+
+// กติกาคำขอคืนเงิน / ยกเลิกเอง
+var day = new DateOnly(2026, 11, 22);
+Check(PaymentService.CanRequestRefund(BookingStatuses.Booked, day.AddDays(1), false, true, false, day),
+    "Paid booking before check-out without a stay may request a refund (check-in day included).");
+Check(!PaymentService.CanRequestRefund(BookingStatuses.Booked, day.AddDays(5), false, false, false, day),
+    "Unpaid booking cannot request a refund.");
+Check(!PaymentService.CanRequestRefund(BookingStatuses.Booked, day.AddDays(5), true, true, false, day),
+    "Checked-in booking cannot request a refund.");
+Check(!PaymentService.CanRequestRefund(BookingStatuses.Booked, day.AddDays(5), false, true, true, day),
+    "Only one refund request per booking (rejected cannot re-request).");
+Check(!PaymentService.CanRequestRefund(BookingStatuses.Cancelled, day.AddDays(5), false, true, false, day),
+    "Cancelled booking cannot request a refund.");
+Check(!PaymentService.CanRequestRefund(BookingStatuses.Booked, day, false, true, false, day),
+    "Past check-out cannot request a refund.");
+Check(BookingCancellationService.CanCancel(BookingStatuses.Booked, day.AddDays(1), false, false, day),
+    "Booking can be self-cancelled until check-in.");
+Check(!BookingCancellationService.CanCancel(BookingStatuses.Booked, day.AddDays(1), false, true, day),
+    "Self-cancel is blocked while a refund request is pending.");
+Check(!BookingCancellationService.CanCancel(BookingStatuses.Booked, day.AddDays(1), true, false, day),
+    "Checked-in booking cannot be cancelled.");
 
 Console.WriteLine("Payment workflow regression checks passed.");

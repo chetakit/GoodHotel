@@ -917,3 +917,44 @@ label.card:has(input:checked) { border-color: var(--accent); background: var(--a
 .hbar-row { display: grid; grid-template-columns: 7.5rem 1fr 2rem; gap: .6rem; align-items: center; padding: .4rem 1.1rem; font-size: .9rem; }
 .hbar-track { height: 10px; background: var(--chart-grid); border-radius: 0 4px 4px 0; }
 .hbar-fill { height: 100%; background: var(--chart-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+
+/* ---------- ใบเสร็จ (Views/Payment/Receipt.cshtml) ---------- */
+.receipt-tools { display: flex; justify-content: space-between; gap: .5rem; max-width: 760px; margin: 0 auto .75rem; }
+.receipt {
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 2rem 2.25rem;
+}
+.receipt-head { display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; padding-bottom: 1.25rem; border-bottom: 2px solid var(--ink); }
+.receipt-hotel { font-family: var(--serif); font-size: 1.5rem; }
+.receipt-title { text-align: right; }
+.receipt-title h2 { font-size: 1.25rem; margin: 0 0 .25rem; }
+.receipt-muted { color: var(--muted); font-size: .875rem; }
+.receipt-label { font-size: .78rem; color: var(--muted); margin-bottom: .15rem; }
+.receipt-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; padding: 1.25rem 0; }
+.receipt-lines { margin-top: .25rem; }
+.receipt-lines tfoot td { padding: .5rem .75rem; border-bottom: 0; }
+.receipt-lines tfoot tr:first-child td { border-top: 1px solid var(--line-strong); }
+.receipt-total td { font-weight: 600; font-size: 1.05rem; }
+.receipt-note { margin: 1rem 0 0; padding: .6rem .8rem; background: var(--paper); border-radius: 6px; font-size: .875rem; }
+.receipt-foot { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.75rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+@media (max-width: 575.98px) {
+    .receipt { padding: 1.25rem; }
+    .receipt-title { text-align: left; }
+    .receipt-parties { grid-template-columns: 1fr; }
+}
+
+/* พิมพ์: เหลือแค่ใบเสร็จ ไม่มีเมนู ส่วนหัว ส่วนท้าย หรือปุ่ม */
+@media print {
+    .top-header, .hotel-footer, .bo-side, .bo-top, .no-print, .page-loading { display: none !important; }
+    body, .bo, .hotel-body { background: #fff !important; }
+    .bo-content, .content-section, .content-section > .container { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+    .receipt { border: 0; padding: 0; max-width: none; }
+}
+
+/* แถบยกเลิกการจองในหน้าชำระเงิน */
+.cancel-strip { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; padding: .6rem .9rem; margin-bottom: 1rem; border: 1px dashed var(--line-strong); border-radius: 6px; }
+.cancel-strip form, form.cancel-strip { margin-bottom: 1rem; }

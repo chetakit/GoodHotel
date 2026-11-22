@@ -58,6 +58,8 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
             BookingId = bookingId, Status = "CheckedIn", CheckedInAtUtc = timeProvider.GetUtcNow().UtcDateTime,
             CheckedInByUserId = actorId, IsEarlyCheckIn = early, CheckInNote = note?.Trim()
         });
+        // มาพักแล้ว: คำขอคืนเงินที่ยังรออยู่ถูกปิดอัตโนมัติ (บัญชีจะอนุมัติคืนเงินหลังเข้าพักไม่ได้)
+        await PaymentService.CloseOpenRefundsAsync(db, bookingId, actorId, timeProvider.GetUtcNow().UtcDateTime, ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return null;

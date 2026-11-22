@@ -51,13 +51,17 @@
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
-                    <label asp-for="Status" class="form-label">สถานะห้อง</label>
-                    <select asp-for="Status" class="form-select">
-                        <option value="Available">ว่าง (พร้อมขาย)</option>
-                        <option value="Occupied">มีผู้เข้าพัก</option>
-                        <option value="Reserved">จองไว้ (ไม่พร้อมขาย)</option>
-                        <option value="Maintenance">ซ่อมบำรุง</option>
+                    @{
+                        // ค่า Occupied เก่า (เคยให้ Admin ตั้งเองได้) แสดงเป็น "ปิดขาย"
+                        var selectedStatus = Model.Status == "Occupied" ? "Reserved" : Model.Status;
+                    }
+                    <label for="Status" class="form-label">การเปิดขาย</label>
+                    <select id="Status" name="Status" class="form-select">
+                        <option value="Available" selected="@(selectedStatus == "Available")">เปิดขาย (ลูกค้าจองได้)</option>
+                        <option value="Reserved" selected="@(selectedStatus == "Reserved")">ปิดขาย (ไม่รับจองชั่วคราว)</option>
+                        <option value="Maintenance" selected="@(selectedStatus == "Maintenance")">ซ่อมบำรุง</option>
                     </select>
+                    <div class="form-text">ห้องมีผู้เข้าพักหรือไม่ ระบบดูจากการเช็คอินจริงเอง ไม่ต้องตั้ง</div>
                     <span asp-validation-for="Status" class="text-danger"></span>
                 </div>
             </div>

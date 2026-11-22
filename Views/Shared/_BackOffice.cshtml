@@ -17,7 +17,7 @@
             ("รับลูกค้า Walk-in", "Staff", "WalkIn", On("Staff", "WalkIn")),
             ("สถานะห้อง", "Staff", "RoomStatus", On("Staff", "RoomStatus")),
             ("ตรวจห้องหลังทำความสะอาด", "Staff", "VerificationTasks", On("Staff", "VerificationTasks", "VerificationDetails")),
-            ("การชำระเงิน", "Payment", "Queue", On("Payment")),
+            ("สถานะการชำระเงิน", "Payment", "Queue", On("Payment")),
             ("แจ้งซ่อม", "Maintenance", "Index", On("Maintenance")),
         },
         "Housekeeper" => new[]
@@ -33,6 +33,7 @@
             ("ปิดยอดรายวัน", "Accountant", "Daily", On("Accountant", "Daily")),
             ("รายการชำระเงิน", "Payment", "Queue", On("Payment")),
             ("รายงานการเงิน", "Accountant", "Reports", On("Accountant", "Reports")),
+            ("ตรวจสอบย้อนหลัง", "Accountant", "Audit", On("Accountant", "Audit")),
         },
         "Admin" => new[]
         {

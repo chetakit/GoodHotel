@@ -7,19 +7,20 @@ public sealed record CancelBookingResult(bool Succeeded, string Message);
 
 /// <summary>
 /// ลูกค้ายกเลิกการจองของตัวเอง
-/// เงื่อนไข: ต้องเป็นเจ้าของการจอง, ยังไม่ถูกยกเลิก, ยังไม่ check-in และต้องยกเลิกก่อนวันเข้าพัก
-/// ถ้าจ่ายเงินแล้ว ระบบจะสร้างคำขอคืนเงินให้ฝ่ายบัญชีอนุมัติต่ออัตโนมัติ
+/// เงื่อนไข: ต้องเป็นเจ้าของการจอง, ยังไม่ถูกยกเลิก, ยังไม่ check-in, ยังไม่เลยวันออก
+/// และไม่มีคำขอคืนเงินที่รอฝ่ายบัญชีพิจารณา (กันกรณียกเลิกไปแล้วบัญชีมาอนุมัติทีหลัง)
+/// ยกเลิกเอง = ไม่คืนเงิน ถ้าต้องการเงินคืนต้องส่งคำขอคืนเงินให้ฝ่ายบัญชีอนุมัติ (อนุมัติแล้วระบบยกเลิกการจองให้เอง)
 /// </summary>
 public sealed class BookingCancellationService(
     GoodHotelDbContext db,
-    PaymentService payments,
     TimeProvider time)
 {
-    public static bool CanCancel(string status, DateOnly? checkIn, bool hasStay, DateOnly today) =>
+    public static bool CanCancel(string status, DateOnly? checkOut, bool hasStay, bool refundPending, DateOnly today) =>
         status == BookingStatuses.Booked &&
         !hasStay &&
-        checkIn.HasValue &&
-        checkIn.Value > today;
+        !refundPending &&
+        checkOut.HasValue &&
+        checkOut.Value > today;
 
     public async Task<CancelBookingResult> CancelAsync(int bookingId, int customerId, CancellationToken ct)
     {
@@ -31,7 +32,9 @@ public sealed class BookingCancellationService(
             .Where(b => b.BookingId == bookingId &&
                         b.UserId == customerId &&
                         b.Status == BookingStatuses.Booked &&
-                        b.CheckIn > today &&
+                        b.CheckOut > today &&
+                        !db.PaymentRefunds.Any(r => r.Payment.BookingId == b.BookingId &&
+                                                    r.Status == PaymentService.RefundRequested) &&
                         !db.BookingStays.Any(s => s.BookingId == b.BookingId))
             .ExecuteUpdateAsync(b => b
                 .SetProperty(x => x.Status, BookingStatuses.Cancelled)
@@ -44,8 +47,10 @@ public sealed class BookingCancellationService(
         }
 
         await CloseOpenPaymentsAsync(bookingId, ct);
-        var refundMessage = await RequestRefundIfPaidAsync(bookingId, customerId, ct);
-        return new CancelBookingResult(true, $"ยกเลิกการจอง #{bookingId} เรียบร้อยแล้ว {refundMessage}".Trim());
+        var wasPaid = await PaymentService.IsPaidAsync(db, bookingId, ct);
+        return new CancelBookingResult(true, wasPaid
+            ? $"ยกเลิกการจอง #{bookingId} เรียบร้อยแล้ว (ยกเลิกเองไม่คืนเงิน)"
+            : $"ยกเลิกการจอง #{bookingId} เรียบร้อยแล้ว");
     }
 
     /// <summary>
@@ -61,13 +66,14 @@ public sealed class BookingCancellationService(
     /// <summary>
     /// พนักงานต้อนรับยกเลิกการจองแทนลูกค้า (เช่น ลูกค้าไม่มาเข้าพัก / จองแล้วไม่จ่ายเงิน)
     /// ยกเลิกได้เฉพาะการจองที่ยังไม่จ่ายเงินและยังไม่เช็คอิน
-    /// ถ้าจ่ายแล้ว ลูกค้าต้องยกเลิกเองเพื่อให้ระบบส่งคำขอคืนเงิน
+    /// ถ้าจ่ายแล้ว ให้ลูกค้าขอคืนเงิน (ฝ่ายบัญชีอนุมัติ) หรือยกเลิกเองแบบไม่คืนเงิน
     /// </summary>
     public async Task<CancelBookingResult> CancelByStaffAsync(int bookingId, CancellationToken ct)
     {
         if (await PaymentService.IsPaidAsync(db, bookingId, ct))
         {
-            return new CancelBookingResult(false, "การจองนี้จ่ายเงินแล้ว ให้ลูกค้ายกเลิกเองเพื่อขอคืนเงิน");
+            return new CancelBookingResult(false,
+                "การจองนี้ชำระเงินแล้ว ลูกค้าขอคืนเงินหรือยกเลิกเองได้ที่หน้าการจองของฉัน");
         }
 
         var updated = await db.Bookings
@@ -86,41 +92,6 @@ public sealed class BookingCancellationService(
             : new CancelBookingResult(false, "ยกเลิกไม่ได้: การจองนี้ถูกยกเลิกแล้วหรือเช็คอินไปแล้ว");
     }
 
-    private async Task<string> RequestRefundIfPaidAsync(int bookingId, int customerId, CancellationToken ct)
-    {
-        var confirmedPayment = await db.Payments.AsNoTracking()
-            .Where(p => p.BookingId == bookingId && p.VerifiedAtUtc != null)
-            .OrderBy(p => p.PaymentId)
-            .Select(p => new { p.PaymentId, p.Amount })
-            .FirstOrDefaultAsync(ct);
-
-        if (confirmedPayment?.Amount is not > 0)
-        {
-            return "";
-        }
-
-        var alreadyRefunded = await db.PaymentRefunds
-            .Where(r => r.PaymentId == confirmedPayment.PaymentId && r.Status == "Approved")
-            .SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
-        var remaining = confirmedPayment.Amount.Value - alreadyRefunded;
-        if (remaining <= 0)
-        {
-            return "";
-        }
-
-        var refund = await payments.RequestRefundAsync(
-            confirmedPayment.PaymentId,
-            customerId,
-            remaining,
-            $"ลูกค้ายกเลิกการจอง #{bookingId}",
-            Guid.NewGuid().ToString("N"),
-            ct);
-
-        return refund.Succeeded
-            ? $"ส่งคำขอคืนเงิน ฿{remaining:N2} ให้ฝ่ายบัญชีอนุมัติแล้ว"
-            : $"แต่ส่งคำขอคืนเงินอัตโนมัติไม่สำเร็จ ({refund.Message}) กรุณาขอคืนเงินที่หน้า Payment details";
-    }
-
     private async Task<string> ExplainWhyNotCancelledAsync(
         int bookingId, int customerId, DateOnly today, CancellationToken ct)
     {
@@ -129,15 +100,18 @@ public sealed class BookingCancellationService(
             .Select(b => new
             {
                 b.Status,
-                b.CheckIn,
-                HasStay = db.BookingStays.Any(s => s.BookingId == b.BookingId)
+                b.CheckOut,
+                HasStay = db.BookingStays.Any(s => s.BookingId == b.BookingId),
+                RefundPending = db.PaymentRefunds.Any(r => r.Payment.BookingId == b.BookingId &&
+                                                           r.Status == PaymentService.RefundRequested)
             })
             .SingleOrDefaultAsync(ct);
 
         if (booking == null) return "ไม่พบการจองนี้";
         if (booking.Status == BookingStatuses.Cancelled) return "การจองนี้ถูกยกเลิกไปแล้ว";
         if (booking.HasStay) return "เช็คอินแล้ว ไม่สามารถยกเลิกได้";
-        if (booking.CheckIn <= today) return "ยกเลิกได้ก่อนวันเข้าพักเท่านั้น กรุณาติดต่อพนักงานต้อนรับ";
+        if (booking.RefundPending) return "มีคำขอคืนเงินรอฝ่ายบัญชีพิจารณาอยู่ กรุณารอผลก่อน";
+        if (booking.CheckOut <= today) return "เลยวันออกของการจองนี้แล้ว";
         return "ไม่สามารถยกเลิกการจองนี้ได้";
     }
 }

@@ -1,7 +1,8 @@
 @model GoodHotel.Models.ViewModels.PaymentQueueViewModel
 @{
-    ViewData["Title"] = "รายการชำระเงิน";
     var isAccountant = User.IsInRole("Accountant");
+    // พนักงานต้อนรับใช้ดูว่าการจองไหนจ่ายแล้ว/คืนเงินแล้ว (ลูกค้าชำระออนไลน์ ยืนยันอัตโนมัติ) ฝ่ายบัญชีใช้ตรวจและพิจารณาคืนเงิน
+    ViewData["Title"] = isAccountant ? "รายการชำระเงิน" : "สถานะการชำระเงิน";
 
     string Badge(string status) => status switch
     {
@@ -14,12 +15,12 @@
 
 @if (Model.Refunds.Count > 0)
 {
-    <section class="table-panel mb-3">
+    <section class="table-panel mb-3" id="refunds">
         <div class="panel-head">
-            <h2>คำขอคืนเงินรออนุมัติ (@Model.Refunds.Count)</h2>
+            <h2>คำขอคืนเงินรอพิจารณา (@Model.Refunds.Count)</h2>
             @if (!isAccountant)
             {
-                <span class="text-muted small">ฝ่ายบัญชีเป็นผู้อนุมัติ</span>
+                <span class="text-muted small">ฝ่ายบัญชีเป็นผู้พิจารณา</span>
             }
         </div>
         <div class="table-responsive">
@@ -38,7 +39,7 @@
                                 @if (refund.BookingId.HasValue)
                                 {
                                     <a class="btn btn-sm @(isAccountant ? "btn-primary" : "btn-outline-primary")"
-                                       asp-action="Details" asp-route-id="@refund.BookingId">@(isAccountant ? "ตรวจและอนุมัติ" : "ดู")</a>
+                                       asp-action="Details" asp-route-id="@refund.BookingId" asp-fragment="refund">@(isAccountant ? "พิจารณา" : "ดู")</a>
                                 }
                             </td>
                         </tr>

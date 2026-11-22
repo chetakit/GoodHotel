@@ -313,6 +313,7 @@ public class HomeController : Controller
     [HttpGet]
     [Authorize(Roles = "Customer")]
     public async Task<IActionResult> MyBookings(
+        [FromServices] RefundNotices notices,
         CancellationToken cancellationToken)
     {
         if (!int.TryParse(
@@ -354,8 +355,6 @@ public class HomeController : Controller
         var today = _availability.HotelToday();
         foreach (var booking in bookings)
         {
-            booking.CanCancel = BookingCancellationService.CanCancel(
-                booking.BookingStatus, booking.CheckIn, booking.StayStatus != null, today);
             booking.IsHistory = booking.BookingStatus == BookingStatuses.Cancelled ||
                                 booking.StayStatus == "CheckedOut" ||
                                 (booking.StayStatus == null && booking.CheckOut <= today);
@@ -366,9 +365,11 @@ public class HomeController : Controller
             .Select(p => new { p.BookingId, p.PaymentId, p.PaymentMethod, p.PaymentStatus, p.Amount,
                 p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition })
             .ToListAsync(cancellationToken);
-        var refunds = await _db.PaymentRefunds.AsNoTracking()
-            .Where(r => r.Payment.Booking != null && r.Payment.Booking.UserId == userId && r.Status == "Approved")
-            .Select(r => new { r.Payment.BookingId, r.PaymentId, r.Amount }).ToListAsync(cancellationToken);
+        var allRefunds = await _db.PaymentRefunds.AsNoTracking()
+            .Where(r => r.Payment.Booking != null && r.Payment.Booking.UserId == userId)
+            .OrderByDescending(r => r.RefundId)
+            .Select(r => new { r.Payment.BookingId, r.PaymentId, r.Amount, r.Status }).ToListAsync(cancellationToken);
+        var refunds = allRefunds.Where(r => r.Status == PaymentService.RefundApproved).ToList();
 
         foreach (var booking in bookings)
         {
@@ -378,6 +379,12 @@ public class HomeController : Controller
             var confirmedPayment = records.Where(p => p.VerifiedAtUtc != null)
                 .OrderBy(p => p.PaymentId).FirstOrDefault();
             var paid = confirmedPayment?.Amount ?? 0m;
+            var bookingRefunds = allRefunds.Where(r => r.BookingId == booking.BookingId).ToList();
+            booking.RefundStatus = bookingRefunds.FirstOrDefault()?.Status;
+            booking.CanCancel = BookingCancellationService.CanCancel(booking.BookingStatus, booking.CheckOut,
+                booking.StayStatus != null, booking.RefundStatus == PaymentService.RefundRequested, today);
+            booking.CanRequestRefund = PaymentService.CanRequestRefund(booking.BookingStatus, booking.CheckOut,
+                booking.StayStatus != null, confirmedPayment != null, bookingRefunds.Count > 0, today);
             var refunded = refunds.Where(r => r.BookingId == booking.BookingId &&
                 r.PaymentId == confirmedPayment?.PaymentId).Sum(r => r.Amount);
             // การคืนเงินไม่ทำให้ลูกค้าค้างจ่ายเพิ่ม (เดิมบวกยอดคืนกลับเข้าไป)
@@ -406,22 +413,44 @@ public class HomeController : Controller
             }
         }
 
+        // ผลคำขอคืนเงินใหม่ที่ยังไม่เคยเห็น: แจ้งบนหน้านี้ แล้วนับว่าเห็นแล้ว (ตัวเลขที่เมนูหายไป)
+        ViewData["RefundNotices"] = await notices.UnseenAsync(HttpContext, _db, userId, cancellationToken);
+        notices.MarkSeen(HttpContext, userId);
         return View(bookings);
     }
 
     [HttpPost]
     [Authorize(Roles = "Customer")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CancelBooking(int bookingId, CancellationToken cancellationToken)
+    /// <param name="findAnotherRoom">กดจากหน้าชำระเงิน "ยกเลิกแล้วเลือกห้องอื่น": ยกเลิกสำเร็จแล้วพาไปค้นห้องวันเดิม</param>
+    public async Task<IActionResult> CancelBooking(int bookingId, bool findAnotherRoom, CancellationToken cancellationToken)
     {
         if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
         {
             return Forbid();
         }
 
+        var stay = await _db.Bookings.AsNoTracking()
+            .Where(b => b.BookingId == bookingId && b.UserId == userId)
+            .Select(b => new { b.CheckIn, b.CheckOut, b.Guests })
+            .FirstOrDefaultAsync(cancellationToken);
+
         var result = await _cancellation.CancelAsync(bookingId, userId, cancellationToken);
         TempData[result.Succeeded ? "BookingSuccess" : "BookingError"] = result.Message;
-        return RedirectToAction(nameof(MyBookings));
+
+        if (result.Succeeded && findAnotherRoom && stay?.CheckIn != null && stay.CheckOut != null)
+        {
+            var iso = System.Globalization.CultureInfo.InvariantCulture;
+            return RedirectToAction(nameof(Rooms), new
+            {
+                CheckIn = stay.CheckIn.Value.ToString("yyyy-MM-dd", iso),
+                CheckOut = stay.CheckOut.Value.ToString("yyyy-MM-dd", iso),
+                Guests = stay.Guests ?? 1
+            });
+        }
+        return result.Succeeded || !findAnotherRoom
+            ? RedirectToAction(nameof(MyBookings))
+            : RedirectToAction("Details", "Payment", new { id = bookingId });
     }
 
     [HttpGet]
@@ -475,7 +504,8 @@ public class HomeController : Controller
                 CheckIn = checkIn,
                 CheckOut = checkOut,
                 Guests = request.Guests,
-                ExtraBedCount = request.ExtraBedCount
+                ExtraBedCount = request.ExtraBedCount,
+                PromotionId = request.PromotionId
             },
             CurrentCustomerId(),
             cancellationToken);
@@ -487,19 +517,27 @@ public class HomeController : Controller
 
         return Json(new ApplyPromotionResponseViewModel(
             true,
-            PromotionMessage(quote.PromotionName),
+            PromotionMessage(quote),
             quote.PromotionName,
             quote.NightCount,
             quote.RoomSubtotal,
             quote.DiscountAmount,
             quote.ExtraBedAmount,
-            quote.TotalAmount));
+            quote.TotalAmount,
+            quote.PromotionId));
     }
 
-    private static string PromotionMessage(string? promotionName) =>
-        promotionName == null
-            ? "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชัน"
-            : $"ได้รับโปรโมชัน \"{promotionName}\" อัตโนมัติ";
+    // ข้อความใต้ dropdown: บอกว่าใช้โปรอะไร และถ้าไม่ใช่โปรที่ลดได้มากที่สุดให้บอกด้วย
+    private static string PromotionMessage(BookingConfirmationViewModel quote)
+    {
+        if (quote.PromotionName == null) return "การจองนี้ยังไม่เข้าเงื่อนไขโปรโมชัน";
+        var best = quote.AvailablePromotions.FirstOrDefault();
+        var chosenDiscount = quote.DiscountAmount ?? 0m;
+        // บอกว่ามีโปรที่ลดได้มากกว่า เฉพาะเมื่อมากกว่าจริง (ลดเท่ากันถือว่าคุ้มที่สุดเหมือนกัน)
+        return best != null && best.DiscountAmount > chosenDiscount
+            ? $"ใช้โปร \"{quote.PromotionName}\" ลด ฿{chosenDiscount:N0} (โปร \"{best.Name}\" ลดได้ ฿{best.DiscountAmount:N0})"
+            : $"ใช้โปร \"{quote.PromotionName}\" ลด ฿{chosenDiscount:N0} ซึ่งคุ้มที่สุดแล้ว";
+    }
 
     private int? CurrentCustomerId() =>
         User.IsInRole("Customer") && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0
@@ -515,6 +553,7 @@ public class HomeController : Controller
         [FromForm] string? checkOut,
         [FromForm] int? guests,
         [FromForm] int extraBedCount,
+        [FromForm] int? promotionId,
         CancellationToken cancellationToken)
     {
         var parsedCheckIn = TryParseBookingDate(
@@ -530,7 +569,8 @@ public class HomeController : Controller
             CheckIn = parsedCheckIn ? checkInDate : null,
             CheckOut = parsedCheckOut ? checkOutDate : null,
             Guests = guests,
-            ExtraBedCount = extraBedCount
+            ExtraBedCount = extraBedCount,
+            PromotionId = promotionId
         };
 
         if (!parsedCheckIn)
@@ -1015,15 +1055,36 @@ public class HomeController : Controller
             return View(data);
         }
 
-        var lastUser = _db.Users
-            .OrderByDescending(u => u.UserId)
-            .FirstOrDefault();
+        // เคยมาแบบ Walk-in: พนักงานสร้างบัญชีให้แล้ว (ยังไม่มีรหัสผ่าน) → ผูกเข้าบัญชีเดิมแทนการสร้างบัญชีซ้ำ
+        // ประวัติการเข้าพักเดิมจะโผล่ในหน้าการจองของฉัน และ Walk-in ครั้งหน้าก็เข้าบัญชีเดียวกัน
+        // ต้องตรงทั้งเบอร์และชื่อ-นามสกุล และต้องเป็นบัญชีที่ยังไม่มีรหัสผ่านเท่านั้น
+        // (กันคนอื่นกรอกเบอร์ของลูกค้าคนอื่นมาสมัครเพื่อดูประวัติ หรือสมัครทับบัญชีที่มีเจ้าของแล้ว)
+        var firstName = data.FirstName!.Trim();
+        var lastName = data.LastName!.Trim();
+        var walkInCandidates = _db.Users
+            .Where(u => u.Role == "Customer" && u.Password == null && u.Phone == data.Phone)
+            .ToList();
+        var walkInAccount = walkInCandidates.FirstOrDefault(u =>
+            string.Equals(u.FirstName?.Trim(), firstName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(u.LastName?.Trim(), lastName, StringComparison.OrdinalIgnoreCase));
 
-        User user = new();
+        User user;
+        if (walkInAccount != null)
+        {
+            user = walkInAccount;
+            user.IsActive = true;
+        }
+        else
+        {
+            var lastUser = _db.Users
+                .OrderByDescending(u => u.UserId)
+                .FirstOrDefault();
+            user = new User { UserId = lastUser == null ? 1 : lastUser.UserId + 1, Role = "Customer" };
+            _db.Add(user);
+        }
 
-        user.UserId = lastUser == null ? 1 : lastUser.UserId + 1;
-        user.FirstName = data.FirstName!.Trim();
-        user.LastName = data.LastName!.Trim();
+        user.FirstName = firstName;
+        user.LastName = lastName;
         user.Email = email;
         user.Phone = data.Phone!;
         user.BirthDate = data.BirthDate;
@@ -1034,11 +1095,8 @@ public class HomeController : Controller
             data.Password!
         );
 
-        user.Role = "Customer";
-
         try
         {
-            _db.Add(user);
             _db.SaveChanges();
         }
         catch (Microsoft.EntityFrameworkCore.DbUpdateException exception)
@@ -1056,8 +1114,9 @@ public class HomeController : Controller
             return View(data);
         }
 
-        TempData["RegisterSuccessMessage"] =
-            "สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ";
+        TempData["RegisterSuccessMessage"] = walkInAccount != null
+            ? "สมัครสมาชิกสำเร็จ ระบบเชื่อมประวัติการเข้าพักที่เคาน์เตอร์ (Walk-in) เข้ากับบัญชีนี้แล้ว กรุณาเข้าสู่ระบบ"
+            : "สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ";
 
         return RedirectToAction("Login");
     }

@@ -21,6 +21,9 @@ public sealed class ApplyPromotionRequestViewModel
 
     [Range(0, 1)]
     public int ExtraBedCount { get; set; }
+
+    // โปรที่ลูกค้าเลือก (null = โปรที่ลดได้มากที่สุด)
+    public int? PromotionId { get; set; }
 }
 
 public sealed record ApplyPromotionResponseViewModel(
@@ -31,4 +34,5 @@ public sealed record ApplyPromotionResponseViewModel(
     decimal? RoomSubtotal = null,
     decimal? DiscountAmount = null,
     decimal? ExtraBedAmount = null,
-    decimal? TotalAmount = null);
+    decimal? TotalAmount = null,
+    int? PromotionId = null);

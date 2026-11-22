@@ -71,6 +71,7 @@ namespace GoodHotel.Controllers
             string BookingStatus)
         {
             public string PaymentLabel { get; init; } = "";
+            public bool RefundPending { get; init; }
         }
 
         public sealed record GuestDetailsModel(
@@ -235,7 +236,9 @@ namespace GoodHotel.Controllers
 
             return View(booking with
             {
-                PaymentLabel = await PaymentService.PaymentLabelAsync(_db, booking.BookingId, cancellationToken)
+                PaymentLabel = await PaymentService.PaymentLabelAsync(_db, booking.BookingId, cancellationToken),
+                RefundPending = await _db.PaymentRefunds.AnyAsync(r => r.Payment.BookingId == booking.BookingId &&
+                    r.Status == PaymentService.RefundRequested, cancellationToken)
             });
         }
 

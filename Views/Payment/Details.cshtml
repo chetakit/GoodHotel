@@ -93,14 +93,78 @@
     }
     else if (pending && isCustomer)
     {
-        <div class="alert alert-info">มีการชำระเงินที่รอยืนยัน ถ้าชำระด้วยเงินสด พนักงานจะยืนยันเมื่อได้รับเงินที่โรงแรม</div>
+        <div class="alert alert-info">มีการชำระเงินที่รอยืนยัน รอพนักงานหรือฝ่ายบัญชีตรวจสอบ</div>
+    }
+
+    @* ยังไม่จ่าย: ยกเลิกได้ทันที แล้วพาไปเลือกห้องอื่นวันเดิม *@
+    @if (isCustomer && !Model.IsCancelled && !confirmed)
+    {
+        @if (TempData["BookingError"] is string cancelError) { <div class="alert alert-danger" role="alert">@cancelError</div> }
+        <form asp-controller="Home" asp-action="CancelBooking" method="post" class="cancel-strip"
+              onsubmit="return confirm('ยกเลิกการจอง #@Model.BookingId แล้วไปเลือกห้องอื่น?');">
+            <input type="hidden" name="bookingId" value="@Model.BookingId" />
+            <input type="hidden" name="findAnotherRoom" value="true" />
+            <span class="text-muted small">เปลี่ยนใจ อยากได้ห้องอื่น? ยกเลิกการจองนี้ได้ (ยังไม่ได้จ่ายเงิน จึงไม่มีค่าใช้จ่าย)</span>
+            <button type="submit" class="btn btn-sm btn-outline-danger">ยกเลิกแล้วเลือกห้องอื่น</button>
+        </form>
+    }
+    else if (isCustomer && confirmed)
+    {
+        @if (TempData["BookingError"] is string cancelError) { <div class="alert alert-danger" role="alert">@cancelError</div> }
+
+        @* จ่ายแล้ว: ขอคืนเงิน (ฝ่ายบัญชีพิจารณา อนุมัติแล้วยกเลิกการจองให้เอง) *@
+        @if (Model.CanRequestRefund)
+        {
+            <section class="booking-panel mb-3" id="refund">
+                <h3 class="mt-0">ขอคืนเงิน</h3>
+                <p class="text-muted small mb-2">
+                    ขอคืนเงินเต็มจำนวน @ThaiText.Baht(Model.ConfirmedAmount) ได้ครั้งเดียว ฝ่ายบัญชีจะพิจารณา
+                    ถ้าอนุมัติ ระบบจะยกเลิกการจองให้อัตโนมัติ ถ้าปฏิเสธ การจองยังอยู่ตามเดิม
+                </p>
+                <form asp-action="RequestRefund" method="post" data-refund-form>
+                    <input type="hidden" name="bookingId" value="@Model.BookingId" />
+                    <input type="hidden" name="key" value="@Key()" />
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <label class="form-label" for="refund-reason">เหตุผล</label>
+                            <select id="refund-reason" name="reasonChoice" class="form-select" required>
+                                <option value="">-- เลือกเหตุผล --</option>
+                                @foreach (var reason in PaymentService.RefundReasons)
+                                {
+                                    <option value="@reason">@reason</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label" for="refund-detail">รายละเอียดเพิ่มเติม (ถ้าเลือก "อื่นๆ" ต้องกรอก)</label>
+                            <input id="refund-detail" name="detail" class="form-control" maxlength="500" />
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-2"
+                            onclick="return confirm('ส่งคำขอคืนเงินการจอง #@Model.BookingId ? ขอได้ครั้งเดียว');">ส่งคำขอคืนเงิน</button>
+                </form>
+            </section>
+        }
+
+        @* จ่ายแล้วยกเลิกเอง = ไม่คืนเงิน (ไม่มีให้กดระหว่างรอบัญชีพิจารณา) *@
+        @if (Model.CanCancel)
+        {
+            <form asp-controller="Home" asp-action="CancelBooking" method="post" class="cancel-strip"
+                  onsubmit="return confirm('การจอง #@Model.BookingId ชำระเงินแล้ว ยกเลิกเองจะไม่ได้รับเงินคืน ยืนยันยกเลิก?');">
+                <input type="hidden" name="bookingId" value="@Model.BookingId" />
+                <span class="text-muted small">
+                    ยกเลิกเองได้ก่อนเช็คอิน แต่ไม่คืนเงิน@(Model.CanRequestRefund ? " · ถ้าต้องการเงินคืน ให้ส่งคำขอคืนเงินด้านบน" : "")
+                </span>
+                <button type="submit" class="btn btn-sm btn-outline-danger">ยกเลิกเอง (ไม่คืนเงิน)</button>
+            </form>
+        }
     }
 
     @* ---------- รายการชำระเงิน ---------- *@
     <section class="table-panel mb-3">
         <div class="panel-head">
             <h2>รายการชำระเงิน</h2>
-            @if (confirmed) { <span class="text-muted small">ชำระครบแล้ว รับชำระซ้ำไม่ได้</span> }
+            @if (confirmed) { <a class="btn btn-sm btn-outline-primary" asp-action="Receipt" asp-route-id="@Model.BookingId">ดูใบเสร็จ</a> }
         </div>
         @if (Model.Payments.Count == 0)
         {
@@ -110,8 +174,6 @@
         {
             var status = payment.DisplayStatus;
             var reviewable = canReview && payment.IsNew && !payment.IsVerified && (payment.Status == "Pending" || payment.Status == "Submitted");
-            var refundable = isCustomer && payment.IsVerified && payment.Amount > 0 &&
-                             !Model.Refunds.Any(r => r.PaymentId == payment.PaymentId && r.Status == "Requested");
 
             <div class="pay-row">
                 <div class="pay-row-main">
@@ -166,22 +228,6 @@
                     </div>
                 }
 
-                @* ลูกค้าขอคืนเงิน *@
-                @if (refundable)
-                {
-                    <details class="pay-action">
-                        <summary>ขอคืนเงินรายการนี้</summary>
-                        <form asp-action="RequestRefund" method="post" class="mt-2">
-                            <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="paymentId" value="@payment.PaymentId" />
-                            <input type="hidden" name="key" value="@Key()" />
-                            <label class="form-label" for="refund-amount-@payment.PaymentId">จำนวนเงินที่ขอคืน (บาท)</label>
-                            <input id="refund-amount-@payment.PaymentId" name="amount" type="number" min="0.01" step="0.01" class="form-control" required />
-                            <label class="form-label mt-2" for="refund-reason-@payment.PaymentId">เหตุผล</label>
-                            <textarea id="refund-reason-@payment.PaymentId" name="reason" class="form-control" rows="2" maxlength="2000" required></textarea>
-                            <button class="btn btn-outline-primary mt-2" type="submit">ส่งคำขอคืนเงิน</button>
-                        </form>
-                    </details>
-                }
             </div>
         }
     </section>
@@ -189,11 +235,14 @@
     @* ---------- คำขอคืนเงิน ---------- *@
     @if (Model.Refunds.Count > 0)
     {
-        <section class="table-panel mb-3">
+        <section class="table-panel mb-3" id="refund">
             <div class="panel-head"><h2>คำขอคืนเงิน</h2></div>
             @foreach (var refund in Model.Refunds)
             {
-                var method = Model.Payments.FirstOrDefault(p => p.PaymentId == refund.PaymentId)?.Method;
+                var rejectReason = refund.Status == "Rejected"
+                    ? Model.Events.Where(e => e.EventType == "RefundRejected" && e.PaymentId == refund.PaymentId)
+                        .Select(e => e.Reason).FirstOrDefault()
+                    : null;
                 <div class="pay-row">
                     <div class="pay-row-main">
                         <div>
@@ -203,34 +252,45 @@
                         </div>
                         <div class="num fw-semibold">@ThaiText.Baht(refund.Amount)</div>
                     </div>
-                    <div class="small">เหตุผล: @ThaiText.OrDash(refund.Reason)</div>
+                    <div class="small">เหตุผล: @ThaiText.OrDash(refund.Reason) · ขอโดย @(await Users.NameAsync(refund.RequestedByUserId))</div>
+                    @if (rejectReason != null)
+                    {
+                        <div class="alert alert-danger small mt-2 mb-0">
+                            <strong>ฝ่ายบัญชีปฏิเสธ:</strong> @rejectReason
+                            @if (isCustomer && Model.CanCancel)
+                            {
+                                <div>การจองยังอยู่ มาพักได้ตามปกติ หรือยกเลิกเองแบบไม่คืนเงินได้ด้านบน</div>
+                            }
+                        </div>
+                    }
+                    @if (refund.Status == "Approved")
+                    {
+                        <div class="small text-success mt-1">อนุมัติแล้ว @ThaiText.Time(refund.ApprovedAtUtc) · การจองถูกยกเลิกอัตโนมัติ</div>
+                    }
+                    @if (isCustomer && refund.Status == "Requested")
+                    {
+                        <div class="small text-muted mt-1">รอฝ่ายบัญชีพิจารณา ระหว่างนี้การจองยังอยู่ และยังยกเลิกเองไม่ได้จนกว่าจะได้ผล</div>
+                    }
 
+                    @* ฝ่ายบัญชีพิจารณาคำขอ *@
                     @if (isAccountant && refund.Status == "Requested")
                     {
                         <div class="pay-action row g-3">
-                            <form asp-action="ApproveRefund" method="post" class="col-md-6">
+                            <form asp-action="ApproveRefund" method="post" class="col-md-6"
+                                  onsubmit="return confirm('อนุมัติคืนเงิน @ThaiText.Baht(refund.Amount) ? การจอง #@Model.BookingId จะถูกยกเลิกทันที');">
                                 <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="refundId" value="@refund.RefundId" />
                                 <input type="hidden" name="key" value="@Key()" />
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="sent-@refund.RefundId" name="actualRefundSent" value="true" required />
-                                    <label class="form-check-label" for="sent-@refund.RefundId">
-                                        @(PaymentService.IsMockMethod(method) ? "ยืนยันว่าเป็นการคืนเงินจำลอง ไม่มีการโอนเงินจริง" : "ยืนยันว่าโอนเงินคืนให้ลูกค้าแล้วจริง")
-                                    </label>
-                                </div>
-                                <button class="btn btn-primary mt-2" type="submit">อนุมัติการคืนเงิน</button>
+                                <p class="small text-muted mb-2">อนุมัติแล้ว ระบบบันทึกเงินคืนและยกเลิกการจองให้ ห้องว่างทันที</p>
+                                <button class="btn btn-primary" type="submit">อนุมัติคืนเงิน</button>
                             </form>
                             <form asp-action="RejectRefund" method="post" class="col-md-6">
                                 <input type="hidden" name="bookingId" value="@Model.BookingId" /><input type="hidden" name="refundId" value="@refund.RefundId" />
                                 <input type="hidden" name="key" value="@Key()" />
-                                <label class="form-label" for="refund-reject-@refund.RefundId">เหตุผลที่ปฏิเสธ</label>
-                                <input id="refund-reject-@refund.RefundId" name="reason" class="form-control" maxlength="2000" required />
-                                <button class="btn btn-outline-danger mt-2" type="submit">ปฏิเสธคำขอ</button>
+                                <label class="form-label" for="reject-refund-@refund.RefundId">เหตุผลที่ปฏิเสธ (ลูกค้าจะเห็น)</label>
+                                <input id="reject-refund-@refund.RefundId" name="reason" class="form-control" maxlength="2000" required />
+                                <button class="btn btn-outline-danger mt-2" type="submit">ปฏิเสธ</button>
                             </form>
                         </div>
-                    }
-                    else if (refund.Status == "Requested")
-                    {
-                        <div class="small text-muted mt-1">รอฝ่ายบัญชีอนุมัติ</div>
                     }
                 </div>
             }

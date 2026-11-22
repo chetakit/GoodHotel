@@ -523,6 +523,11 @@
         extraBedAmount.textContent = formatMoney(result.extraBedAmount);
         totalAmount.textContent = formatMoney(result.totalAmount);
         promotionName.textContent = result.promotionName || "ไม่เข้าเงื่อนไขโปร";
+        // server เป็นคนตัดสินโปรที่ใช้ได้จริง: ถ้าโปรที่เลือกใช้ไม่ได้แล้ว ให้ dropdown ตรงกับที่ server ใช้
+        const select = document.getElementById("booking-promotion-select");
+        if (select && result.promotionId) {
+            select.value = String(result.promotionId);
+        }
         showMessage(result.message, true);
     };
 
@@ -553,14 +558,21 @@
         }
     };
 
+    const promotionSelect = document.getElementById("booking-promotion-select");
+
     form.addEventListener("submit", event => event.preventDefault());
     extraBedInput.addEventListener("change", requestQuote);
+    promotionSelect?.addEventListener("change", requestQuote);
 
-    // ส่งจำนวนเตียงเสริมล่าสุดไปกับฟอร์มยืนยันการจอง
+    // ส่งจำนวนเตียงเสริมและโปรที่เลือกล่าสุดไปกับฟอร์มยืนยันการจอง
     confirmForm?.addEventListener("submit", () => {
         const confirmExtraBed = confirmForm.querySelector('[name="ExtraBedCount"]');
         if (confirmExtraBed) {
             confirmExtraBed.value = extraBedInput.value;
+        }
+        const confirmPromotion = confirmForm.querySelector('[name="PromotionId"]');
+        if (confirmPromotion && promotionSelect) {
+            confirmPromotion.value = promotionSelect.value;
         }
     });
 })();
