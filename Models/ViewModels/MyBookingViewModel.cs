@@ -43,7 +43,7 @@ public class MyBookingViewModel
 
     public string? CancelReason { get; set; }
 
-    // เส้นตายชำระเงิน (null = ไม่มี เช่น จ่ายแล้ว เลือกเงินสด หรือการจองเก่า)
+    // เส้นตายชำระเงิน (null = ไม่มี เช่น จ่ายแล้ว มีการชำระที่รอยืนยัน หรือการจองเก่า)
     public DateTime? PaymentDueAtUtc { get; set; }
 
     // true = อยู่ในแท็บ "ประวัติการเข้าพัก" (ยกเลิกแล้ว / เช็คเอาท์แล้ว / เลยวันแล้ว)

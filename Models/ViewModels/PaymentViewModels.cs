@@ -26,7 +26,7 @@ public record PaymentDetailsViewModel(int BookingId, decimal? BookingAmount, dec
 {
     public bool IsCancelled => BookingStatus == BookingStatuses.Cancelled;
 
-    // เส้นตายชำระเงิน: แสดงเฉพาะการจองที่ยังไม่ยกเลิก ยังไม่จ่าย และยังไม่ได้เลือกวิธีที่รอยืนยัน (เช่นเงินสด)
+    // เส้นตายชำระเงิน: แสดงเฉพาะการจองที่ยังไม่ยกเลิก ยังไม่จ่าย และไม่มีการชำระที่รอยืนยันค้างอยู่
     public DateTime? PaymentDueAtUtc => IsCancelled || Payments.Any(p => p.IsVerified ||
         (p.IsNew && (p.Status == "Pending" || p.Status == "Submitted")))
         ? null : PaymentDeadline.DueAtUtc(CreatedAtUtc);
