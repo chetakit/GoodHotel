@@ -1,0 +1,40 @@
+@model GoodHotel.Models.ViewModels.ProfileViewModel
+@{
+    ViewData["Title"] = "บัญชีของฉัน";
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="auth-card">
+            <h2 class="h4 mb-3">บัญชีของฉัน</h2>
+            @if (TempData["ProfileSuccess"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+            <form asp-action="Profile" method="post">
+                <div class="mb-3">
+                    <label asp-for="FirstName" class="form-label">ชื่อ</label>
+                    <input asp-for="FirstName" class="form-control" autocomplete="given-name" />
+                    <span asp-validation-for="FirstName" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="LastName" class="form-label">นามสกุล</label>
+                    <input asp-for="LastName" class="form-control" autocomplete="family-name" />
+                    <span asp-validation-for="LastName" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Phone" class="form-label">เบอร์โทร</label>
+                    <input asp-for="Phone" type="tel" class="form-control" autocomplete="tel" />
+                    <span asp-validation-for="Phone" class="text-danger small"></span>
+                </div>
+                <dl class="about-contact">
+                    <dt>อีเมล (ใช้เข้าสู่ระบบ)</dt><dd>@ThaiText.OrDash(Model.Email)</dd>
+                    <dt>วันเกิด (ใช้กับโปรเดือนเกิด แก้เองไม่ได้)</dt><dd>@ThaiText.Date(Model.BirthDate)</dd>
+                </dl>
+                <button type="submit" class="btn btn-primary w-100">บันทึก</button>
+            </form>
+            <a asp-action="Password" class="btn btn-outline-secondary w-100 mt-2">เปลี่ยนรหัสผ่าน</a>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

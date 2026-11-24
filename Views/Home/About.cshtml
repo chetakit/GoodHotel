@@ -1,0 +1,62 @@
+@{
+    ViewData["Title"] = "เกี่ยวกับเรา";
+    var minutes = (int)PaymentDeadline.Window.TotalMinutes;
+}
+
+<section class="content-section">
+    <div class="container about">
+        <div class="section-heading">
+            <h2>เกี่ยวกับ Good Hotel</h2>
+            <p>โรงแรมย่านสุขุมวิท กรุงเทพฯ จองและชำระเงินออนไลน์ได้ในหน้าเดียว</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <h3 class="h5">จองห้องยังไง</h3>
+                <ol class="about-steps">
+                    <li><strong>เลือกวันและห้อง</strong> ระบบแสดงเฉพาะห้องที่ว่างจริงในวันที่เลือก</li>
+                    <li><strong>เลือกโปรโมชัน</strong> ระบบเลือกโปรที่คุ้มที่สุดให้ก่อน เปลี่ยนเองได้</li>
+                    <li><strong>ชำระเงินออนไลน์</strong> ภายใน @minutes นาที แล้วเปิดใบเสร็จได้ทันที</li>
+                    <li><strong>มาเช็คอิน</strong> แจ้งชื่อหรือเลขที่การจองกับพนักงานต้อนรับ</li>
+                </ol>
+
+                <h3 class="h5 mt-4">คำถามที่พบบ่อย</h3>
+                <div class="about-faq">
+                    <details>
+                        <summary>ไม่ชำระเงินภายใน @minutes นาทีจะเป็นยังไง</summary>
+                        <p>ระบบยกเลิกการจองให้อัตโนมัติ และไม่มีค่าใช้จ่าย จองใหม่ได้ถ้าห้องยังว่าง</p>
+                    </details>
+                    <details>
+                        <summary>ยกเลิกการจองได้ไหม</summary>
+                        <p>ได้ก่อนเช็คอิน ถ้ายังไม่ชำระเงินยกเลิกได้ฟรี ถ้าชำระแล้วและยกเลิกเองจะไม่ได้เงินคืน</p>
+                    </details>
+                    <details>
+                        <summary>ขอคืนเงินได้ไหม</summary>
+                        <p>ขอได้ 1 ครั้งต่อการจองก่อนเช็คอิน ฝ่ายบัญชีจะพิจารณา ถ้าอนุมัติ การจองจะถูกยกเลิกให้ ถ้าไม่อนุมัติ การจองยังอยู่ตามเดิม</p>
+                    </details>
+                    <details>
+                        <summary>เสริมเตียงได้ไหม</summary>
+                        <p>ได้ ค่าเตียงเสริม ฿500 ต่อเตียงต่อคืน เลือกได้ตอนจอง</p>
+                    </details>
+                    <details>
+                        <summary>ไม่ได้จองมาก่อน เดินเข้ามาพักได้ไหม</summary>
+                        <p>ได้ถ้ามีห้องว่าง ชำระเงินสดที่เคาน์เตอร์ สมัครสมาชิกทีหลังด้วยชื่อและเบอร์เดิม จะเห็นประวัติการเข้าพักด้วย</p>
+                    </details>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="feature-box">
+                    <h3 class="h5">ติดต่อเรา</h3>
+                    <dl class="about-contact">
+                        <dt>ที่อยู่</dt><dd>86 ถนนสุขุมวิท กรุงเทพฯ</dd>
+                        <dt>โทรศัพท์</dt><dd><a href="tel:025558900">02 555 8900</a></dd>
+                        <dt>อีเมล</dt><dd><a href="mailto:hello@goodhotel.com">hello@goodhotel.com</a></dd>
+                    </dl>
+                    <a asp-action="Rooms" class="btn btn-primary w-100">ค้นหาห้องว่าง</a>
+                </div>
+                <p class="text-muted small mt-3">เว็บไซต์นี้เป็นโปรเจคการศึกษา การชำระเงินเป็นแบบจำลอง ไม่มีการโอนเงินจริง</p>
+            </div>
+        </div>
+    </div>
+</section>

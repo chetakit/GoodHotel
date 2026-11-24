@@ -372,6 +372,17 @@ dd { margin-bottom: .6rem; }
 .feature-box h4 { margin-bottom: .35rem; }
 .feature-icon { display: none; }
 
+/* เกี่ยวกับเรา */
+.about-steps { padding-left: 1.25rem; margin: 0; }
+.about-steps li { margin-bottom: .6rem; }
+.about-steps strong { display: block; }
+.about-faq { border-top: 1px solid var(--line); }
+.about-faq details { border-bottom: 1px solid var(--line); }
+.about-faq summary { cursor: pointer; padding: .75rem 0; font-weight: 500; }
+.about-faq p { margin: 0 0 .9rem; color: var(--ink-2); }
+.about-contact dt { font-size: .8rem; font-weight: 500; color: var(--muted); }
+.about-contact dd { margin-bottom: .75rem; }
+
 /* ฟอร์มเข้าสู่ระบบ/สมัคร และสรุปการจอง */
 .auth-card { max-width: 440px; margin: 0 auto; padding: 1.6rem; }
 .auth-card .nav-pills { background: var(--paper); border-radius: var(--radius); padding: .25rem; }

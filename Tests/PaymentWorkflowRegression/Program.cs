@@ -213,4 +213,8 @@ Check(typeof(AuditController).GetCustomAttribute<AuthorizeAttribute>()?.Roles ==
     !typeof(AuditController).GetMethods().Any(m => m.IsDefined(typeof(HttpPostAttribute))),
     "Audit is read-only for Accountant and Admin; other accounting pages stay Accountant-only.");
 
+Check(ProfileViewModel.NormalizePhone("089 111 2233") == "0891112233" && ProfileViewModel.NormalizePhone("021112233") == null &&
+    ProfileViewModel.NormalizePhone("9911122334") == null && ProfileViewModel.NormalizePhone("08911x2233") == null &&
+    ProfileViewModel.NormalizePhone(null) == null, "Profile phone must be a Thai mobile number.");
+
 Console.WriteLine("Payment workflow regression checks passed.");

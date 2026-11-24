@@ -305,6 +305,8 @@ public class HomeController : Controller
         });
     }
 
+    public IActionResult About() => View();
+
     public async Task<IActionResult> Promotion()
     {
         return View(await LoadOpenPromotionsAsync());
