@@ -18,7 +18,8 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
             TimeZoneInfo.ConvertTimeToUtc(start.AddDays(1), HotelTimeZone));
     }
 
-    public async Task<string?> CheckInAsync(int bookingId, int actorId, string? note, CancellationToken ct)
+    public async Task<string?> CheckInAsync(int bookingId, int actorId, string? note, bool closeRefund,
+        CancellationToken ct)
     {
         if (note?.Length > 2000) return "หมายเหตุต้องไม่เกิน 2000 ตัวอักษร";
         var roomId = await db.Bookings.AsNoTracking().Where(b => b.BookingId == bookingId)
@@ -52,6 +53,12 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
         if (await db.MaintenanceReports.AnyAsync(r =>
             r.RoomId == roomId && r.Status != MaintenanceReport.Resolved, ct))
             return "ห้องนี้ติดงานซ่อม";
+
+        // มีคำขอคืนเงินค้าง: พนักงานต้องยืนยันก่อน ไม่งั้นคำขอของลูกค้าถูกปิดโดยไม่มีใครรู้
+        // (ตรวจฝั่ง server ด้วย เผื่อลูกค้าเพิ่งส่งคำขอหลังจากพนักงานเปิดหน้าค้างไว้)
+        if (!closeRefund && await db.PaymentRefunds.AnyAsync(r => r.Payment.BookingId == bookingId &&
+                r.Status == PaymentService.RefundRequested, ct))
+            return "การจองนี้มีคำขอคืนเงินรอฝ่ายบัญชีพิจารณา ถ้าเช็คอินคำขอจะถูกปิด กรุณาแจ้งลูกค้าแล้วกดเช็คอินอีกครั้งเพื่อยืนยัน";
 
         db.BookingStays.Add(new BookingStay
         {

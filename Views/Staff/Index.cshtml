@@ -78,11 +78,15 @@
                                 <span class="badge @(row.IsPaid ? "text-bg-success" : "text-bg-warning")">
                                     @(row.IsPaid ? "จ่ายแล้ว" : "ยังไม่จ่าย")
                                 </span>
+                                @if (row.RefundPending) { <span class="badge text-bg-warning">ขอคืนเงินอยู่</span> }
                             </td>
                             <td class="text-end">
                                 @if (row.IsPaid)
                                 {
-                                    <form asp-action="CheckIn" method="post" class="d-inline">
+                                    <form asp-action="CheckIn" method="post" class="d-inline"
+                                          data-refund-pending="@(row.RefundPending ? "true" : "false")"
+                                          onsubmit="return this.dataset.refundPending !== 'true' || confirm('การจอง #@row.BookingId มีคำขอคืนเงินรอพิจารณา ถ้าเช็คอิน คำขอจะถูกปิดและไม่คืนเงิน ยืนยันเช็คอิน?');">
+                                        <input type="hidden" name="closeRefund" value="@(row.RefundPending ? "true" : "false")" />
                                         <input type="hidden" name="bookingId" value="@row.BookingId" />
                                         <input type="hidden" name="fromDashboard" value="true" />
                                         <button type="submit" class="btn btn-sm btn-primary">เช็คอิน</button>

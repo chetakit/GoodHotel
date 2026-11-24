@@ -67,7 +67,10 @@
         }
         else if (Model.StayStatus == null)
         {
-            <form asp-action="CheckIn" method="post" class="booking-panel mt-3">
+            <form asp-action="CheckIn" method="post" class="booking-panel mt-3"
+                  data-refund-pending="@(Model.RefundPending ? "true" : "false")"
+                  onsubmit="return this.dataset.refundPending !== 'true' || confirm('การจอง #@Model.BookingId มีคำขอคืนเงินรอพิจารณา ถ้าเช็คอิน คำขอจะถูกปิดและไม่คืนเงิน ยืนยันเช็คอิน?');">
+                <input type="hidden" name="closeRefund" value="@(Model.RefundPending ? "true" : "false")" />
                 <input type="hidden" name="bookingId" value="@Model.BookingId" />
                 <p class="text-muted">เช็คอินได้ตั้งแต่วันเข้าพักที่จองไว้ (ยังไม่รองรับการเช็คอินก่อนวัน)</p>
                 <label class="form-label mt-2" for="note">หมายเหตุ (ไม่บังคับ)</label>

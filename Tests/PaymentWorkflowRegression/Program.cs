@@ -172,4 +172,15 @@ Check(!BookingCancellationService.CanCancel(BookingStatuses.Booked, day.AddDays(
 Check(!BookingCancellationService.CanCancel(BookingStatuses.Booked, day.AddDays(1), true, false, day),
     "Checked-in booking cannot be cancelled.");
 
+// Walk-in: เบอร์ซ้ำต้องไม่เข้าผิดบัญชี
+WalkInCustomer[] samePhone = [new(1, "สมชาย", "ใจดี", false), new(2, "คนอื่น", "แอบอ้าง", true)];
+Check(WalkInService.MatchCustomer([], "ก", "ข", null) == (null, false), "Unknown phone creates a new customer.");
+Check(WalkInService.MatchCustomer(samePhone, " คนอื่น ", "แอบอ้าง", null) == (2, false), "Same phone must match by name, not by first row.");
+Check(WalkInService.MatchCustomer(samePhone, "มานี", "มีสุข", null) == (null, true), "Same phone with a different name needs a staff choice.");
+Check(WalkInService.MatchCustomer(samePhone, "มานี", "มีสุข", 1) == (1, false), "Staff may pick a listed customer.");
+Check(WalkInService.MatchCustomer(samePhone, "มานี", "มีสุข", 0) == (null, false), "Staff may create a new customer.");
+Check(WalkInService.MatchCustomer(samePhone, "มานี", "มีสุข", 99) == (null, true), "A customer outside the phone's list is not accepted.");
+WalkInCustomer[] twins = [new(1, "ก", "ข", false), new(2, "ก", "ข", true)];
+Check(WalkInService.MatchCustomer(twins, "ก", "ข", null) == (null, true), "Duplicate names need a staff choice.");
+
 Console.WriteLine("Payment workflow regression checks passed.");

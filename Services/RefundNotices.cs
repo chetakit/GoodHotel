@@ -12,16 +12,17 @@ namespace GoodHotel.Services;
 /// </summary>
 public sealed class RefundNotices(IMemoryCache cache)
 {
-    public const string SeenCookie = "gh_refund_seen";
+    // แยก cookie ตามผู้ใช้: เบราว์เซอร์เดียวกันอาจมีลูกค้าหลายคนสลับกันล็อกอิน
+    private static string SeenCookie(int userId) => $"gh_refund_seen_{userId}";
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan LookBack = TimeSpan.FromDays(14);
 
     private static string Key(int userId) => $"refund-notices:{userId}";
 
-    private static DateTime SeenAtUtc(HttpContext context)
+    private static DateTime SeenAtUtc(HttpContext context, int userId)
     {
         var floor = DateTime.UtcNow - LookBack;
-        return context.Request.Cookies.TryGetValue(SeenCookie, out var raw) &&
+        return context.Request.Cookies.TryGetValue(SeenCookie(userId), out var raw) &&
                long.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var ticks) &&
                ticks > floor.Ticks && ticks <= DateTime.UtcNow.Ticks
             ? new DateTime(ticks, DateTimeKind.Utc)
@@ -32,7 +33,7 @@ public sealed class RefundNotices(IMemoryCache cache)
     public async Task<int> UnseenAsync(HttpContext context, GoodHotelDbContext db, int userId, CancellationToken ct)
     {
         if (cache.TryGetValue(Key(userId), out int count)) return count;
-        var seen = SeenAtUtc(context);
+        var seen = SeenAtUtc(context, userId);
         count = await db.PaymentEvents.AsNoTracking()
             // เขียน == ตรงๆ: array.Contains ใน .NET 10 ผูกกับ Span ทำให้ EF แปลงเป็น SQL ไม่ได้
             .CountAsync(e => (e.EventType == "RefundApproved" || e.EventType == "RefundRejected") && e.OccurredAtUtc > seen &&
@@ -44,7 +45,7 @@ public sealed class RefundNotices(IMemoryCache cache)
     /// <summary>เปิดหน้าการจองของฉันแล้ว = เห็นแล้ว</summary>
     public void MarkSeen(HttpContext context, int userId)
     {
-        context.Response.Cookies.Append(SeenCookie, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture),
+        context.Response.Cookies.Append(SeenCookie(userId), DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture),
             new CookieOptions { HttpOnly = true, IsEssential = true, SameSite = SameSiteMode.Lax,
                 Secure = context.Request.IsHttps, Expires = DateTimeOffset.UtcNow.Add(LookBack) });
         cache.Set(Key(userId), 0, Lifetime);

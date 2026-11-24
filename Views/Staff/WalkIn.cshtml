@@ -75,7 +75,7 @@
                 <div class="col-md-6">
                     <label asp-for="Phone" class="form-label">เบอร์โทร</label>
                     <input asp-for="Phone" class="form-control" placeholder="0812345678" />
-                    <small class="text-muted">ถ้าเบอร์นี้เคยเป็นลูกค้าแล้ว ระบบจะใช้บัญชีเดิม</small>
+                    <small class="text-muted">ถ้าเบอร์และชื่อตรงกับลูกค้าเดิม ระบบจะใช้บัญชีเดิม</small>
                     <span asp-validation-for="Phone" class="text-danger d-block"></span>
                 </div>
                 <div class="col-md-6">
@@ -90,6 +90,28 @@
                     </div>
                 </div>
             </div>
+
+            @if (Model.Candidates.Count > 0)
+            {
+                <fieldset class="alert alert-warning mt-3 mb-0">
+                    <legend class="h6">เบอร์นี้มีลูกค้าอยู่แล้ว ลูกค้าที่มาคือใคร?</legend>
+                    <input type="hidden" name="CustomerChoiceFor" value="@Model.CustomerKey" />
+                    @foreach (var customer in Model.Candidates)
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="CustomerChoice" id="customer-@customer.UserId" value="@customer.UserId" required />
+                            <label class="form-check-label" for="customer-@customer.UserId">
+                                @ThaiText.OrDash($"{customer.FirstName} {customer.LastName}".Trim())
+                                <span class="text-muted small">(ลูกค้า #@customer.UserId · @(customer.CanLogin ? "สมัครสมาชิกแล้ว" : "เคยมา Walk-in"))</span>
+                            </label>
+                        </div>
+                    }
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="CustomerChoice" id="customer-new" value="0" required />
+                        <label class="form-check-label" for="customer-new">ไม่ใช่คนในรายการ สร้างลูกค้าใหม่</label>
+                    </div>
+                </fieldset>
+            }
 
             <button type="submit" class="btn btn-primary btn-lg mt-4" disabled="@(Model.AvailableRooms.Count == 0)">
                 ยืนยัน · รับเงินสด · เช็คอิน

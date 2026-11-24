@@ -136,7 +136,8 @@ namespace GoodHotel.Controllers
             b.User == null ? null : b.User.LastName,
             b.User == null ? null : b.User.Phone,
             b.Room == null ? null : b.Room.Room1,
-            b.CheckIn, b.CheckOut, b.Guests);
+            b.CheckIn, b.CheckOut, b.Guests,
+            b.Payments.Any(p => p.Refunds.Any(r => r.Status == PaymentService.RefundRequested)));
 
         [HttpGet]
         public async Task<IActionResult> Bookings(
@@ -268,12 +269,13 @@ namespace GoodHotel.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CheckIn(int bookingId, string? note, bool fromDashboard, CancellationToken ct)
+        public async Task<IActionResult> CheckIn(int bookingId, string? note, bool fromDashboard,
+            bool closeRefund, CancellationToken ct)
         {
             if (!ModelState.IsValid || bookingId <= 0) return BadRequest();
             var actorId = await GetActorIdAsync(ct);
             if (!actorId.HasValue) return Forbid();
-            var error = await _stays.CheckInAsync(bookingId, actorId.Value, note, ct);
+            var error = await _stays.CheckInAsync(bookingId, actorId.Value, note, closeRefund, ct);
             TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "เช็คอินเรียบร้อย";
             return BackToDeskOrBooking(fromDashboard, bookingId);
         }
@@ -360,6 +362,7 @@ namespace GoodHotel.Controllers
                     return RedirectToAction(nameof(BookingDetails), new { id = result.BookingId });
                 }
 
+                form.Candidates = result.Candidates ?? [];
                 ModelState.AddModelError(string.Empty, result.Message);
             }
 

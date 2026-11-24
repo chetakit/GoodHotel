@@ -33,7 +33,17 @@ public class WalkInViewModel
     [Required(ErrorMessage = "กรุณาเลือกห้อง")]
     public int? RoomId { get; set; }
 
+    // เบอร์ซ้ำและระบบตัดสินเองไม่ได้: พนักงานเลือกลูกค้า (0 = ลูกค้าใหม่)
+    public int? CustomerChoice { get; set; }
+
+    // เบอร์+ชื่อตอนที่เลือก ถ้าแก้เบอร์หรือชื่อหลังเลือก ตัวเลือกเดิมใช้ไม่ได้ ต้องเลือกใหม่
+    public string? CustomerChoiceFor { get; set; }
+
+    public string CustomerKey => $"{Phone?.Trim()}|{FirstName?.Trim()}|{LastName?.Trim()}";
+
     // ข้อมูลสำหรับแสดงผล
+    public IReadOnlyList<WalkInCustomer> Candidates { get; set; } = [];
+
     public DateOnly Today { get; set; }
 
     public IReadOnlyList<RoomStatusItem> AvailableRooms { get; set; } = [];
