@@ -52,11 +52,11 @@
         }
         else if (Model.StayStatus == null && !isPaid)
         {
-            @* ยังไม่จ่ายเงิน: เช็คอินไม่ได้ ต้องยืนยันการชำระเงินก่อน หรือยกเลิกถ้าลูกค้าไม่มา *@
+            @* ยังไม่จ่ายเงิน: เช็คอินไม่ได้ ลูกค้าต้องชำระออนไลน์เอง หรือยกเลิกถ้าลูกค้าไม่มา *@
             <div class="booking-panel mt-3">
-                <p class="mb-2">ยังไม่ได้รับชำระเงิน จึงเช็คอินไม่ได้ ให้ไปยืนยันการชำระเงินก่อน</p>
+                <p class="mb-2">ยังไม่ได้ชำระเงิน จึงเช็คอินไม่ได้ ให้ลูกค้าชำระออนไลน์ที่หน้า "การจองของฉัน" ก่อน</p>
                 <div class="d-flex flex-wrap gap-2">
-                    <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-primary">ไปหน้าการชำระเงิน</a>
+                    <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">ดูการชำระเงิน</a>
                     <form asp-action="CancelBooking" method="post"
                           onsubmit="return confirm('ยกเลิกการจอง #@Model.BookingId (ลูกค้าไม่มา/ไม่จ่ายเงิน)?');">
                         <input type="hidden" name="bookingId" value="@Model.BookingId" />

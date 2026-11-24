@@ -19,6 +19,7 @@ public sealed class WalkInService(
     BookingService bookings,
     PaymentService payments,
     StayService stays,
+    BookingCancellationService cancellation,
     RoomAvailabilityService availability)
 {
     public async Task<WalkInResult> CreateAsync(WalkInViewModel form, int staffId, CancellationToken ct)
@@ -52,13 +53,18 @@ public sealed class WalkInService(
             return new WalkInResult(false, booking.Message ?? "จองห้องไม่สำเร็จ");
         }
 
-        // ถ้าขั้นตอนหลังจากนี้ไม่ผ่าน การจองยังอยู่ พนักงานไปทำต่อที่หน้า Booking Details ได้
         var payment = await payments.RecordDeskCashAsync(bookingId, staffId, ct);
         if (!payment.Succeeded)
         {
-            return new WalkInResult(false, $"จองแล้ว แต่บันทึกการชำระเงินไม่สำเร็จ: {payment.Message}", bookingId);
+            // รับเงินสดทีหลังไม่ได้ (การจองทั่วไปชำระออนไลน์เท่านั้น) จึงยกเลิกให้แล้วทำใหม่ ไม่ปล่อยการจองค้าง
+            // ถ้ายกเลิกไม่ได้เพราะเงินถูกบันทึกไปแล้วจริงๆ การจองยังอยู่ ให้พนักงานเปิดดู
+            var cancelled = await cancellation.CancelByStaffAsync(bookingId, ct);
+            return cancelled.Succeeded
+                ? new WalkInResult(false, $"บันทึกเงินสดไม่สำเร็จ ({payment.Message}) ยกเลิกการจอง #{bookingId} แล้ว กรุณาทำรายการใหม่")
+                : new WalkInResult(false, $"บันทึกเงินสดไม่สำเร็จ ({payment.Message}) กรุณาตรวจสอบการจองนี้", bookingId);
         }
 
+        // เช็คอินไม่ผ่าน: จ่ายเงินแล้ว การจองยังอยู่ พนักงานกดเช็คอินต่อที่หน้ารายละเอียดการจองได้
         var checkInError = await stays.CheckInAsync(bookingId, staffId, "Walk-in", closeRefund: false, ct);
         if (checkInError != null)
         {

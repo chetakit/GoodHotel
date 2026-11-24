@@ -42,7 +42,7 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
         var early = today < booking.CheckIn;
         if (early) return "ยังเช็คอินก่อนวันเข้าพักไม่ได้";
         if (!await PaymentService.IsPaidAsync(db, bookingId, ct))
-            return "ยังไม่ได้รับชำระเงิน กรุณายืนยันการชำระเงินก่อนเช็คอิน";
+            return "ยังไม่ได้ชำระเงิน ให้ลูกค้าชำระออนไลน์ก่อนเช็คอิน";
         if (await db.BookingStays.AnyAsync(s => s.BookingId == bookingId, ct))
             return "การจองนี้เช็คอินไปแล้ว";
         if (await db.BookingStays.AnyAsync(s => s.Status == "CheckedIn" && s.Booking.RoomId == roomId, ct))
