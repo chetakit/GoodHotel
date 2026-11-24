@@ -71,5 +71,15 @@ public sealed class FinanceLedger(ParallelReader reader)
             .OrderByDescending(m => m.Amount)
             .ToList();
 
+    // ช่วงวันที่ที่ใช้ได้: ไม่ระบุ = ต้นเดือนถึงวันนี้, กลับด้านให้อัตโนมัติ, ไม่เกิน 1 ปี
+    public static (DateOnly Start, DateOnly End) Range(DateOnly? from, DateOnly? to, DateOnly today)
+    {
+        var end = to ?? today;
+        var start = from ?? new DateOnly(end.Year, end.Month, 1);
+        if (start > end) (start, end) = (end, start);
+        if (end.DayNumber - start.DayNumber > 366) start = end.AddDays(-366);
+        return (start, end);
+    }
+
     public static DateOnly HotelDate(DateTime utc) => RoomAvailabilityService.HotelDate(utc);
 }

@@ -2,7 +2,7 @@
     // หน้าของพนักงาน (ทุก role ที่ไม่ใช่ลูกค้า) ใช้ layout หลังบ้านชุดเดียวกัน
     // หน้าเว็บลูกค้า (Home) ใช้ layout หน้าร้านเสมอ แม้พนักงานจะเปิดดู
     var controller = ViewContext.RouteData.Values["Controller"]?.ToString() ?? "";
-    var backOfficeController = new[] { "Admin", "Staff", "Housekeeper", "Accountant", "Maintenance", "Payment" }
+    var backOfficeController = new[] { "Admin", "Staff", "Housekeeper", "Accountant", "Maintenance", "Payment", "Account", "Audit" }
         .Contains(controller, StringComparer.OrdinalIgnoreCase);
     var isEmployee = User.Identity?.IsAuthenticated == true && !User.IsInRole("Customer");
     Layout = backOfficeController && isEmployee ? "_BackOffice" : "_Layout";

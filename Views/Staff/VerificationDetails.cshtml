@@ -17,6 +17,11 @@
             <form asp-action="VerifyTask" asp-route-id="@Model.TaskId" method="post">
                 <button class="btn btn-primary" type="submit">ตรวจผ่าน</button>
             </form>
+            <form asp-action="ReworkTask" asp-route-id="@Model.TaskId" method="post" class="booking-panel mt-3">
+                <label class="form-label" for="rework-reason">ตรวจไม่ผ่าน ต้องแก้อะไร (แม่บ้านเห็น)</label>
+                <input id="rework-reason" name="reason" class="form-control" maxlength="500" required />
+                <button class="btn btn-outline-danger mt-2" type="submit">ส่งกลับให้ทำใหม่</button>
+            </form>
         }
         <a asp-action="VerificationTasks" class="btn btn-outline-primary mt-3">กลับไปรายการงาน</a>
     </div>

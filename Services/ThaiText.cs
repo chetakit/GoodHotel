@@ -61,6 +61,8 @@ public static class ThaiText
         ["RefundRequested"] = "ขอคืนเงิน",
         ["RefundApproved"] = "อนุมัติคืนเงิน",
         ["RefundRejected"] = "ปฏิเสธการคืนเงิน",
+        ["RoomMoved"] = "ย้ายห้อง",
+        ["Rework"] = "ตรวจไม่ผ่าน ให้ทำใหม่",
         ["RefundClosed"] = "ปิดคำขอคืนเงิน (เช็คอินแล้ว)",
         ["Closed"] = "ปิดแล้ว",
         ["LegacyConfirmed"] = "ยืนยันข้อมูลเก่า",

@@ -50,6 +50,11 @@
         </p>
     }
 
+    @if (Model.IsNoShow)
+    {
+        <div class="alert alert-secondary">เลยวันออกแล้วและไม่มีการเช็คอิน (ไม่มาเข้าพัก)</div>
+    }
+
     <div class="figures">
         <div class="figure">
             <div class="label">ยอดการจอง</div>

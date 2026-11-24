@@ -3,7 +3,8 @@ namespace GoodHotel.Models.ViewModels;
 public record HousekeepingTaskItem(
     int TaskId, string? RoomNumber, string? RoomType, string TaskType,
     string Status, int? AssignedToUserId, DateTime CreatedAtUtc,
-    DateTime? AcceptedAtUtc, DateTime? StartedAtUtc, DateTime? CompletedAtUtc);
+    DateTime? AcceptedAtUtc, DateTime? StartedAtUtc, DateTime? CompletedAtUtc,
+    string? ReworkReason = null);
 
 public record HousekeepingDashboardViewModel(
     int AvailableCount, int AcceptedCount, int InProgressCount, int CompletedTodayCount,

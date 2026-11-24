@@ -194,4 +194,23 @@ Check(!LegacyPassword.Matches(v2, v2), "An Identity V2 hash must not work as a p
 Check(LegacyPassword.Matches("plain123", "plain123") && LegacyPassword.Matches("AAAA", "AAAA"), "Old plain-text passwords still migrate.");
 Check(!LegacyPassword.Matches("plain123", "other"), "A wrong plain-text password is refused.");
 
+// ย้ายห้อง
+Check(RoomMoveService.CanMove(BookingStatuses.Booked, day.AddDays(1), false, true, false, day), "Paid booking before check-in can move.");
+Check(!RoomMoveService.CanMove(BookingStatuses.Booked, day.AddDays(1), false, false, false, day), "Unpaid booking cannot move.");
+Check(!RoomMoveService.CanMove(BookingStatuses.Booked, day.AddDays(1), true, true, false, day), "Checked-in booking cannot move.");
+Check(!RoomMoveService.CanMove(BookingStatuses.Booked, day.AddDays(1), false, true, true, day), "Pending refund blocks a move.");
+Check(!RoomMoveService.CanMove(BookingStatuses.Booked, day, false, true, false, day), "No-show cannot move.");
+Check(!RoomMoveService.CanMove(BookingStatuses.Cancelled, day.AddDays(1), false, true, false, day), "Cancelled booking cannot move.");
+Check(RoomMoveService.IsSuitable(2500m, 2500m, 2, 3, 1) && !RoomMoveService.IsSuitable(2500m, 2400m, 2, 1, 0) &&
+    !RoomMoveService.IsSuitable(2500m, 3000m, 2, 3, 0), "A move keeps or raises the room rate and must fit the guests.");
+Check(ThaiText.Status("RoomMoved") != "RoomMoved" && "RoomMoved".Length <= 30, "Room moves are shown in Thai and fit the column.");
+
+Check(RoomMoveService.BlockReason(BookingStatuses.Booked, day.AddDays(1), false, true, true, day)!.Contains("คืนเงิน") &&
+    RoomMoveService.BlockReason(BookingStatuses.Booked, day.AddDays(1), false, false, false, day)!.Contains("ชำระเงิน"),
+    "Staff are told why a room cannot be moved.");
+Check(typeof(AuditController).GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Accountant,Admin" &&
+    typeof(AccountantController).GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Accountant" &&
+    !typeof(AuditController).GetMethods().Any(m => m.IsDefined(typeof(HttpPostAttribute))),
+    "Audit is read-only for Accountant and Admin; other accounting pages stay Accountant-only.");
+
 Console.WriteLine("Payment workflow regression checks passed.");

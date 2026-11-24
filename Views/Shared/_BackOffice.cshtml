@@ -33,7 +33,7 @@
             ("ปิดยอดรายวัน", "Accountant", "Daily", On("Accountant", "Daily")),
             ("รายการชำระเงิน", "Payment", "Queue", On("Payment")),
             ("รายงานการเงิน", "Accountant", "Reports", On("Accountant", "Reports")),
-            ("ตรวจสอบย้อนหลัง", "Accountant", "Audit", On("Accountant", "Audit")),
+            ("ตรวจสอบย้อนหลัง", "Audit", "Index", On("Audit")),
         },
         "Admin" => new[]
         {
@@ -44,6 +44,7 @@
             ("พนักงาน", "Admin", "Employees", On("Admin", "Employees", "EmployeeProfile")),
             ("งานซ่อม", "Maintenance", "Index", On("Maintenance")),
             ("รายงาน", "Admin", "Reports", On("Admin", "Reports")),
+            ("ตรวจสอบย้อนหลัง", "Audit", "Index", On("Audit")),
         },
         _ => Array.Empty<(string, string, string, bool)>()
     };
@@ -83,6 +84,7 @@
                 <div class="bo-user">
                     <div class="bo-user-name">@User.Identity?.Name</div>
                     <div class="bo-user-links">
+                        <a asp-controller="Account" asp-action="Password">เปลี่ยนรหัสผ่าน</a>
                         <a asp-controller="Home" asp-action="Index">หน้าเว็บลูกค้า</a>
                         <form asp-controller="Home" asp-action="Logout" method="post" class="d-inline">
                             <button type="submit">ออกจากระบบ</button>

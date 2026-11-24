@@ -172,10 +172,13 @@ namespace GoodHotel.Controllers
             {
                 "today" => query.Where(b => b.CheckIn == today || b.CheckOut == today),
                 "upcoming" => query.Where(b => b.Status != BookingStatuses.Cancelled && b.CheckIn > today),
+                "noshow" => query.Where(b => b.Status != BookingStatuses.Cancelled && b.CheckOut <= today &&
+                    !_db.BookingStays.Any(s => s.BookingId == b.BookingId)),
                 "staying" => query.Where(b => _db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedIn")),
                 _ => query
             };
 
+            ViewBag.Today = today;
             var bookings = await query
                 .OrderByDescending(booking => booking.CheckIn)
                 .ThenByDescending(booking => booking.BookingId)
@@ -235,6 +238,7 @@ namespace GoodHotel.Controllers
                 return NotFound();
             }
 
+            ViewBag.Today = _availability.HotelToday();
             return View(booking with
             {
                 PaymentLabel = await PaymentService.PaymentLabelAsync(_db, booking.BookingId, cancellationToken),
@@ -390,6 +394,47 @@ namespace GoodHotel.Controllers
 
             form.AvailableRooms = freeNow;
             return form;
+        }
+
+        /// <summary>ย้ายห้องให้การจองที่จ่ายแล้วแต่ยังไม่เช็คอิน</summary>
+        [HttpGet]
+        public async Task<IActionResult> MoveRoom(int id, [FromServices] RoomMoveService moves, CancellationToken ct)
+        {
+            var info = await moves.InfoAsync(id, ct);
+            if (info == null)
+            {
+                TempData["StaffError"] = "การจองนี้ย้ายห้องไม่ได้ (ต้องจ่ายแล้ว ยังไม่เช็คอิน และไม่มีคำขอคืนเงินค้าง)";
+                return RedirectToAction(nameof(BookingDetails), new { id });
+            }
+            ViewBag.Options = await moves.OptionsAsync(info, ct);
+            return View(info);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MoveRoom(int bookingId, int newRoomId, string? reason,
+            [FromServices] RoomMoveService moves, CancellationToken ct)
+        {
+            if (bookingId <= 0 || newRoomId <= 0) return BadRequest();
+            var actorId = await GetActorIdAsync(ct);
+            if (!actorId.HasValue) return Forbid();
+            var error = await moves.MoveAsync(bookingId, newRoomId, actorId.Value, reason, ct);
+            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "ย้ายห้องเรียบร้อย ลูกค้าจ่ายเท่าเดิม";
+            return error == null
+                ? RedirectToAction(nameof(BookingDetails), new { id = bookingId })
+                : RedirectToAction(nameof(MoveRoom), new { id = bookingId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReworkTask(int id, string? reason, CancellationToken ct)
+        {
+            if (id <= 0) return BadRequest();
+            var actorId = await GetActorIdAsync(ct);
+            if (!actorId.HasValue) return Forbid();
+            var error = await _housekeeping.ReworkAsync(id, actorId.Value, reason, ct);
+            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "ส่งงานกลับให้แม่บ้านทำใหม่แล้ว ห้องยังจองไม่ได้จนกว่าจะตรวจผ่าน";
+            return RedirectToAction(nameof(VerificationTasks));
         }
 
         [HttpGet]

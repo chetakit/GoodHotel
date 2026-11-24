@@ -3,7 +3,11 @@
 @{
     ViewData["Title"] = $"การจอง #{Model.BookingId}";
     var customerName = $"{Model.FirstName} {Model.LastName}".Trim();
+    var noShow = Model.BookingStatus != BookingStatuses.Cancelled && Model.StayStatus == null &&
+                 Model.CheckOut <= (DateOnly)ViewBag.Today;
     var isPaid = Model.PaymentLabel == PaymentService.PaidLabel;
+    var moveBlocked = RoomMoveService.BlockReason(Model.BookingStatus, Model.CheckOut, Model.StayStatus != null, isPaid,
+        Model.RefundPending, (DateOnly)ViewBag.Today);
 }
 
 <section class="content-section">
@@ -32,7 +36,7 @@
                 <dt class="col-sm-5 col-lg-4">สถานะการจอง</dt>
                 <dd class="col-sm-7 col-lg-8">@ThaiText.Status(Model.BookingStatus)</dd>
                 <dt class="col-sm-5 col-lg-4">สถานะการเข้าพัก</dt>
-                <dd class="col-sm-7 col-lg-8">@(Model.StayStatus == null ? "ยังไม่เช็คอิน" : ThaiText.Status(Model.StayStatus))</dd>
+                <dd class="col-sm-7 col-lg-8">@(noShow ? "ไม่มาเข้าพัก" : Model.StayStatus == null ? "ยังไม่เช็คอิน" : ThaiText.Status(Model.StayStatus))</dd>
                 <dt class="col-sm-5 col-lg-4">การชำระเงิน</dt>
                 <dd class="col-sm-7 col-lg-8">
                     <span class="badge @(isPaid ? "text-bg-success" : Model.PaymentLabel == PaymentService.RefundedLabel ? "text-bg-secondary" : "text-bg-warning")">@Model.PaymentLabel</span>
@@ -40,7 +44,7 @@
             </dl>
         </div>
 
-        @if (Model.RefundPending && Model.StayStatus == null)
+        @if (Model.RefundPending && Model.StayStatus == null && !noShow)
         {
             <div class="alert alert-warning mt-3">
                 ลูกค้ามีคำขอคืนเงินรอฝ่ายบัญชีพิจารณา ถ้าลูกค้ามาเช็คอิน คำขอนี้จะถูกปิดอัตโนมัติ (ไม่คืนเงิน)
@@ -49,6 +53,12 @@
         @if (Model.BookingStatus == BookingStatuses.Cancelled)
         {
             <div class="alert alert-secondary mt-3">การจองนี้ถูกยกเลิกแล้ว@(Model.PaymentLabel == PaymentService.RefundedLabel ? " และคืนเงินให้ลูกค้าแล้ว" : "")</div>
+        }
+        else if (noShow)
+        {
+            <div class="alert alert-secondary mt-3">
+                เลยวันออกแล้วและไม่มีการเช็คอิน ถือว่าลูกค้าไม่มาเข้าพัก@(isPaid ? " เงินที่จ่ายแล้วยังเป็นรายได้" : "")@(Model.RefundPending ? " · มีคำขอคืนเงินรอฝ่ายบัญชีพิจารณา" : "")
+            </div>
         }
         else if (Model.StayStatus == null && !isPaid)
         {
@@ -86,7 +96,16 @@
             </form>
         }
 
+        @* ยกเลิก เช็คอินแล้ว หรือเลยวันออก เห็นจากสถานะด้านบนอยู่แล้ว ไม่ต้องบอกซ้ำ *@
+        @if (moveBlocked != null && Model.BookingStatus != BookingStatuses.Cancelled && Model.StayStatus == null && !noShow)
+        {
+            <p class="text-muted small mt-3 mb-0">ย้ายห้องไม่ได้: @moveBlocked</p>
+        }
         <nav class="d-flex flex-wrap gap-2 mt-4">
+            @if (moveBlocked == null)
+            {
+                <a asp-action="MoveRoom" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">ย้ายห้อง</a>
+            }
             <a asp-controller="Payment" asp-action="Details" asp-route-id="@Model.BookingId" class="btn btn-outline-primary">การชำระเงิน</a>
             @if (isPaid)
             {

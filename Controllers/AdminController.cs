@@ -435,7 +435,7 @@ namespace GoodHotel.Controllers
                 {
                     DeleteNewUpload(uploadedImagePath);
                     ModelState.AddModelError(nameof(data.Status),
-                        "ห้องนี้ยังมีแขก การจอง หรืองานทำความสะอาดค้างอยู่ กรุณาลองใหม่ภายหลัง");
+                        "ห้องนี้ยังมีแขกหรืองานทำความสะอาดค้างอยู่ กรุณาลองใหม่ภายหลัง");
                     return View("RoomForm", data);
                 }
 

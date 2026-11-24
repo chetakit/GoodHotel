@@ -22,7 +22,7 @@ public record PaymentDetailsViewModel(int BookingId, decimal? BookingAmount, dec
     decimal RefundedAmount, bool RequiresReconciliation, IReadOnlyList<PaymentListItem> Payments,
     IReadOnlyList<PaymentHistoryItem> Events, IReadOnlyList<PaymentRefundItem> Refunds,
     string? BookingStatus = null, string? GuestName = null, string? RoomNumber = null,
-    DateTime? CreatedAtUtc = null, string? CancelReason = null, bool CanCancel = false, bool CanRequestRefund = false)
+    DateTime? CreatedAtUtc = null, string? CancelReason = null, bool CanCancel = false, bool CanRequestRefund = false, bool IsNoShow = false)
 {
     public bool IsCancelled => BookingStatus == BookingStatuses.Cancelled;
 

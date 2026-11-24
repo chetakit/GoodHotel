@@ -55,7 +55,7 @@ public class MyBookingViewModel
         {
             "CheckedIn" => "กำลังเข้าพัก",
             "CheckedOut" => "เข้าพักเสร็จแล้ว",
-            _ when IsHistory => "ไม่ได้เข้าพัก",
+            _ when IsHistory => "ไม่มาเข้าพัก",
             _ => "รอเข้าพัก"
         };
 
@@ -64,7 +64,7 @@ public class MyBookingViewModel
         "ยกเลิกแล้ว" => "text-bg-secondary",
         "กำลังเข้าพัก" => "text-bg-success",
         "เข้าพักเสร็จแล้ว" => "text-bg-dark",
-        "ไม่ได้เข้าพัก" => "text-bg-warning",
+        "ไม่มาเข้าพัก" => "text-bg-warning",
         _ => "text-bg-primary"
     };
 }

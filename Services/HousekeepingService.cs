@@ -188,10 +188,48 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return true;
     }
 
+    /// <summary>
+    /// ตรวจไม่ผ่าน: ส่งกลับให้แม่บ้านคนเดิมทำใหม่ (ถ้าคนเดิมใช้งานไม่ได้แล้ว ส่งกลับเข้ากองให้คนอื่นรับ)
+    /// ห้องยังจองไม่ได้ เพราะงานทำความสะอาดยังไม่ Verified
+    /// </summary>
+    public async Task<string?> ReworkAsync(int taskId, int actorId, string? reason, CancellationToken ct)
+    {
+        reason = reason?.Trim();
+        if (string.IsNullOrEmpty(reason) || reason.Length > 500) return "กรุณาระบุสิ่งที่ต้องแก้ (ไม่เกิน 500 ตัวอักษร)";
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        var assignee = await db.HousekeepingTasks.AsNoTracking().Where(t => t.TaskId == taskId)
+            .Select(t => t.AssignedToUserId).SingleOrDefaultAsync(ct);
+        var keep = assignee.HasValue && await LockUserAsync(db, assignee.Value, ct) &&
+            await db.Users.AsNoTracking().AnyAsync(u => u.UserId == assignee && u.IsActive && u.Role == "Housekeeper", ct);
+        var next = keep ? "InProgress" : "Pending";
+        var nextAssignee = keep ? assignee : null;
+        var changed = await db.HousekeepingTasks
+            .Where(t => t.TaskId == taskId && t.Status == "Completed" && t.AssignedToUserId == assignee &&
+                t.AssignedToUserId != actorId && t.CompletedByUserId != actorId)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, next)
+                .SetProperty(t => t.AssignedToUserId, nextAssignee)
+                .SetProperty(t => t.CompletedAtUtc, (DateTime?)null)
+                .SetProperty(t => t.CompletedByUserId, (int?)null), ct);
+        if (changed != 1) return "ส่งงานนี้กลับไม่ได้ (งานถูกเปลี่ยนไปแล้ว หรือคุณเป็นคนทำงานนี้เอง)";
+        db.HousekeepingTaskEvents.Add(new HousekeepingTaskEvent
+        {
+            TaskId = taskId, ActorUserId = actorId, EventType = "Rework", OccurredAtUtc = now,
+            PreviousStatus = "Completed", NewStatus = next,
+            PreviousAssignee = assignee, NewAssignee = nextAssignee, Reason = reason
+        });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return null;
+    }
+
     private IQueryable<HousekeepingTaskItem> TaskItems(IQueryable<HousekeepingTask> tasks) =>
         tasks.Select(t => new HousekeepingTaskItem(
             t.TaskId, t.Room.Room1, t.Room.Type, t.TaskType, t.Status, t.AssignedToUserId,
-            t.CreatedAtUtc, t.AcceptedAtUtc, t.StartedAtUtc, t.CompletedAtUtc));
+            t.CreatedAtUtc, t.AcceptedAtUtc, t.StartedAtUtc, t.CompletedAtUtc,
+            t.Status == "Completed" || t.Status == "Verified" ? null
+                : t.Events.Where(e => e.EventType == "Rework").OrderByDescending(e => e.EventId)
+                    .Select(e => e.Reason).FirstOrDefault()));
 
     public async Task<HousekeepingDashboardViewModel> DashboardAsync(int userId, CancellationToken ct)
     {

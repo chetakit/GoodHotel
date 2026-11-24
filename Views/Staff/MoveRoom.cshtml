@@ -1,0 +1,47 @@
+@model GoodHotel.Services.RoomMoveInfo
+@{
+    ViewData["Title"] = $"ย้ายห้อง · การจอง #{Model.BookingId}";
+    var options = (IReadOnlyList<RoomMoveOption>)ViewBag.Options;
+}
+
+<section class="content-section">
+    <div class="container">
+        @if (TempData["StaffError"] is string error) { <div class="alert alert-warning" role="alert">@error</div> }
+        <div class="booking-panel mb-3">
+            <dl class="row mb-0">
+                <dt class="col-sm-4">ลูกค้า</dt><dd class="col-sm-8">@ThaiText.OrDash(Model.GuestName?.Trim())</dd>
+                <dt class="col-sm-4">ห้องเดิม</dt><dd class="col-sm-8">@Model.RoomNumber · @Model.RoomType · ฿@Model.Rate?.ToString("N2") / คืน</dd>
+                <dt class="col-sm-4">วันเข้าพัก</dt><dd class="col-sm-8">@ThaiText.Date(Model.CheckIn) – @ThaiText.Date(Model.CheckOut)</dd>
+                <dt class="col-sm-4">ผู้เข้าพัก</dt><dd class="col-sm-8">@Model.Guests คน · เตียงเสริม @Model.ExtraBed</dd>
+            </dl>
+        </div>
+        @if (options.Count == 0)
+        {
+            <div class="alert alert-light border">
+                ไม่มีห้องว่างที่ย้ายได้ (ต้องว่างตลอดช่วง รับจำนวนคนได้ และราคาไม่ต่ำกว่าห้องเดิม)
+                ให้ลูกค้าส่งคำขอคืนเงินที่หน้า "การจองของฉัน"
+            </div>
+        }
+        else
+        {
+            <form asp-action="MoveRoom" method="post" class="booking-panel"
+                  onsubmit="return confirm('ย้ายห้องการจอง #@Model.BookingId ? ลูกค้าไม่ต้องจ่ายเพิ่ม');">
+                <input type="hidden" name="bookingId" value="@Model.BookingId" />
+                <p class="text-muted">ลูกค้าจ่ายเท่าเดิม ไม่เก็บส่วนต่าง</p>
+                @foreach (var room in options)
+                {
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="newRoomId" id="room-@room.RoomId" value="@room.RoomId" required />
+                        <label class="form-check-label" for="room-@room.RoomId">
+                            <strong>@room.RoomNumber</strong> · @room.Type · รับได้ @room.Capacity คน · ฿@room.Rate?.ToString("N2") / คืน
+                        </label>
+                    </div>
+                }
+                <label class="form-label mt-2" for="reason">เหตุผล (ลูกค้าและฝ่ายบัญชีเห็น)</label>
+                <input id="reason" name="reason" class="form-control" maxlength="500" required placeholder="เช่น แอร์เสีย" />
+                <button class="btn btn-primary mt-3" type="submit">ย้ายห้อง</button>
+            </form>
+        }
+        <a asp-action="BookingDetails" asp-route-id="@Model.BookingId" class="btn btn-outline-primary mt-3">กลับไปการจอง</a>
+    </div>
+</section>

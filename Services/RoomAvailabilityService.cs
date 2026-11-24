@@ -129,12 +129,8 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
 
     public async Task<bool> HasCurrentRestrictionsAsync(int roomId, CancellationToken ct)
     {
-        var today = HotelToday();
+        // แค่มีคนจองวันนี้ (ยังไม่เช็คอิน) ไม่กันการเปิดห้อง ไม่งั้นซ่อมเสร็จแล้วแขกเช็คอินไม่ได้ และ Admin ก็เปิดห้องไม่ได้
         return await CurrentStays(db.BookingStays.AsNoTracking(), roomId).AnyAsync(ct) ||
-               await CurrentBookings(db.Bookings.AsNoTracking(), roomId, today)
-                   // แขกที่เช็คเอาท์ไปแล้ว (แม้ก่อนกำหนด) ไม่ถือว่ายังใช้ห้องอยู่
-                   .Where(b => !db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedOut"))
-                   .AnyAsync(ct) ||
                await PendingCheckoutCleaning(db.HousekeepingTasks.AsNoTracking(), roomId).AnyAsync(ct);
     }
 

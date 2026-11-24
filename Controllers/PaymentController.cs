@@ -120,7 +120,8 @@ public class PaymentController(
             BookingCancellationService.CanCancel(booking.Status ?? "", booking.CheckOut, booking.HasStay,
                 refunds.Any(r => r.Status == PaymentService.RefundRequested), today),
             PaymentService.CanRequestRefund(booking.Status, booking.CheckOut, booking.HasStay,
-                confirmedPayment != null && refunded < confirmed, refunds.Count > 0, today)));
+                confirmedPayment != null && refunded < confirmed, refunds.Count > 0, today),
+            booking.Status != BookingStatuses.Cancelled && !booking.HasStay && booking.CheckOut <= today));
     }
 
     /// <summary>

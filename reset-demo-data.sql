@@ -50,9 +50,9 @@ DELETE FROM `maintenance_reports` WHERE `ReportId` > 0
 --    15 op as, 16 asdww weff, 18 QA WalkIn, 19 หมู เติ้ล
 DELETE FROM `users` WHERE `UserId` IN (3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 16, 18, 19)
 
--- 10.1 ลบบัญชีที่สร้างตอนทดสอบ: 22 ทดสอบ วอล์กอิน, 23 มานี ทดสอบสมัคร, 24 คนอื่น แอบอ้าง
+-- 10.1 ลบบัญชีที่สร้างตอนทดสอบ: 22 ทดสอบ วอล์กอิน, 23 มานี ทดสอบสมัคร, 24 คนอื่น แอบอ้าง, 25 เลือก ทดสอบ, 26 แข่ง ทดสอบ
 --      (บัญชี #21 ACC count ฝ่ายบัญชี เก็บไว้)
-DELETE FROM `users` WHERE `UserId` IN (22, 23, 24)
+DELETE FROM `users` WHERE `UserId` IN (22, 23, 24, 25, 26)
 
 -- 11 ตั้งชื่อพนักงานให้ดูเป็นคนจริงตอนสาธิต (อีเมล asd@gmail.com เดิม)
 UPDATE `users` SET `FirstName` = 'สมชาย', `LastName` = 'ใจดี' WHERE `UserId` = 10

@@ -1,6 +1,8 @@
 @model GoodHotel.Models.ViewModels.AuditViewModel
 @{
     ViewData["Title"] = "ตรวจสอบย้อนหลัง (Audit)";
+    // ผู้ดูแลระบบดูได้อย่างเดียว เปิดหน้าการชำระเงินรายการจองไม่ได้ จึงไม่ทำเป็นลิงก์
+    var canOpen = User.IsInRole("Accountant");
     var iso = System.Globalization.CultureInfo.InvariantCulture;
     var fromText = Model.From.ToString("yyyy-MM-dd", iso);
     var toText = Model.To.ToString("yyyy-MM-dd", iso);
@@ -15,11 +17,11 @@
 }
 
 @section Actions {
-    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportAudit" asp-route-from="@fromText" asp-route-to="@toText"
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Export" asp-route-from="@fromText" asp-route-to="@toText"
        asp-route-type="@Model.Type" asp-route-bookingId="@Model.BookingId" asp-route-actor="@Model.Actor">ดาวน์โหลด CSV</a>
 }
 
-<form method="get" asp-action="Audit" class="toolbar">
+<form method="get" asp-action="Index" class="toolbar">
     <div>
         <label class="form-label" for="from">ตั้งแต่</label>
         <input id="from" name="from" type="date" class="form-control" value="@fromText" />
@@ -47,7 +49,7 @@
         <input id="actor" name="actor" class="form-control" value="@Model.Actor" placeholder="ชื่อ" />
     </div>
     <button class="btn btn-primary" type="submit">กรอง</button>
-    <a class="btn btn-outline-secondary" asp-action="Audit">ล้าง</a>
+    <a class="btn btn-outline-secondary" asp-action="Index">ล้าง</a>
 </form>
 
 <section class="table-panel">
@@ -79,11 +81,11 @@
                                 }
                             </td>
                             <td>
-                                @if (e.BookingId.HasValue)
+                                @if (e.BookingId.HasValue && canOpen)
                                 {
                                     <a asp-controller="Payment" asp-action="Details" asp-route-id="@e.BookingId">#@e.BookingId</a>
                                 }
-                                else { <span>-</span> }
+                                else { <span>@(e.BookingId.HasValue ? $"#{e.BookingId}" : "-")</span> }
                             </td>
                             <td>@ThaiText.OrDash(e.Actor)@if (e.ActorRole != null) {<div class="text-muted small">@e.ActorRole</div>}</td>
                             <td class="small">@ThaiText.OrDash(e.Detail)</td>

@@ -24,6 +24,7 @@
                 <div class="task-meta">
                     @ThaiText.Status(task.TaskType) · งาน #@task.TaskId
                     <span class="badge @(task.Status == "InProgress" ? "text-bg-info" : "text-bg-secondary") ms-1">@ThaiText.Status(task.Status)</span>
+                    @if (task.ReworkReason != null) { <div class="text-danger">ตรวจไม่ผ่าน ต้องแก้: @task.ReworkReason</div> }
                 </div>
                 <div class="task-action">
                     @if (task.Status == "Accepted")
@@ -55,7 +56,7 @@
         {
             <div class="task-row">
                 <a class="task-room" asp-action="TaskDetails" asp-route-id="@task.TaskId">ห้อง @ThaiText.OrDash(task.RoomNumber)</a>
-                <div class="task-meta">@ThaiText.Status(task.TaskType) · งาน #@task.TaskId</div>
+                <div class="task-meta">@ThaiText.Status(task.TaskType) · งาน #@task.TaskId@if (task.ReworkReason != null) { <div class="text-danger">ตรวจไม่ผ่าน ต้องแก้: @task.ReworkReason</div> }</div>
                 <div class="task-action">
                     <form asp-action="ClaimAndStart" asp-route-id="@task.TaskId" method="post"><button class="btn btn-primary" type="submit">รับงานและเริ่มทำ</button></form>
                 </div>
