@@ -36,7 +36,10 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
         configuration.GetConnectionString("DefaultConnection") ?? "")
     {
         ConnectionReset = false,
-        MinimumPoolSize = WarmReaders,
+        // Pomelo เติมสองค่านี้เองเสมอ ต้องใส่ให้ตรงกัน ไม่งั้นตัวอุ่นเครื่องจะเปิดคนละ pool กับที่ EF ใช้
+        AllowUserVariables = true,
+        UseAffectedRows = false,
+        // ไม่ตั้ง MinimumPoolSize: ไดรเวอร์จะต่อทีละเส้นจนครบก่อนตอบคำขอแรก (~10 วินาที) ให้ ReadConnectionWarmer เปิดพร้อมกันแทน
         Keepalive = 30
     }.ConnectionString;
 
