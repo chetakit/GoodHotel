@@ -61,7 +61,8 @@ public sealed class BookingService
     public async Task<BookingConfirmationViewModel> PrepareConfirmationAsync(
         CreateBookingViewModel request,
         int? customerId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isNewCustomer = false)
     {
         var model = CopyRequest(request);
         var validationMessage = ValidateRequest(request);
@@ -71,11 +72,18 @@ public sealed class BookingService
             return model;
         }
 
+        // เช็ควันว่างพร้อมกับดึงข้อมูลห้อง (วันว่างอ่านผ่าน connection แยก ไม่ชนกับ _db)
+        var availableTask = _availability.IsAvailableAsync(
+            request.RoomId,
+            request.CheckIn!.Value,
+            request.CheckOut!.Value,
+            cancellationToken);
         var room = await _db.Rooms
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 item => item.RoomId == request.RoomId,
                 cancellationToken);
+        var available = await availableTask;
 
         if (room == null)
         {
@@ -112,12 +120,6 @@ public sealed class BookingService
             return model;
         }
 
-        var available = await _availability.IsAvailableAsync(
-            room.RoomId,
-            request.CheckIn!.Value,
-            request.CheckOut!.Value,
-            cancellationToken);
-
         if (!available)
         {
             model.StatusMessage = "ห้องพักไม่พร้อมให้จองในช่วงวันที่เลือก";
@@ -131,7 +133,7 @@ public sealed class BookingService
 
         // โปรที่ลูกค้าเลือก (ถ้าเลือกโปรที่ใช้ไม่ได้ หรือยังไม่เลือก ใช้โปรที่ลดได้มากที่สุด)
         var (promotion, eligible) = await _promotions.ResolveAsync(
-            new PromotionContext(customerId, request.CheckIn!.Value, request.CheckOut!.Value, subtotal),
+            new PromotionContext(customerId, request.CheckIn!.Value, request.CheckOut!.Value, subtotal, isNewCustomer),
             request.PromotionId,
             cancellationToken);
         model.AvailablePromotions = eligible;

@@ -174,13 +174,14 @@ public class PaymentController(
         method = method?.Trim();
         if (search?.Length > 100 || status?.Length > 30 || method?.Length > 50) return BadRequest();
         var query = FilterHistory(db.Payments.AsNoTracking(), search, method);
+        var refundsTask = reader.Run(c => c.PaymentRefunds.AsNoTracking().Where(r => r.Status == PaymentService.RefundRequested)
+            .OrderBy(r => r.RefundId)
+            .Select(r => new PaymentRefundItem(r.RefundId, r.PaymentId, r.Payment.BookingId, r.Amount, r.Status, r.Reason,
+                r.RequestedByUserId, r.RequestedAtUtc, r.ApprovedByUserId, r.ApprovedAtUtc)).ToListAsync(ct));
         var list = await ManagementItems(query.OrderByDescending(p => p.PaymentId)).ToListAsync(ct);
         if (!string.IsNullOrEmpty(status))
             list = list.Where(p => p.Payment.DisplayStatus == status).ToList();
-        var refunds = await db.PaymentRefunds.AsNoTracking().Where(r => r.Status == PaymentService.RefundRequested)
-            .OrderBy(r => r.RefundId)
-            .Select(r => new PaymentRefundItem(r.RefundId, r.PaymentId, r.Payment.BookingId, r.Amount, r.Status, r.Reason,
-                r.RequestedByUserId, r.RequestedAtUtc, r.ApprovedByUserId, r.ApprovedAtUtc)).ToListAsync(ct);
+        var refunds = await refundsTask;
         return View(new PaymentQueueViewModel(list, refunds, search, status, method));
     }
 

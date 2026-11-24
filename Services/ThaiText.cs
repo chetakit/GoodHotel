@@ -106,6 +106,10 @@ public static class ThaiText
     public static string Date(DateOnly? date) =>
         date?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "-";
 
+    /// <summary>หมายเหตุที่ระบบบันทึกเป็นภาษาอังกฤษ → ไทย (ข้อมูลในฐานข้อมูลไม่เปลี่ยน)</summary>
+    public static string? Reason(string? value) =>
+        value == "DEMO only; no real payment was transferred." ? "การชำระเงินจำลอง ไม่มีการโอนเงินจริง" : value;
+
     /// <summary>ข้อความว่าง → "-"</summary>
     public static string OrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 

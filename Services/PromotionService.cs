@@ -8,7 +8,8 @@ public sealed record PromotionContext(
     int? CustomerId,
     DateOnly CheckIn,
     DateOnly CheckOut,
-    decimal RoomSubtotal);
+    decimal RoomSubtotal,
+    bool IsNewCustomer = false);
 
 public sealed record AppliedPromotion(int PromotionId, string Name, decimal DiscountAmount);
 
@@ -17,16 +18,31 @@ public sealed record AppliedPromotion(int PromotionId, string Name, decimal Disc
 /// กติกา: 1 การจองใช้ได้ 1 โปร ลูกค้าเลือกเองจากโปรที่เข้าเงื่อนไข (ค่าเริ่มต้น = โปรที่ลดได้มากที่สุด)
 /// ส่วนลดคิดจากค่าห้องเท่านั้น (ไม่รวมเตียงเสริม)
 /// </summary>
-public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityService availability)
+public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityService availability, ParallelReader reader)
 {
     /// <summary>โปรทั้งหมดที่การจองนี้ใช้ได้ เรียงจากลดมากไปน้อย</summary>
     public async Task<IReadOnlyList<AppliedPromotion>> FindEligibleAsync(PromotionContext booking, CancellationToken ct)
     {
-        var candidates = await db.Promotions.AsNoTracking()
+        Task<List<Promotion>> Candidates(GoodHotelDbContext c) => c.Promotions.AsNoTracking()
             .Where(p => p.IsActive && p.RuleType != null && p.DiscountType != null && p.DiscountValue > 0)
             .ToListAsync(ct);
 
-        var customer = await LoadCustomerHistoryAsync(booking.CustomerId, ct);
+        List<Promotion> candidates;
+        CustomerHistory customer;
+        if (db.Database.CurrentTransaction != null)
+        {
+            // กำลังจองอยู่ใน transaction ต้องอ่านผ่าน connection เดิมทีละ query
+            candidates = await Candidates(db);
+            customer = await LoadCustomerHistoryAsync(db, booking, ct);
+        }
+        else
+        {
+            var candidatesTask = reader.Run(Candidates);
+            var customerTask = reader.Run(c => LoadCustomerHistoryAsync(c, booking, ct));
+            await Task.WhenAll(candidatesTask, customerTask);
+            candidates = candidatesTask.Result;
+            customer = customerTask.Result;
+        }
         var today = availability.HotelToday();
 
         return candidates
@@ -104,24 +120,27 @@ public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityServ
 
     private sealed record CustomerHistory(bool IsKnown, int? BirthMonth, int ActiveBookingCount, int CompletedStayCount);
 
-    private async Task<CustomerHistory> LoadCustomerHistoryAsync(int? customerId, CancellationToken ct)
+    // ทุกตัวเลขอยู่ใน query เดียว (แต่ละ query ไปฐานข้อมูลใช้ ~200ms)
+    private static async Task<CustomerHistory> LoadCustomerHistoryAsync(
+        GoodHotelDbContext c, PromotionContext booking, CancellationToken ct)
     {
+        var customerId = booking.CustomerId;
         if (customerId is not > 0)
         {
-            return new CustomerHistory(false, null, 0, 0);
+            // ลูกค้าใหม่ที่กำลังจะถูกสร้าง (Walk-in) = รู้แน่ว่ายังไม่เคยจอง
+            return new CustomerHistory(booking.IsNewCustomer, null, 0, 0);
         }
 
-        var birthDate = await db.Users.AsNoTracking()
+        var history = await c.Users.AsNoTracking()
             .Where(u => u.UserId == customerId)
-            .Select(u => u.BirthDate)
+            .Select(u => new
+            {
+                u.BirthDate,
+                Active = c.Bookings.Count(b => b.UserId == u.UserId && b.Status != BookingStatuses.Cancelled),
+                Completed = c.BookingStays.Count(s => s.Booking.UserId == u.UserId && s.Status == "CheckedOut")
+            })
             .FirstOrDefaultAsync(ct);
 
-        var activeBookings = await db.Bookings.AsNoTracking()
-            .CountAsync(b => b.UserId == customerId && b.Status != BookingStatuses.Cancelled, ct);
-
-        var completedStays = await db.BookingStays.AsNoTracking()
-            .CountAsync(s => s.Booking.UserId == customerId && s.Status == "CheckedOut", ct);
-
-        return new CustomerHistory(true, birthDate?.Month, activeBookings, completedStays);
+        return new CustomerHistory(true, history?.BirthDate?.Month, history?.Active ?? 0, history?.Completed ?? 0);
     }
 }

@@ -15,7 +15,7 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(ThaiValidation.Configure);
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<RoomAvailabilityService>();
 builder.Services.AddScoped<PaymentService>();
@@ -35,23 +35,21 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 
 // Database Connection
-var connectionString = builder.Configuration
-    .GetConnectionString("DefaultConnection");
-
 var serverVersion = new MySqlServerVersion(
     new Version(8, 0, 0)
 );
 
-builder.Services.AddDbContext<GoodHotelDbContext>(
-    options => options.UseMySql(
-        connectionString,
-        serverVersion
-    )
-);
+// เปิดหน้า (GET) ใช้ pool สำหรับอ่าน ส่วนการบันทึกใช้ pool เดิม (ดูเหตุผลใน DatabaseConnections)
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<DatabaseConnections>();
+void ConfigureDatabase(IServiceProvider services, DbContextOptionsBuilder options) => options.UseMySql(
+    services.GetRequiredService<DatabaseConnections>()
+        .For(services.GetRequiredService<IHttpContextAccessor>().HttpContext),
+    serverVersion);
+builder.Services.AddDbContext<GoodHotelDbContext>(ConfigureDatabase);
 // factory สำหรับ ParallelReader (สร้าง DbContext แยกเพื่อยิง query พร้อมกัน)
-builder.Services.AddDbContextFactory<GoodHotelDbContext>(
-    options => options.UseMySql(connectionString, serverVersion),
-    ServiceLifetime.Scoped);
+builder.Services.AddDbContextFactory<GoodHotelDbContext>(ConfigureDatabase, ServiceLifetime.Scoped);
+builder.Services.AddHostedService<ReadConnectionWarmer>();
 builder.Services.AddScoped<ParallelReader>();
 builder.Services.AddScoped<FinanceLedger>();
 
@@ -106,8 +104,22 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// ลิงก์ผิด/ข้อมูลไม่มีอยู่: แสดงหน้าบอกผู้ใช้แทนหน้าขาวเปล่า (คำตอบที่มีเนื้อหาอยู่แล้ว เช่น JSON ไม่เปลี่ยน)
+app.UseStatusCodePagesWithReExecute("/Home/StatusPage", "?code={0}");
+
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+// รูปห้องตั้งชื่อไฟล์ใหม่ทุกครั้งที่อัปโหลด และ css/js มีเลขรุ่น (?v=) ต่อท้าย เบราว์เซอร์จึงเก็บไว้ใช้ซ้ำได้
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = file =>
+    {
+        var request = file.Context.Request;
+        if (request.Query.ContainsKey("v") || request.Path.StartsWithSegments("/uploads"))
+            file.Context.Response.Headers.CacheControl = "public,max-age=2592000";
+        else if (request.Path.StartsWithSegments("/images") || request.Path.StartsWithSegments("/lib"))
+            file.Context.Response.Headers.CacheControl = "public,max-age=86400";
+    }
+});
 
 // เปิด connection ฐานข้อมูลค้างไว้ตลอด 1 request
 // ปกติ EF เปิด/ปิด connection ทุก query และทุกครั้งที่หยิบจาก pool ต้อง reset
@@ -115,6 +127,7 @@ app.UseStaticFiles();
 // (ลองใช้ interceptor กันไม่ให้ EF ปิดแล้ว ช้ากว่าเดิม จึงใช้วิธีนี้)
 app.Use(async (context, next) =>
 {
+    context.RequestServices.GetRequiredService<DatabaseConnections>().DropIfStale();
     var db = context.RequestServices.GetRequiredService<GoodHotelDbContext>();
     await db.Database.OpenConnectionAsync(context.RequestAborted);
     try { await next(); }

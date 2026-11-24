@@ -1,3 +1,4 @@
+using System.Data;
 using GoodHotel.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -70,6 +71,11 @@ public sealed class BookingCancellationService(
     /// </summary>
     public async Task<CancelBookingResult> CancelByStaffAsync(int bookingId, CancellationToken ct)
     {
+        // ล็อกการจองก่อนเช็คการจ่าย (ตอนลูกค้าจ่ายก็ล็อกแถวเดียวกัน)
+        // ไม่งั้นลูกค้าจ่ายแทรกระหว่างเช็คกับยกเลิก การจองที่จ่ายแล้วจะถูกยกเลิก
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        if (!await PaymentService.LockBookingAsync(db, bookingId, ct))
+            return new CancelBookingResult(false, "ไม่พบการจองนี้");
         if (await PaymentService.IsPaidAsync(db, bookingId, ct))
         {
             return new CancelBookingResult(false,
@@ -86,6 +92,7 @@ public sealed class BookingCancellationService(
                 .SetProperty(x => x.CancelReason, CancelReasons.Staff), ct);
 
         if (updated == 1) await CloseOpenPaymentsAsync(bookingId, ct);
+        await tx.CommitAsync(ct);
 
         return updated == 1
             ? new CancelBookingResult(true, $"ยกเลิกการจอง #{bookingId} แล้ว ห้องกลับมาว่างให้จองได้")

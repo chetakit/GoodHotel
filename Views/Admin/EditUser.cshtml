@@ -37,11 +37,10 @@
            type="tel"
            inputmode="numeric"
            maxlength="10"
-           pattern="0[689][0-9]{8}"
            oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)"
            required />
     <span asp-validation-for="Phone" class="text-danger"></span>
-    <small class="text-muted">กรอกเบอร์มือถือไทย 10 หลัก เช่น 0812345678</small>
+    <small class="text-muted">ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0</small>
 </div>
 
 
@@ -66,6 +65,21 @@
             }
             <span asp-validation-for="Role" class="text-danger"></span>
         </div>
+
+        @if (User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value != Model.UserId.ToString())
+        {
+            <div class="mb-3">
+                <label asp-for="NewPassword" class="form-label">ตั้งรหัสผ่านใหม่ (ไม่บังคับ)</label>
+                <input asp-for="NewPassword" type="password" class="form-control" autocomplete="new-password" minlength="8" />
+                <div class="form-text">ใช้เมื่อเจ้าของบัญชีลืมรหัส 8 ตัวอักษรขึ้นไป เว้นว่างถ้าไม่เปลี่ยน</div>
+                <span asp-validation-for="NewPassword" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="ConfirmPassword" class="form-label">ยืนยันรหัสผ่านใหม่</label>
+                <input asp-for="ConfirmPassword" type="password" class="form-control" autocomplete="new-password" />
+                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+            </div>
+        }
 
         <button type="submit" class="btn btn-primary">บันทึก</button>
         <a asp-controller="Admin" asp-action="Members"

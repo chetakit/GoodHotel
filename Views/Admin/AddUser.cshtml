@@ -12,21 +12,21 @@
             <div class="col-md-6">
                 <div class="mb-3">
                     <label asp-for="FirstName" class="form-label">ชื่อ</label>
-                    <input asp-for="FirstName" class="form-control" placeholder="Enter first name" />
+                    <input asp-for="FirstName" class="form-control" />
                     <span asp-validation-for="FirstName" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
                     <label asp-for="LastName" class="form-label">นามสกุล</label>
-                    <input asp-for="LastName" class="form-control" placeholder="Enter last name" />
+                    <input asp-for="LastName" class="form-control" />
                     <span asp-validation-for="LastName" class="text-danger"></span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="mb-3">
                     <label asp-for="Email" class="form-label">อีเมล</label>
-                    <input asp-for="Email" type="email" class="form-control" placeholder="Enter email" />
+                    <input asp-for="Email" type="email" class="form-control" />
                     <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
             </div>
@@ -43,7 +43,8 @@
             <div class="col-md-6">
                 <div class="mb-3">
                     <label asp-for="Password" class="form-label">รหัสผ่าน</label>
-                    <input asp-for="Password" type="password" class="form-control" placeholder="Enter password" />
+                    <input asp-for="Password" type="password" class="form-control" minlength="8" autocomplete="new-password" aria-describedby="passwordHelp" />
+                    <div id="passwordHelp" class="form-text">8 ตัวอักษรขึ้นไป</div>
                     <span asp-validation-for="Password" class="text-danger"></span>
                 </div>
             </div>

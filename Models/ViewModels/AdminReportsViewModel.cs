@@ -3,6 +3,11 @@ namespace GoodHotel.Models.ViewModels;
 /// <summary>รายงานงานโรงแรมของ Admin (ไม่มีตัวเลขเงิน)</summary>
 public class AdminReportsViewModel
 {
+    // ว่าง = ไม่จำกัดช่วงวันที่
+    public DateOnly? From { get; set; }
+
+    public DateOnly? To { get; set; }
+
     // การจองที่ยังไม่ถูกยกเลิก
     public int BookingCount { get; set; }
 

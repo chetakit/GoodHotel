@@ -41,6 +41,9 @@ public class WalkInViewModel
 
     public string CustomerKey => $"{Phone?.Trim()}|{FirstName?.Trim()}|{LastName?.Trim()}";
 
+    // ยอดที่พนักงานเห็นบนหน้าจอก่อนกดยืนยัน ถ้าไม่ตรงกับยอดจริงต้องยืนยันใหม่ (กันเก็บเงินผิด)
+    public decimal? ExpectedTotal { get; set; }
+
     // ข้อมูลสำหรับแสดงผล
     public IReadOnlyList<WalkInCustomer> Candidates { get; set; } = [];
 

@@ -4,30 +4,13 @@
 @{
     ViewData["Title"] = "บัญชีผู้ใช้";
     const int pageSize = 10;
-    const string pageCookie = "AdminMembersPage";
-    // แยกดูได้ว่า ลูกค้า หรือ พนักงาน (Staff/แม่บ้าน/บัญชี/Admin)
+    // แยกดูได้ว่า ลูกค้า หรือ พนักงาน (Staff/แม่บ้าน/บัญชี/Admin) และค้นหาด้วยชื่อ อีเมล หรือเบอร์
     var roleFilter = Context.Request.Query["role"].ToString();
-    var members = Model
-        .Where(m => roleFilter == "customer" ? m.Role == "Customer"
-                  : roleFilter == "staff" ? m.Role != "Customer"
-                  : true)
-        .OrderBy(member => member.UserId).ToList();
+    var search = Context.Request.Query["q"].ToString().Trim();
+    var members = Model.ToList();
     var myId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     var totalPages = Math.Max(1, (int)Math.Ceiling(members.Count / (double)pageSize));
-    var requestedPage = Context.Request.Query.ContainsKey("page")
-        ? Context.Request.Query["page"].ToString()
-        : Context.Request.Cookies[pageCookie];
-    var currentPage = int.TryParse(requestedPage, out var page)
-        ? Math.Clamp(page, 1, totalPages)
-        : 1;
-    Context.Response.Cookies.Append(pageCookie, currentPage.ToString(), new Microsoft.AspNetCore.Http.CookieOptions
-    {
-        HttpOnly = true,
-        IsEssential = true,
-        SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax,
-        Secure = Context.Request.IsHttps,
-        Path = Url.Action("Members", "Admin") ?? "/Admin/Members"
-    });
+    var currentPage = int.TryParse(Context.Request.Query["page"], out var page) ? Math.Clamp(page, 1, totalPages) : 1;
 }
 
 @section Actions {
@@ -36,10 +19,26 @@
 
 <div>
 
-    <ul class="nav nav-pills mb-4">
-        <li class="nav-item"><a class="nav-link @(roleFilter == "" ? "active" : "")" asp-action="Members" asp-route-page="1">ทั้งหมด</a></li>
-        <li class="nav-item"><a class="nav-link @(roleFilter == "customer" ? "active" : "")" asp-action="Members" asp-route-role="customer" asp-route-page="1">ลูกค้า</a></li>
-        <li class="nav-item"><a class="nav-link @(roleFilter == "staff" ? "active" : "")" asp-action="Members" asp-route-role="staff" asp-route-page="1">พนักงาน</a></li>
+    <form method="get" asp-action="Members" class="toolbar">
+        @if (roleFilter != "")
+        {
+            <input type="hidden" name="role" value="@roleFilter" />
+        }
+        <div>
+            <label class="form-label" for="q">ค้นหา</label>
+            <input id="q" name="q" class="form-control" value="@search" placeholder="ชื่อ อีเมล หรือเบอร์โทร" maxlength="100" />
+        </div>
+        <button type="submit" class="btn btn-primary">ค้นหา</button>
+        @if (search != "")
+        {
+            <a class="btn btn-outline-secondary" asp-action="Members" asp-route-role="@roleFilter">ล้าง</a>
+        }
+    </form>
+
+    <ul class="nav nav-pills mb-3">
+        <li class="nav-item"><a class="nav-link @(roleFilter == "" ? "active" : "")" asp-action="Members" asp-route-q="@search">ทั้งหมด</a></li>
+        <li class="nav-item"><a class="nav-link @(roleFilter == "customer" ? "active" : "")" asp-action="Members" asp-route-role="customer" asp-route-q="@search">ลูกค้า</a></li>
+        <li class="nav-item"><a class="nav-link @(roleFilter == "staff" ? "active" : "")" asp-action="Members" asp-route-role="staff" asp-route-q="@search">พนักงาน</a></li>
     </ul>
 
     @if (TempData["SuccessMessage"] is string successMessage)
@@ -76,7 +75,9 @@
             </div>
 }
 
-    <table class="table table-bordered">
+    <section class="table-panel">
+    <div class="table-responsive">
+    <table class="table table-hover">
         <thead>
             <tr>
                 <th>รหัส</th>
@@ -84,6 +85,7 @@
                 <th>อีเมล</th>
                 <th>เบอร์โทร</th>
                 <th>บทบาท</th>
+                <th>สถานะ</th>
                 <th></th>
             </tr>
         </thead>
@@ -97,6 +99,7 @@
                     <td>@item.Email</td>
                     <td>@item.Phone</td>
                     <td>@ThaiText.Status(item.Role)</td>
+                    <td><span class="badge @(item.IsActive ? "text-bg-success" : "text-bg-secondary")">@(item.IsActive ? "ใช้งานอยู่" : "ปิดการใช้งาน")</span></td>
                     <td class="text-nowrap">
                     <a asp-controller="Admin"
                     asp-action="EditUser"
@@ -131,13 +134,15 @@
 
         <tfoot>
             <tr>
-                <th colspan="6">รวม @members.Count คน</th>
+                <th colspan="7">@(members.Count == 0 ? "ไม่พบผู้ใช้ที่ค้นหา" : $"รวม {members.Count} คน")</th>
             </tr>
         </tfoot>
     </table>
+    </div>
+    </section>
     @if (totalPages > 1)
     {
-        <nav aria-label="Member pages" class="mt-4">
+        <nav aria-label="หน้ารายชื่อผู้ใช้" class="mt-4">
             <ul class="pagination flex-wrap mb-0">
                 <li class="page-item @(currentPage == 1 ? "disabled" : "")">
                     @if (currentPage == 1)
@@ -146,7 +151,7 @@
                     }
                     else
                     {
-                        <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-page="@(currentPage - 1)">ก่อนหน้า</a>
+                        <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-q="@search" asp-route-page="@(currentPage - 1)">ก่อนหน้า</a>
                     }
                 </li>
                 @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
@@ -158,7 +163,7 @@
                         }
                         else
                         {
-                            <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-page="@pageNumber">@pageNumber</a>
+                            <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-q="@search" asp-route-page="@pageNumber">@pageNumber</a>
                         }
                     </li>
                 }
@@ -169,7 +174,7 @@
                     }
                     else
                     {
-                        <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-page="@(currentPage + 1)">ถัดไป</a>
+                        <a class="page-link" asp-action="Members" asp-route-role="@roleFilter" asp-route-q="@search" asp-route-page="@(currentPage + 1)">ถัดไป</a>
                     }
                 </li>
             </ul>

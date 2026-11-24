@@ -12,7 +12,10 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
 {
     private const string IdLock = "GoodHotel.PaymentId";
 
-    private async Task<bool> LockBookingAsync(int bookingId, CancellationToken ct)
+    private Task<bool> LockBookingAsync(int bookingId, CancellationToken ct) => LockBookingAsync(db, bookingId, ct);
+
+    /// <summary>ล็อกแถวการจอง ใช้ร่วมกันทุกที่ที่เปลี่ยนการจ่ายหรือยกเลิก (ต้องอยู่ใน transaction)</summary>
+    internal static async Task<bool> LockBookingAsync(GoodHotelDbContext db, int bookingId, CancellationToken ct)
     {
         var transaction = db.Database.CurrentTransaction
             ?? throw new InvalidOperationException("Booking locking requires a transaction.");

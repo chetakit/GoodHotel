@@ -13,9 +13,13 @@ public class MaintenanceReport
     public static string? CapturePreviousRoomStatus(string? current, string? previous, bool hasUnresolved) =>
         hasUnresolved ? previous : current is "Available" or "Occupied" or "Reserved" ? current : null;
 
+    /// <summary>
+    /// ซ่อมเสร็จ: คืนสถานะขายเดิมทันที แม้ยังมีแขกหรือรอทำความสะอาด
+    /// (สองอย่างนั้นกันการจองและเช็คอินเองอยู่แล้ว) ห้องที่ Admin ปิดซ่อมไว้เองไม่มีสถานะเดิม จึงยังปิดอยู่
+    /// </summary>
     public static string RoomStatusAfterResolution(
-        string? previous, bool hasOtherUnresolved, bool hasCurrentRestrictions) =>
-        !hasOtherUnresolved && !hasCurrentRestrictions && previous is "Available" or "Occupied" or "Reserved"
+        string? previous, bool hasOtherUnresolved) =>
+        !hasOtherUnresolved && previous is "Available" or "Occupied" or "Reserved"
             ? previous : "Maintenance";
 
     public int ReportId { get; set; }

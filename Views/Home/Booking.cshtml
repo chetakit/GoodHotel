@@ -253,6 +253,7 @@
                             {
                                 <a asp-controller="Home"
                                    asp-action="Login"
+                                   asp-route-returnUrl="@(Context.Request.Path + Context.Request.QueryString)"
                                    class="btn btn-primary w-100 mt-3">
                                     เข้าสู่ระบบเพื่อยืนยันการจอง
                                 </a>

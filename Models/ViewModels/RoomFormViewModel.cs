@@ -8,22 +8,22 @@ public class RoomFormViewModel
 {
     public int? RoomId { get; set; }
 
-    [Required]
+    [Required(ErrorMessage = "กรุณากรอกหมายเลขห้อง")]
     [StringLength(20)]
     public string? RoomNumber { get; set; }
 
-    [Required]
+    [Required(ErrorMessage = "กรุณากรอกประเภทห้อง")]
     [StringLength(50)]
     public string? Type { get; set; }
 
     [StringLength(500)]
     public string? Description { get; set; }
 
-    [Required]
-    [Range(1, int.MaxValue)]
+    [Required(ErrorMessage = "กรุณากรอกจำนวนคนที่รับได้")]
+    [Range(1, int.MaxValue, ErrorMessage = "ต้องรับได้อย่างน้อย 1 คน")]
     public int? Capacity { get; set; }
 
-    [Required]
+    [Required(ErrorMessage = "กรุณาเลือกสถานะห้อง")]
     [StringLength(20)]
     public string? Status { get; set; } = "Available";
 
@@ -44,8 +44,8 @@ public class RoomFormViewModel
 
     public bool ConfirmMaintenanceReview { get; set; }
 
-    [Required]
-    [Range(typeof(decimal), "0.01", "99999999.99")]
+    [Required(ErrorMessage = "กรุณากรอกราคาต่อคืน")]
+    [Range(typeof(decimal), "0.01", "99999999.99", ErrorMessage = "ราคาต่อคืนต้องมากกว่า 0")]
     public decimal? Rate { get; set; }
 
     public string? ImagePath { get; set; }

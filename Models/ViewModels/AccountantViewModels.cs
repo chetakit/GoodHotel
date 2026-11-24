@@ -6,7 +6,14 @@ public sealed record MoneyTotal(decimal Received, decimal Refunded)
     public decimal Net => Received - Refunded;
 }
 
-public sealed record MethodTotal(string Method, int Count, decimal Amount);
+/// <summary>ยอดของช่องทางชำระหนึ่งช่อง Count = จำนวนรายการที่รับ (ไม่นับรายการคืน)</summary>
+public sealed record MethodTotal(string Method, int Count, decimal Received, decimal Refunded)
+{
+    public decimal Net => Received - Refunded;
+}
+
+/// <summary>เงินสดที่พนักงานแต่ละคนรับ</summary>
+public sealed record CashierTotal(string Name, int Count, decimal Amount);
 
 /// <summary>
 /// หนึ่งรายการในสมุดรายวัน: เงินรับ (การชำระที่ยืนยันแล้ว) หรือเงินคืน (คำขอคืนที่อนุมัติแล้ว)
@@ -25,6 +32,7 @@ public sealed record AccountantDashboardViewModel(
     MoneyTotal Today,
     MoneyTotal ThisMonth,
     MoneyTotal AllTime,
+    decimal Advance,
     int AwaitingReview,
     int LegacyToReconcile,
     int RefundRequests,
@@ -35,6 +43,7 @@ public sealed record DailyCloseViewModel(
     DateOnly Date,
     MoneyTotal Total,
     IReadOnlyList<MethodTotal> ByMethod,
+    IReadOnlyList<CashierTotal> Cashiers,
     IReadOnlyList<LedgerEntry> Entries);
 
 public sealed record FinanceReportViewModel(

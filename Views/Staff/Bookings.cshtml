@@ -2,6 +2,7 @@
 
 @{
     ViewData["Title"] = "รายการจอง";
+    var when = Context.Request.Query["when"].ToString();
 }
 
 <section class="content-section">
@@ -20,13 +21,15 @@
                 </div>
                 <div class="col-sm-6 col-lg-3">
                     <label for="when" class="form-label">แสดง</label>
-                    @{ var when = Context.Request.Query["when"].ToString(); }
+                    
                     <select id="when" name="when" class="form-select" onchange="this.form.submit()">
-                        <option value="" selected="@(when == "")">ทั้งหมด</option>
+                        <option value="" selected="@(when == "")">ไม่รวมที่ยกเลิก</option>
                         <option value="today" selected="@(when == "today")">เข้า/ออกวันนี้</option>
                         <option value="staying" selected="@(when == "staying")">กำลังเข้าพัก</option>
                         <option value="noshow" selected="@(when == "noshow")">ไม่มาเข้าพัก</option>
                         <option value="upcoming" selected="@(when == "upcoming")">กำลังจะมาถึง</option>
+                        <option value="cancelled" selected="@(when == "cancelled")">ยกเลิกแล้ว</option>
+                        <option value="all" selected="@(when == "all")">ทั้งหมด</option>
                     </select>
                 </div>
                 <div class="col-auto">
@@ -105,6 +108,23 @@
                             }
                         </tbody>
                     </table>
+                </div>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                    <span class="text-muted small">ทั้งหมด @ViewBag.Total รายการ · หน้า @ViewBag.Page จาก @ViewBag.TotalPages</span>
+                    @if ((int)ViewBag.TotalPages > 1)
+                    {
+                        var search = Context.Request.Query["q"].ToString();
+                        <div class="d-flex gap-2">
+                            @if ((int)ViewBag.Page > 1)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Bookings" asp-route-q="@search" asp-route-when="@when" asp-route-page="@((int)ViewBag.Page - 1)">ก่อนหน้า</a>
+                            }
+                            @if ((int)ViewBag.Page < (int)ViewBag.TotalPages)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Bookings" asp-route-q="@search" asp-route-when="@when" asp-route-page="@((int)ViewBag.Page + 1)">ถัดไป</a>
+                            }
+                        </div>
+                    }
                 </div>
             }
         }

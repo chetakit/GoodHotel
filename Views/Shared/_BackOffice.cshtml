@@ -108,6 +108,10 @@
         </div>
     </div>
 
+    @* ชี้เมาส์ที่เมนูแล้วโหลดหน้ารอไว้ กดแล้วเปิดทันที (เมนูและหน้ารายละเอียด ซึ่งเปิดดูอย่างเดียว) *@
+    <script type="speculationrules">
+        { "prefetch": [{ "where": { "selector_matches": ".bo-nav a, .bo-content a[href*='Details/']" }, "eagerness": "moderate" }] }
+    </script>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

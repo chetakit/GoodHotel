@@ -39,13 +39,13 @@ Check(RoomAvailabilityService.PendingCheckoutCleaning(tasks, 1).Any(), "Unverifi
 Check(!RoomAvailabilityService.PendingCheckoutCleaning(tasks, 2).Any(), "Verified cleaning must not restrict restoration.");
 Check(!RoomAvailabilityService.PendingCheckoutCleaning(tasks, 3).Any(), "Other tasks must retain existing behavior.");
 
-Check(MaintenanceReport.RoomStatusAfterResolution("Available", false, true) == "Maintenance",
-    "A current restriction must prevent restoration to Available.");
-Check(MaintenanceReport.RoomStatusAfterResolution("Available", false, false) == "Available",
+Check(MaintenanceReport.RoomStatusAfterResolution("Reserved", false) == "Reserved",
+    "A room an admin had closed for sale must stay closed after the repair.");
+Check(MaintenanceReport.RoomStatusAfterResolution("Available", false) == "Available",
     "Unrestricted rooms must restore their saved status.");
-Check(MaintenanceReport.RoomStatusAfterResolution("Available", true, false) == "Maintenance",
+Check(MaintenanceReport.RoomStatusAfterResolution("Available", true) == "Maintenance",
     "Another unresolved report must keep the room in Maintenance.");
-Check(MaintenanceReport.RoomStatusAfterResolution(null, false, false) == "Maintenance",
+Check(MaintenanceReport.RoomStatusAfterResolution(null, false) == "Maintenance",
     "Unknown previous status must remain in Maintenance for review.");
 
 var form = new RoomFormViewModel

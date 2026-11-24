@@ -85,25 +85,28 @@ namespace GoodHotel.Controllers
             DateOnly? BirthDate);
 
         [HttpGet]
-        public async Task<IActionResult> Index(CancellationToken cancellationToken)
+        public async Task<IActionResult> Index([FromServices] ParallelReader reader, CancellationToken cancellationToken)
         {
             var (start, end) = _stays.HotelDayUtcBounds();
             // นับทุกตัวเลขใน query เดียว (แต่ละ query ไปฐานข้อมูลใช้ ~200ms)
             // อาศัยแถวของผู้ใช้ที่ล็อกอินอยู่เป็นตัวยึด เพราะแถวนี้มีอยู่แน่นอน
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var counts = await _db.Users.Where(u => u.UserId == userId).Select(_ => new
-            {
-                Bookings = _db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
-                Staying = _db.BookingStays.Count(s => s.Status == "CheckedIn"),
-                CheckedInToday = _db.BookingStays.Count(s => s.CheckedInAtUtc >= start && s.CheckedInAtUtc < end),
-                CheckedOutToday = _db.BookingStays.Count(s => s.CheckedOutAtUtc >= start && s.CheckedOutAtUtc < end),
-                ToVerify = _db.HousekeepingTasks.Count(t => t.Status == "Completed"),
-                OpenMaintenance = _db.MaintenanceReports.Count(r => r.Status != MaintenanceReport.Resolved)
-            }).SingleAsync(cancellationToken);
-            var model = new StaffDashboardViewModel(counts.Bookings, counts.Staying, counts.CheckedInToday,
-                counts.CheckedOutToday, counts.ToVerify, counts.OpenMaintenance);
-
             var today = _availability.HotelToday();
+            var countsTask = reader.Run(db => db.Users.Where(u => u.UserId == userId).Select(_ => new
+            {
+                Bookings = db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
+                Staying = db.BookingStays.Count(s => s.Status == "CheckedIn"),
+                CheckedInToday = db.BookingStays.Count(s => s.CheckedInAtUtc >= start && s.CheckedInAtUtc < end),
+                CheckedOutToday = db.BookingStays.Count(s => s.CheckedOutAtUtc >= start && s.CheckedOutAtUtc < end),
+                ToVerify = db.HousekeepingTasks.Count(t => t.Status == "Completed"),
+                OpenMaintenance = db.MaintenanceReports.Count(r => r.Status != MaintenanceReport.Resolved)
+            }).SingleAsync(cancellationToken));
+            // แขกที่ต้องออกวันนี้ = ยังพักอยู่ และวันออกคือวันนี้หรือเลยมาแล้ว
+            var departuresTask = reader.Run(db => db.BookingStays.AsNoTracking()
+                .Where(s => s.Status == "CheckedIn" && s.Booking.CheckOut <= today)
+                .OrderBy(s => s.Booking.Room!.Room1)
+                .Select(s => s.Booking).Select(FrontDeskRowProjection)
+                .ToListAsync(cancellationToken));
 
             // แขกที่รอเช็คอิน = ไม่ได้ยกเลิก ยังไม่เช็คอิน และวันนี้อยู่ในช่วงที่จองไว้
             // รวมแขกที่มาช้ากว่าวันเข้าพัก (ระบบยังให้เช็คอินได้จนถึงวันออก) ไม่งั้นจะหายไปจากหน้านี้
@@ -131,12 +134,11 @@ namespace GoodHotel.Controllers
                 })
                 .ToList();
 
-            // แขกที่ต้องออกวันนี้ = ยังพักอยู่ และวันออกคือวันนี้หรือเลยมาแล้ว
-            var departures = await _db.BookingStays.AsNoTracking()
-                .Where(s => s.Status == "CheckedIn" && s.Booking.CheckOut <= today)
-                .OrderBy(s => s.Booking.Room!.Room1)
-                .Select(s => s.Booking).Select(FrontDeskRowProjection)
-                .ToListAsync(cancellationToken);
+            await Task.WhenAll(countsTask, departuresTask);
+            var counts = countsTask.Result;
+            var departures = departuresTask.Result;
+            var model = new StaffDashboardViewModel(counts.Bookings, counts.Staying, counts.CheckedInToday,
+                counts.CheckedOutToday, counts.ToVerify, counts.OpenMaintenance);
 
             ViewBag.Today = today;
             return View(model with { Arrivals = arrivalsWithPayment, Departures = departures });
@@ -157,8 +159,10 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> Bookings(
             string? q,
             string? when,
+            int? page,
             CancellationToken cancellationToken)
         {
+            const int pageSize = 20;
             var query = _db.Bookings.AsNoTracking();
 
             // ช่องค้นหาเดียว: พิมพ์เลขที่การจอง ชื่อ นามสกุล หรือเบอร์โทรก็ได้
@@ -189,13 +193,25 @@ namespace GoodHotel.Controllers
                 "noshow" => query.Where(b => b.Status != BookingStatuses.Cancelled && b.CheckOut <= today &&
                     !_db.BookingStays.Any(s => s.BookingId == b.BookingId)),
                 "staying" => query.Where(b => _db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedIn")),
-                _ => query
+                "cancelled" => query.Where(b => b.Status == BookingStatuses.Cancelled),
+                "all" => query,
+                // ค่าเริ่มต้นไม่แสดงที่ยกเลิก แต่ถ้ากำลังค้นหา ต้องหาเจอทุกการจอง
+                _ => string.IsNullOrEmpty(keyword) ? query.Where(b => b.Status != BookingStatuses.Cancelled) : query
             };
+
+            var total = await query.CountAsync(cancellationToken);
+            var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
+            var currentPage = Math.Clamp(page ?? 1, 1, totalPages);
+            ViewBag.Total = total;
+            ViewBag.Page = currentPage;
+            ViewBag.TotalPages = totalPages;
 
             ViewBag.Today = today;
             var bookings = await query
                 .OrderByDescending(booking => booking.CheckIn)
                 .ThenByDescending(booking => booking.BookingId)
+                .Skip((currentPage - 1) * pageSize)
+                .Take(pageSize)
                 .Select(booking => new BookingListItem(
                     booking.BookingId,
                     booking.User == null ? null : booking.User.FirstName,
@@ -221,13 +237,16 @@ namespace GoodHotel.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> BookingDetails(int id, CancellationToken cancellationToken)
+        public async Task<IActionResult> BookingDetails(int id, [FromServices] ParallelReader reader, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid || id <= 0)
             {
                 return BadRequest();
             }
 
+            var labelsTask = reader.Run(db => PaymentService.PaymentLabelsAsync(db, new[] { id }, cancellationToken));
+            var refundPendingTask = reader.Run(db => db.PaymentRefunds.AnyAsync(r => r.Payment.BookingId == id &&
+                r.Status == PaymentService.RefundRequested, cancellationToken));
             var booking = await _db.Bookings
                 .AsNoTracking()
                 .Where(item => item.BookingId == id)
@@ -247,6 +266,7 @@ namespace GoodHotel.Controllers
                         .Select(s => s.Status).SingleOrDefault(),
                     item.Status))
                 .SingleOrDefaultAsync(cancellationToken);
+            await Task.WhenAll(labelsTask, refundPendingTask);
 
             if (booking == null)
             {
@@ -256,9 +276,8 @@ namespace GoodHotel.Controllers
             ViewBag.Today = _availability.HotelToday();
             return View(booking with
             {
-                PaymentLabel = await PaymentService.PaymentLabelAsync(_db, booking.BookingId, cancellationToken),
-                RefundPending = await _db.PaymentRefunds.AnyAsync(r => r.Payment.BookingId == booking.BookingId &&
-                    r.Status == PaymentService.RefundRequested, cancellationToken)
+                PaymentLabel = labelsTask.Result[id],
+                RefundPending = refundPendingTask.Result
             });
         }
 
@@ -388,6 +407,18 @@ namespace GoodHotel.Controllers
             return View(await FillWalkInRoomsAsync(form, ct));
         }
 
+        /// <summary>ยอดเงินสดที่ต้องเก็บ แสดงบนหน้า Walk-in ก่อนกดยืนยัน</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> WalkInQuote(WalkInViewModel form, CancellationToken ct)
+        {
+            // ฟอร์มยังกรอกไม่ครบก็คำนวณได้ จึงไม่ดู ModelState ที่นี่ (ตอนยืนยันตรวจครบ)
+            form.CheckOut = DateOnly.TryParseExact(Request.Form["CheckOut"], "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var checkOut) ? checkOut : null;
+            return Json(await _walkIn.QuoteAsync(form, ct));
+        }
+
         /// <summary>ห้องที่ขายได้ตั้งแต่วันนี้ถึงวันออก และรับจำนวนคนได้ (รวมเตียงเสริม)</summary>
         private async Task<WalkInViewModel> FillWalkInRoomsAsync(WalkInViewModel form, CancellationToken ct)
         {
@@ -472,8 +503,12 @@ namespace GoodHotel.Controllers
             var actorId = await GetActorIdAsync(ct);
             if (!actorId.HasValue) return Forbid();
             var verified = await _housekeeping.VerifyAsync(id, actorId.Value, ct);
+            // ตรวจผ่านแล้วแต่ห้องอาจยังปิดอยู่ (งานซ่อมค้าง หรือ Admin ปิดไว้) อย่าบอกว่าพร้อมเข้าพัก
+            var roomOpen = verified && await _db.HousekeepingTasks.AsNoTracking().AnyAsync(t => t.TaskId == id &&
+                t.Room.Status == "Available" &&
+                !_db.MaintenanceReports.Any(r => r.RoomId == t.RoomId && r.Status != MaintenanceReport.Resolved), ct);
             TempData[verified ? "StaffSuccess" : "StaffError"] = verified
-                ? "ตรวจผ่านแล้ว ห้องพร้อมให้เข้าพัก"
+                ? (roomOpen ? "ตรวจผ่านแล้ว ห้องพร้อมให้เข้าพัก" : "ตรวจผ่านแล้ว แต่ห้องยังปิดอยู่ (ติดงานซ่อมหรือ Admin ปิดไว้)")
                 : "ตรวจงานนี้ไม่ได้ (งานถูกเปลี่ยนไปแล้ว หรือคุณเป็นคนทำงานนี้เอง)";
             return RedirectToAction(nameof(VerificationTasks));
         }

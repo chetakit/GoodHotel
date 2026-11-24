@@ -219,6 +219,7 @@ public class HomeController : Controller
         int? roomId,
         int? year,
         int? month,
+        [FromServices] ParallelReader reader,
         CancellationToken cancellationToken)
     {
         if (!roomId.HasValue || roomId.Value <= 0 ||
@@ -242,6 +243,24 @@ public class HomeController : Controller
             return BadRequest(new { message = "เดือนที่ระบุไม่ถูกต้อง" });
         }
 
+        // 3 อย่างนี้ไม่ขึ้นต่อกัน ยิงพร้อมกัน
+        var blockedTask = _availability.GetBlockedPeriodsAsync(
+            new[] { roomId.Value }, monthStart, monthEnd, cancellationToken);
+        var bookingPeriodsTask = reader.Run(db => db.Bookings
+            .AsNoTracking()
+            .Where(booking =>
+                booking.Status != BookingStatuses.Cancelled &&
+                booking.RoomId == roomId.Value &&
+                booking.CheckIn.HasValue &&
+                booking.CheckOut.HasValue &&
+                booking.CheckIn.Value < monthEnd &&
+                booking.CheckOut.Value > monthStart)
+            .Select(booking => new
+            {
+                CheckIn = booking.CheckIn!.Value,
+                CheckOut = booking.CheckOut!.Value
+            })
+            .ToListAsync(cancellationToken));
         var room = await _db.Rooms
             .AsNoTracking()
             .Where(item => item.RoomId == roomId.Value)
@@ -255,30 +274,15 @@ public class HomeController : Controller
                 item.Status
             })
             .SingleOrDefaultAsync(cancellationToken);
+        await Task.WhenAll(blockedTask, bookingPeriodsTask);
 
         if (room == null)
         {
             return NotFound(new { message = "ไม่พบห้องพักที่เลือก" });
         }
 
-        var bookingPeriods = await _db.Bookings
-            .AsNoTracking()
-            .Where(booking =>
-                booking.Status != BookingStatuses.Cancelled &&
-                booking.RoomId == room.RoomId &&
-                booking.CheckIn.HasValue &&
-                booking.CheckOut.HasValue &&
-                booking.CheckIn.Value < monthEnd &&
-                booking.CheckOut.Value > monthStart)
-            .Select(booking => new
-            {
-                CheckIn = booking.CheckIn!.Value,
-                CheckOut = booking.CheckOut!.Value
-            })
-            .ToListAsync(cancellationToken);
-
-        var blockedPeriods = (await _availability.GetBlockedPeriodsAsync(
-            new[] { room.RoomId }, monthStart, monthEnd, cancellationToken))
+        var bookingPeriods = bookingPeriodsTask.Result;
+        var blockedPeriods = blockedTask.Result
             .Select(period => new
             {
                 CheckIn = !period.Start.HasValue || period.Start < monthStart ? monthStart : period.Start.Value,
@@ -343,6 +347,7 @@ public class HomeController : Controller
     [Authorize(Roles = "Customer")]
     public async Task<IActionResult> MyBookings(
         [FromServices] CustomerNotices notices,
+        [FromServices] ParallelReader reader,
         CancellationToken cancellationToken)
     {
         if (!int.TryParse(
@@ -354,6 +359,22 @@ public class HomeController : Controller
         {
             return Forbid();
         }
+
+        // ข้อมูลประกอบไม่ขึ้นต่อกัน ยิงพร้อมกันกับรายการจอง
+        var paymentsTask = reader.Run(db => db.Payments.AsNoTracking()
+            .Where(p => p.Booking != null && p.Booking.UserId == userId)
+            .Select(p => new { p.BookingId, p.PaymentId, p.PaymentMethod, p.PaymentStatus, p.Amount,
+                p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition })
+            .ToListAsync(cancellationToken));
+        var refundsTask = reader.Run(db => db.PaymentRefunds.AsNoTracking()
+            .Where(r => r.Payment.Booking != null && r.Payment.Booking.UserId == userId)
+            .OrderByDescending(r => r.RefundId)
+            .Select(r => new { r.Payment.BookingId, r.PaymentId, r.Amount, r.Status }).ToListAsync(cancellationToken));
+        var movesTask = reader.Run(db => db.PaymentEvents.AsNoTracking()
+            .Where(e => e.EventType == "RoomMoved" && e.Payment.Booking != null && e.Payment.Booking.UserId == userId)
+            .OrderByDescending(e => e.EventId)
+            .Select(e => new { e.Payment.BookingId, e.Reason }).ToListAsync(cancellationToken));
+        var noticesTask = reader.Run(db => notices.UnseenAsync(HttpContext, db, userId, cancellationToken, fresh: true));
 
         var bookings = await (
             from booking in _db.Bookings.AsNoTracking()
@@ -389,15 +410,9 @@ public class HomeController : Controller
                                 (booking.StayStatus == null && booking.CheckOut <= today);
         }
 
-        var paymentRows = await _db.Payments.AsNoTracking()
-            .Where(p => p.Booking != null && p.Booking.UserId == userId)
-            .Select(p => new { p.BookingId, p.PaymentId, p.PaymentMethod, p.PaymentStatus, p.Amount,
-                p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition })
-            .ToListAsync(cancellationToken);
-        var allRefunds = await _db.PaymentRefunds.AsNoTracking()
-            .Where(r => r.Payment.Booking != null && r.Payment.Booking.UserId == userId)
-            .OrderByDescending(r => r.RefundId)
-            .Select(r => new { r.Payment.BookingId, r.PaymentId, r.Amount, r.Status }).ToListAsync(cancellationToken);
+        await Task.WhenAll(paymentsTask, refundsTask, movesTask, noticesTask);
+        var paymentRows = paymentsTask.Result;
+        var allRefunds = refundsTask.Result;
         var refunds = allRefunds.Where(r => r.Status == PaymentService.RefundApproved).ToList();
 
         foreach (var booking in bookings)
@@ -442,19 +457,12 @@ public class HomeController : Controller
             }
         }
 
-        // การย้ายห้องล่าสุดของแต่ละการจอง (เช่น "Room 101 → Room 202: แอร์เสีย") ดึงเฉพาะเมื่อมีการจองที่ยังไม่จบ
-        if (bookings.Any(b => !b.IsHistory))
-        {
-            var moves = await _db.PaymentEvents.AsNoTracking()
-                .Where(e => e.EventType == "RoomMoved" && e.Payment.Booking != null && e.Payment.Booking.UserId == userId)
-                .OrderByDescending(e => e.EventId)
-                .Select(e => new { e.Payment.BookingId, e.Reason }).ToListAsync(cancellationToken);
-            foreach (var booking in bookings.Where(b => !b.IsHistory))
-                booking.RoomMoved = moves.FirstOrDefault(m => m.BookingId == booking.BookingId)?.Reason;
-        }
+        // การย้ายห้องล่าสุดของแต่ละการจองที่ยังไม่จบ (เช่น "Room 101 → Room 202: แอร์เสีย")
+        foreach (var booking in bookings.Where(b => !b.IsHistory))
+            booking.RoomMoved = movesTask.Result.FirstOrDefault(m => m.BookingId == booking.BookingId)?.Reason;
 
         // ผลคำขอคืนเงินใหม่ที่ยังไม่เคยเห็น: แจ้งบนหน้านี้ แล้วนับว่าเห็นแล้ว (ตัวเลขที่เมนูหายไป)
-        ViewData["Notices"] = await notices.UnseenAsync(HttpContext, _db, userId, cancellationToken, fresh: true);
+        ViewData["Notices"] = noticesTask.Result;
         notices.MarkSeen(HttpContext, userId);
         return View(bookings);
     }
@@ -796,9 +804,26 @@ public class HomeController : Controller
             : sanitized[..128];
     }
 
-    // ถ้า Login อยู่แล้ว ห้ามกลับมาหน้า Login
-    public IActionResult Login()
+    /// <summary>
+    /// หน้าที่ลูกค้ากำลังทำค้างก่อนล็อกอิน (null = ไปหน้าแรกตามปกติ)
+    /// รับเฉพาะหน้าในเว็บนี้ที่เปิดดูได้ กันลิงก์หลอกพาไปเว็บอื่น
+    /// </summary>
+    private string? CustomerReturnUrl(string? url)
     {
+        if (!Url.IsLocalUrl(url)) return null;
+        var path = url!.Split('?', '#')[0];
+        string[] allowed = ["/Home/MyBookings", "/Account/Profile"];
+        string[] prefixes = ["/Home/RoomDetails/", "/Payment/Details/", "/Payment/Receipt/"];
+        return allowed.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)) ||
+               prefixes.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)) ||
+               (path.Equals("/Home/Booking", StringComparison.OrdinalIgnoreCase) && url.Contains('?'))
+            ? url : null;
+    }
+
+    // ถ้า Login อยู่แล้ว ห้ามกลับมาหน้า Login
+    public IActionResult Login(string? returnUrl)
+    {
+        ViewBag.ReturnUrl = returnUrl = CustomerReturnUrl(returnUrl);
         if (User.Identity != null && User.Identity.IsAuthenticated)
         {
             if (User.IsInRole("Admin"))
@@ -814,7 +839,7 @@ public class HomeController : Controller
                 return RedirectToAction("Index", "Accountant");
 
             if (User.IsInRole("Customer"))
-                return RedirectToAction("Index", "Home");
+                return returnUrl != null ? LocalRedirect(returnUrl) : RedirectToAction("Index", "Home");
         }
 
         return View();
@@ -822,12 +847,13 @@ public class HomeController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(User data)
+    public async Task<IActionResult> Login(User data, string? returnUrl)
     {
+        ViewBag.ReturnUrl = returnUrl = CustomerReturnUrl(returnUrl);
         if (string.IsNullOrWhiteSpace(data.Email) ||
             string.IsNullOrWhiteSpace(data.Password))
         {
-            ViewBag.Status = "กรุณากรอก Email และ Password";
+            ViewBag.Status = "กรุณากรอกอีเมลและรหัสผ่าน";
             return View(data);
         }
 
@@ -933,6 +959,7 @@ public class HomeController : Controller
         return user.Role switch
         {
             "Admin" => RedirectToAction("Dashboard", "Admin"),
+            "Customer" when returnUrl != null => LocalRedirect(returnUrl),
             "Customer" => RedirectToAction("Index", "Home"),
             "Staff" => RedirectToAction("Index", "Staff"),
             "Housekeeper" => RedirectToAction("Index", "Housekeeper"),
@@ -957,8 +984,9 @@ public class HomeController : Controller
         return View();
     }
 
-    public IActionResult Register()
+    public IActionResult Register(string? returnUrl)
     {
+        ViewBag.ReturnUrl = CustomerReturnUrl(returnUrl);
         return View();
     }
 
@@ -967,8 +995,10 @@ public class HomeController : Controller
     public IActionResult Register(
         User data,
         string? ConfirmPassword,
-        bool AgreeToTerms)
+        bool AgreeToTerms,
+        string? returnUrl)
     {
+        ViewBag.ReturnUrl = returnUrl = CustomerReturnUrl(returnUrl);
         if (string.IsNullOrWhiteSpace(data.FirstName))
         {
             ModelState.AddModelError("FirstName", "กรุณากรอกชื่อ");
@@ -1049,6 +1079,10 @@ public class HomeController : Controller
         if (string.IsNullOrWhiteSpace(data.Password))
         {
             ModelState.AddModelError("Password", "กรุณากรอกรหัสผ่าน");
+        }
+        else if (data.Password.Length < 8)
+        {
+            ModelState.AddModelError("Password", "รหัสผ่านต้องยาว 8 ตัวอักษรขึ้นไป");
         }
         else if (data.Password.Length > 255)
         {
@@ -1158,9 +1192,15 @@ public class HomeController : Controller
             ? "สมัครสมาชิกสำเร็จ ระบบเชื่อมประวัติการเข้าพักที่เคาน์เตอร์ (Walk-in) เข้ากับบัญชีนี้แล้ว กรุณาเข้าสู่ระบบ"
             : "สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ";
 
-        return RedirectToAction("Login");
+        return RedirectToAction("Login", new { returnUrl });
     }
 
+    /// <summary>หน้าที่ไม่มีอยู่ (404) หรือคำขอไม่ถูกต้อง แทนหน้าขาวเปล่า</summary>
+    public IActionResult StatusPage(int code)
+    {
+        ViewData["Code"] = code;
+        return View();
+    }
 
     [ResponseCache(
         Duration = 0,

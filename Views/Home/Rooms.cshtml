@@ -12,6 +12,25 @@
             <p>เลือกห้องพักที่ใช่ แล้วตรวจสอบวันว่างจากปฏิทินการจองจริง</p>
         </div>
 
+        @{
+            var minDate = ViewData["HotelToday"] is DateOnly hotelToday ? hotelToday.ToString("yyyy-MM-dd", culture) : "";
+        }
+        <form asp-action="Rooms" method="get" class="stay-search is-row mt-0 mb-4">
+            <div>
+                <label class="form-label" for="rooms-checkin">วันเข้าพัก</label>
+                <input id="rooms-checkin" type="date" name="CheckIn" min="@minDate" class="form-control" value="@Model.CheckIn?.ToString("yyyy-MM-dd", culture)" required />
+            </div>
+            <div>
+                <label class="form-label" for="rooms-checkout">วันออก</label>
+                <input id="rooms-checkout" type="date" name="CheckOut" min="@minDate" class="form-control" value="@Model.CheckOut?.ToString("yyyy-MM-dd", culture)" required />
+            </div>
+            <div>
+                <label class="form-label" for="rooms-guests">ผู้เข้าพัก</label>
+                <input id="rooms-guests" type="number" name="Guests" min="1" class="form-control" value="@(Model.Guests ?? 1)" required />
+            </div>
+            <button type="submit" class="btn btn-primary">ค้นหาห้องว่าง</button>
+        </form>
+
         @if (TempData["BookingSuccess"] is string cancelled)
         {
             <div class="alert alert-success" role="status">@cancelled เลือกห้องใหม่สำหรับวันเดิมได้จากรายการด้านล่าง</div>
@@ -20,7 +39,7 @@
         @if (Model.HasSearchCriteria && !ViewData.ModelState.IsValid)
         {
             <div class="feature-box mb-4">
-                <h4>กรุณาเลือกวันที่เข้าพักจากหน้าแรก</h4>
+                <h4>กรุณาตรวจสอบวันที่และจำนวนคน</h4>
                 <div asp-validation-summary="All" class="text-danger"></div>
             </div>
         }
@@ -29,7 +48,7 @@
             <div class="mb-4 text-muted">
                 ห้องว่างสำหรับวันที่ @ThaiText.Date(Model.CheckIn)
                 ถึง @ThaiText.Date(Model.CheckOut)
-                (ผู้เข้าพัก @Model.Guests คน)
+                (ผู้เข้าพัก @Model.Guests คน) · <a asp-action="Rooms">ดูห้องทั้งหมด</a>
             </div>
         }
 

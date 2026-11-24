@@ -16,13 +16,11 @@ public class MaintenanceController : Controller
 {
     private readonly GoodHotelDbContext _db;
     private readonly TimeProvider _timeProvider;
-    private readonly RoomAvailabilityService _availability;
 
-    public MaintenanceController(GoodHotelDbContext db, TimeProvider timeProvider, RoomAvailabilityService availability)
+    public MaintenanceController(GoodHotelDbContext db, TimeProvider timeProvider)
     {
         _db = db;
         _timeProvider = timeProvider;
-        _availability = availability;
     }
 
     [HttpGet]
@@ -37,7 +35,10 @@ public class MaintenanceController : Controller
                 report.Status,
                 report.BlocksRoom,
                 report.BlockFrom,
-                report.BlockUntil))
+                report.BlockUntil,
+                report.Description,
+                report.ReportedAtUtc,
+                (report.ReportedByUser.FirstName ?? "") + " " + (report.ReportedByUser.LastName ?? "")))
             .ToListAsync(cancellationToken);
 
         return View(reports);
@@ -189,10 +190,8 @@ public class MaintenanceController : Controller
             var otherUnresolved = await _db.MaintenanceReports.AnyAsync(item =>
                 item.RoomId == roomId.Value && item.ReportId != id &&
                 item.Status != MaintenanceReport.Resolved, cancellationToken);
-            var hasCurrentRestrictions = !otherUnresolved &&
-                await _availability.HasCurrentRestrictionsAsync(roomId.Value, cancellationToken);
             room.Status = MaintenanceReport.RoomStatusAfterResolution(
-                room.PreMaintenanceStatus, otherUnresolved, hasCurrentRestrictions);
+                room.PreMaintenanceStatus, otherUnresolved);
             if (room.Status != "Maintenance")
             {
                 room.PreMaintenanceStatus = null;

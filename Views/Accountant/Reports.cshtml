@@ -34,7 +34,7 @@
         <div class="value">฿@Model.Total.Refunded.ToString("N2")</div>
     </div>
     <div class="figure">
-        <div class="label">รายได้สุทธิ</div>
+        <div class="label">เงินรับสุทธิ</div>
         <div class="value">@ThaiText.Baht(Model.Total.Net)</div>
     </div>
     <div class="figure">
@@ -45,7 +45,7 @@
 </div>
 
 <div class="row g-3">
-    <div class="col-lg-7">
+    <div class="col-xl-7">
         <section class="table-panel">
             <div class="panel-head"><h2>รายวัน</h2></div>
             @if (Model.Daily.Count == 0)
@@ -79,26 +79,29 @@
             }
         </section>
     </div>
-    <div class="col-lg-5">
+    <div class="col-xl-5">
         <section class="table-panel mb-3">
-            <div class="panel-head"><h2>เงินรับตามช่องทาง</h2></div>
+            <div class="panel-head"><h2>เงินตามช่องทาง</h2></div>
             @if (Model.ByMethod.Count == 0)
             {
                 <p class="panel-empty">ไม่มีรายการ</p>
             }
             else
             {
-                <table class="table">
+                <div class="table-responsive"><table class="table">
+                    <thead><tr><th>ช่องทาง</th><th class="text-end">รับ</th><th class="text-end">คืน</th><th class="text-end">สุทธิ</th></tr></thead>
                     <tbody>
                         @foreach (var method in Model.ByMethod)
                         {
                             <tr>
                                 <td>@method.Method <span class="text-muted small">(@method.Count)</span></td>
-                                <td class="text-end num">฿@method.Amount.ToString("N2")</td>
+                                <td class="text-end num">@method.Received.ToString("N2")</td>
+                                <td class="text-end num @(method.Refunded > 0 ? "money-out" : "")">@method.Refunded.ToString("N2")</td>
+                                <td class="text-end num fw-semibold">@ThaiText.Baht(method.Net)</td>
                             </tr>
                         }
                     </tbody>
-                </table>
+                </table></div>
             }
         </section>
 

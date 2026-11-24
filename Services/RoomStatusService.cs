@@ -23,7 +23,8 @@ public sealed record RoomStatusItem(
     int? Capacity,
     RoomLiveStatus Status,
     string? Detail,
-    int? BookingId);
+    int? BookingId,
+    decimal? Rate = null);
 
 /// <summary>
 /// ช่อง Room.Status ในฐานข้อมูลถูกแก้โดย Admin/งานซ่อมเท่านั้น
@@ -103,26 +104,37 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
             var arrival = arrivalsToday.FirstOrDefault(a => a.RoomId == room.RoomId);
 
             // ลำดับความสำคัญ: มีคนพัก > ซ่อม > รอทำความสะอาด > ปิดห้อง > มีคนจะเข้าวันนี้ > ว่าง
+            // อย่างที่ถูกบังไว้ให้ต่อท้ายในรายละเอียด พนักงานจะได้เห็นครบ
+            var hasRepair = maintenanceRoomIds.Contains(room.RoomId);
+            var closedNote = room.Status switch
+            {
+                "Available" => "",
+                "Maintenance" => hasRepair ? "" : " · Admin ปิดเป็นซ่อมบำรุงไว้",
+                _ => " · Admin ปิดขายไว้"
+            };
             if (stay != null)
                 return Item(room, RoomLiveStatus.Occupied,
-                    $"{stay.GuestName} · ออก {stay.CheckOut?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}",
+                    $"{stay.GuestName} · ออก {stay.CheckOut?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}" +
+                    (hasRepair ? " · มีงานซ่อมที่ยังไม่เสร็จ" : closedNote),
                     stay.BookingId);
 
-            if (maintenanceRoomIds.Contains(room.RoomId))
-                return Item(room, RoomLiveStatus.Maintenance, "มีรายการแจ้งซ่อมที่ยังไม่เสร็จ");
-
-            // ไม่มีงานซ่อมค้าง แต่ Admin ตั้งห้องเป็นซ่อมบำรุงไว้ (หรือปิดงานซ่อมแล้วยังไม่ได้เปิดห้อง)
-            if (room.Status == "Maintenance")
-                return Item(room, RoomLiveStatus.Maintenance, "Admin ตั้งเป็นซ่อมบำรุงไว้ (ไม่มีงานซ่อมค้าง) เปิดห้องได้ที่หน้าจัดการห้อง");
+            if (hasRepair)
+                return Item(room, RoomLiveStatus.Maintenance, "มีรายการแจ้งซ่อมที่ยังไม่เสร็จ" +
+                    (cleaning == null ? "" : $" · งานทำความสะอาด: {ThaiText.Status(cleaning.Status)}") +
+                    (arrival == null ? "" : $" · {arrival.GuestName} รอเช็คอินวันนี้"), arrival?.BookingId);
 
             if (cleaning != null)
             {
                 // มีแขกจองเข้าวันนี้ด้วย: บอกพนักงานให้รีบ เพราะเช็คอินไม่ได้จนกว่าจะตรวจผ่าน
-                var waiting = arrival == null ? "" : $" · {arrival.GuestName} รอเช็คอินวันนี้";
+                var waiting = (arrival == null ? "" : $" · {arrival.GuestName} รอเช็คอินวันนี้") + closedNote;
                 return cleaning.Status == "Completed"
                     ? Item(room, RoomLiveStatus.Inspection, "แม่บ้านทำเสร็จแล้ว รอพนักงานต้อนรับตรวจ" + waiting, arrival?.BookingId)
                     : Item(room, RoomLiveStatus.Cleaning, $"งานทำความสะอาด: {ThaiText.Status(cleaning.Status)}{waiting}", arrival?.BookingId);
             }
+
+            // ไม่มีงานซ่อมค้าง แต่ Admin ตั้งห้องเป็นซ่อมบำรุงไว้
+            if (room.Status == "Maintenance")
+                return Item(room, RoomLiveStatus.Maintenance, "Admin ตั้งเป็นซ่อมบำรุงไว้ (ไม่มีงานซ่อมค้าง) เปิดห้องได้ที่หน้าจัดการห้อง");
 
             // Admin ปิดขายห้องไว้ (รวมค่า Occupied เก่าที่เคยให้ Admin ตั้งเอง: ไม่มีแขกจริง จึงถือเป็นปิดขาย)
             if (room.Status != "Available")
@@ -137,5 +149,5 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
     }
 
     private static RoomStatusItem Item(Room room, RoomLiveStatus status, string? detail, int? bookingId = null) =>
-        new(room.RoomId, room.Room1, room.Type, room.Capacity, status, detail, bookingId);
+        new(room.RoomId, room.Room1, room.Type, room.Capacity, status, detail, bookingId, room.Rate);
 }

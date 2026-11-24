@@ -8,6 +8,10 @@ namespace GoodHotel.Services;
 public sealed record WalkInResult(bool Succeeded, string Message, int? BookingId = null,
     IReadOnlyList<WalkInCustomer>? Candidates = null);
 
+/// <param name="IsFinal">false = ยังไม่รู้ว่าเป็นลูกค้าคนไหน ส่วนลดอาจเปลี่ยน</param>
+public sealed record WalkInQuote(bool Succeeded, string? Message, int? Nights = null, decimal? RoomSubtotal = null,
+    string? PromotionName = null, decimal? Discount = null, decimal? ExtraBed = null, decimal? Total = null, bool IsFinal = false);
+
 public sealed record WalkInCustomer(int UserId, string? FirstName, string? LastName, bool CanLogin);
 
 /// <summary>
@@ -35,6 +39,15 @@ public sealed class WalkInService(
         if (match.NeedsChoice)
         {
             return new WalkInResult(false, "เบอร์นี้มีลูกค้าอยู่ในระบบแล้ว กรุณาเลือกว่าเป็นลูกค้าคนไหน", Candidates: candidates);
+        }
+
+        // ยอดที่พนักงานเห็นต้องตรงกับยอดที่จะบันทึก ตรวจก่อนสร้างลูกค้าและการจอง
+        if (form.ExpectedTotal.HasValue)
+        {
+            var quote = await PriceAsync(form, match.UserId, isNewCustomer: match.UserId == null, ct);
+            if (!quote.CanConfirm) return new WalkInResult(false, quote.StatusMessage ?? "จองห้องไม่สำเร็จ");
+            if (quote.TotalAmount != form.ExpectedTotal)
+                return new WalkInResult(false, $"ยอดเปลี่ยนเป็น ฿{quote.TotalAmount:N2} กรุณาตรวจยอดแล้วกดยืนยันอีกครั้ง");
         }
 
         var customerId = match.UserId ?? await CreateCustomerAsync(form, ct);
@@ -74,6 +87,44 @@ public sealed class WalkInService(
         return new WalkInResult(true,
             $"Walk-in สำเร็จ: การจอง #{bookingId} ห้องพร้อมเข้าพัก รับเงินสด ฿{booking.Amount:N2}", bookingId);
     }
+
+    /// <summary>ยอดที่ต้องเก็บ คำนวณก่อนยืนยัน (ไม่บันทึกอะไร) ใช้สูตรเดียวกับตอนจองจริง</summary>
+    public async Task<WalkInQuote> QuoteAsync(WalkInViewModel form, CancellationToken ct)
+    {
+        if (form.RoomId is not > 0 || form.CheckOut == null) return new WalkInQuote(false, "เลือกห้องเพื่อดูยอดที่ต้องเก็บ");
+
+        int? customerId = null;
+        var isFinal = false;
+        var phone = form.Phone?.Trim();
+        if (!string.IsNullOrEmpty(phone) && !string.IsNullOrWhiteSpace(form.FirstName) && !string.IsNullOrWhiteSpace(form.LastName))
+        {
+            var candidates = await db.Users.AsNoTracking()
+                .Where(u => u.Role == "Customer" && u.Phone == phone)
+                .Select(u => new WalkInCustomer(u.UserId, u.FirstName, u.LastName, u.Password != null))
+                .ToListAsync(ct);
+            var match = MatchCustomer(candidates, form.FirstName, form.LastName,
+                form.CustomerChoiceFor == form.CustomerKey ? form.CustomerChoice : null);
+            customerId = match.UserId;
+            isFinal = !match.NeedsChoice;
+        }
+
+        var quote = await PriceAsync(form, customerId, isNewCustomer: isFinal && customerId == null, ct);
+        return quote.CanConfirm
+            ? new WalkInQuote(true, null, quote.NightCount, quote.RoomSubtotal, quote.PromotionName,
+                quote.DiscountAmount, quote.ExtraBedAmount, quote.TotalAmount, isFinal)
+            : new WalkInQuote(false, quote.StatusMessage ?? "คำนวณยอดไม่ได้");
+    }
+
+    private Task<BookingConfirmationViewModel> PriceAsync(WalkInViewModel form, int? customerId, bool isNewCustomer,
+        CancellationToken ct) =>
+        bookings.PrepareConfirmationAsync(new CreateBookingViewModel
+        {
+            RoomId = form.RoomId!.Value,
+            CheckIn = availability.HotelToday(),
+            CheckOut = form.CheckOut,
+            Guests = form.Guests,
+            ExtraBedCount = form.ExtraBed ? 1 : 0
+        }, customerId, ct, isNewCustomer);
 
     /// <summary>
     /// เบอร์โทรซ้ำกันได้หลายบัญชี จึงต้องดูชื่อด้วย ไม่งั้นการเข้าพักไปอยู่ในบัญชีคนอื่น

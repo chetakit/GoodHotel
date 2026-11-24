@@ -9,7 +9,7 @@
         <div class="auth-card auth-card-wide">
             <ul class="nav nav-pills nav-fill mb-4">
                 <li class="nav-item">
-                    <a class="nav-link" asp-controller="Home" asp-action="Login">เข้าสู่ระบบ</a>
+                    <a class="nav-link" asp-controller="Home" asp-action="Login" asp-route-returnUrl="@ViewBag.ReturnUrl">เข้าสู่ระบบ</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link active" asp-controller="Home" asp-action="Register">สมัครสมาชิก</a>
@@ -24,6 +24,7 @@
             <p class="text-muted small mb-3">ใช้อีเมลนี้เข้าสู่ระบบเพื่อจอง ชำระเงิน และดูการจองของคุณ</p>
 
             <form asp-controller="Home" asp-action="Register" method="post">
+                <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
                 <div asp-validation-summary="All" class="text-danger mb-3"></div>
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -60,7 +61,7 @@
 
                     <div class="col-md-6">
                         <label asp-for="Password" class="form-label">รหัสผ่าน</label>
-                        <input asp-for="Password" type="password" class="form-control" placeholder="ตั้งรหัสผ่าน" />
+                        <input asp-for="Password" type="password" class="form-control" placeholder="8 ตัวอักษรขึ้นไป" minlength="8" autocomplete="new-password" />
                         <span asp-validation-for="Password" class="text-danger"></span>
                     </div>
 

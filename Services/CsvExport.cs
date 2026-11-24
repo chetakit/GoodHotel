@@ -24,7 +24,7 @@ public static class CsvExport
         value ??= string.Empty;
         var trimmed = value.TrimStart();
         if (value.StartsWith('\t') || value.StartsWith('\r') || value.StartsWith('\n') ||
-            (trimmed.Length > 0 && "=+-@".Contains(trimmed[0]) && !IsNegativeNumber(value)))
+            (trimmed.Length > 0 && value != "-" && "=+-@".Contains(trimmed[0]) && !IsNegativeNumber(value)))
             value = "'" + value;
         return "\"" + value.Replace("\"", "\"\"") + "\"";
     }

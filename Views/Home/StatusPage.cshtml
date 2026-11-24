@@ -1,0 +1,22 @@
+@{
+    var notFound = (int?)ViewData["Code"] == 404;
+    ViewData["Title"] = notFound ? "ไม่พบหน้านี้" : "ทำรายการไม่ได้";
+}
+
+<section class="content-section">
+    <div class="container">
+        <div class="auth-card">
+            <h2 class="mb-2">@ViewData["Title"]</h2>
+            <p class="text-muted">@(notFound ? "ลิงก์อาจพิมพ์ผิด หรือข้อมูลนี้ไม่มีอยู่แล้ว" : "ข้อมูลที่ส่งมาไม่ถูกต้อง หรือหน้านี้หมดอายุแล้ว กรุณากลับไปโหลดหน้าใหม่แล้วลองอีกครั้ง")</p>
+            @if (User.Identity?.IsAuthenticated == true && !User.IsInRole("Customer"))
+            {
+                <a asp-controller="Home" asp-action="Login" class="btn btn-primary">ไปหน้าทำงานของฉัน</a>
+            }
+            else
+            {
+                <a asp-controller="Home" asp-action="Rooms" class="btn btn-primary">ดูห้องพัก</a>
+                <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">กลับหน้าแรก</a>
+            }
+        </div>
+    </div>
+</section>

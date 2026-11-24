@@ -69,7 +69,8 @@ public class AuditController(ParallelReader reader, RoomAvailabilityService avai
         await Task.WhenAll(eventsTask, cancelsTask);
 
         var entries = eventsTask.Result
-            .Select(e => e with { TypeLabel = ThaiText.Status(e.Type), ActorRole = ThaiText.Status(e.ActorRole) })
+            .Select(e => e with { TypeLabel = ThaiText.Status(e.Type), ActorRole = ThaiText.Status(e.ActorRole),
+                Detail = ThaiText.Reason(e.Detail) })
             .Concat(cancelsTask.Result.Select(c => c with
             {
                 TypeLabel = "ยกเลิกการจอง · " + CancelReasons.Label(c.TypeLabel),

@@ -118,6 +118,10 @@
         </div>
     </footer>
 
+    @* ชี้เมาส์ที่เมนูแล้วโหลดหน้ารอไว้ กดแล้วเปิดทันที (เฉพาะหน้าที่เปิดดูอย่างเดียว ไม่รวมการจองของฉัน เพราะเปิดแล้วนับว่าอ่านแจ้งเตือน) *@
+    <script type="speculationrules">
+        { "prefetch": [{ "where": { "selector_matches": ".hotel-brand, .hotel-navbar .nav-link[href*='Rooms'], .hotel-navbar .nav-link[href*='Promotion'], .hotel-navbar .nav-link[href*='About'], a[href*='/Home/RoomDetails/']" }, "eagerness": "moderate" }] }
+    </script>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

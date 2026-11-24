@@ -223,4 +223,9 @@ Check(csvText.Contains("\"-7650.00\"") && csvText.Contains("\"-5\""), "Negative 
 foreach (var risky in new[] { "=1+1", "-1+cmd", "-2+3", "+66811112222", "@x", " -5", "--5" })
     Check(csvText.Contains($"\"'{risky}\""), $"CSV must still neutralise {risky}.");
 
+var required = new System.ComponentModel.DataAnnotations.RequiredAttribute(); ThaiValidation.Translate(required);
+var custom = new System.ComponentModel.DataAnnotations.RequiredAttribute { ErrorMessage = "เอง" }; ThaiValidation.Translate(custom);
+Check(required.FormatErrorMessage("X") == "กรุณากรอกข้อมูลช่องนี้" && custom.ErrorMessage == "เอง",
+    "Default validation messages are Thai and custom ones are kept.");
+
 Console.WriteLine("Payment workflow regression checks passed.");

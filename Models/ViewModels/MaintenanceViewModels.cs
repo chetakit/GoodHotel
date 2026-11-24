@@ -6,10 +6,11 @@ namespace GoodHotel.Models.ViewModels;
 
 public class MaintenanceCreateViewModel
 {
-    [Range(1, int.MaxValue, ErrorMessage = "Select a room.")]
+    [Required(ErrorMessage = "กรุณาเลือกห้อง")]
+    [Range(1, int.MaxValue, ErrorMessage = "กรุณาเลือกห้อง")]
     public int RoomId { get; set; }
 
-    [Required]
+    [Required(ErrorMessage = "กรุณาอธิบายปัญหาที่พบ")]
     [StringLength(2000)]
     public string? Description { get; set; }
 
@@ -23,7 +24,10 @@ public sealed record MaintenanceListItem(
     string Status,
     bool BlocksRoom,
     DateOnly? BlockFrom,
-    DateOnly? BlockUntil);
+    DateOnly? BlockUntil,
+    string Description,
+    DateTime ReportedAtUtc,
+    string? ReportedBy);
 
 public sealed record MaintenanceDetailsViewModel(
     int ReportId,

@@ -93,7 +93,7 @@
         }
 
         <footer class="receipt-foot">
-            <div class="receipt-muted">ผู้รับเงิน / ยืนยันการชำระ: @ThaiText.OrDash(Model.ReceivedBy?.Trim())</div>
+            <div class="receipt-muted">ผู้รับเงิน / ยืนยันการชำระ: @(Model.IsMock ? "ระบบชำระเงินออนไลน์" : ThaiText.OrDash(Model.ReceivedBy?.Trim()))</div>
             <div class="receipt-muted">เอกสารนี้ไม่ใช่ใบกำกับภาษี</div>
         </footer>
     </article>

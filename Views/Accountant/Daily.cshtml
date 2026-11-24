@@ -31,15 +31,55 @@
         <div class="label">สุทธิ</div>
         <div class="value">@ThaiText.Baht(Model.Total.Net)</div>
     </div>
-    @foreach (var method in Model.ByMethod)
-    {
-        <div class="figure">
-            <div class="label">@method.Method</div>
-            <div class="value">฿@method.Amount.ToString("N0")</div>
-            <div class="note">@method.Count รายการ</div>
-        </div>
-    }
 </div>
+
+@if (Model.ByMethod.Count > 0)
+{
+    <div class="row g-3 mb-3">
+        <div class="col-lg-7">
+            <section class="table-panel">
+                <div class="panel-head"><h2>เงินตามช่องทาง</h2></div>
+                <div class="table-responsive"><table class="table">
+                    <thead><tr><th>ช่องทาง</th><th class="text-end">รับ</th><th class="text-end">คืน</th><th class="text-end">สุทธิ</th></tr></thead>
+                    <tbody>
+                        @foreach (var method in Model.ByMethod)
+                        {
+                            <tr>
+                                <td>@method.Method <span class="text-muted small">(@method.Count)</span></td>
+                                <td class="text-end num">@method.Received.ToString("N2")</td>
+                                <td class="text-end num @(method.Refunded > 0 ? "money-out" : "")">@method.Refunded.ToString("N2")</td>
+                                <td class="text-end num fw-semibold">@ThaiText.Baht(method.Net)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table></div>
+            </section>
+        </div>
+        <div class="col-lg-5">
+            <section class="table-panel">
+                <div class="panel-head"><h2>เงินสดแยกตามพนักงานที่รับ</h2></div>
+                @if (Model.Cashiers.Count == 0)
+                {
+                    <p class="panel-empty">ไม่มีการรับเงินสดในวันนี้</p>
+                }
+                else
+                {
+                    <table class="table">
+                        <tbody>
+                            @foreach (var cashier in Model.Cashiers)
+                            {
+                                <tr>
+                                    <td>@cashier.Name <span class="text-muted small">(@cashier.Count)</span></td>
+                                    <td class="text-end num">฿@cashier.Amount.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </section>
+        </div>
+    </div>
+}
 
 <section class="table-panel">
     <div class="panel-head">

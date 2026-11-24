@@ -10,7 +10,7 @@
                     <a class="nav-link active" asp-controller="Home" asp-action="Login">เข้าสู่ระบบ</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" asp-controller="Home" asp-action="Register">สมัครสมาชิก</a>
+                    <a class="nav-link" asp-controller="Home" asp-action="Register" asp-route-returnUrl="@ViewBag.ReturnUrl">สมัครสมาชิก</a>
                 </li>
             </ul>
 
@@ -27,6 +27,7 @@
             }
 
             <form asp-controller="Home" asp-action="Login" method="post">
+                <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
                 <div class="mb-3">
                     <label class="form-label" for="login-email">อีเมล</label>
                     <input id="login-email" type="email" name="Email" class="form-control" autocomplete="username" required />
@@ -39,7 +40,7 @@
             </form>
 
             <p class="text-muted small text-center mt-3 mb-0">
-                ยังไม่มีบัญชี? <a asp-controller="Home" asp-action="Register">สมัครสมาชิก</a>
+                ยังไม่มีบัญชี? <a asp-controller="Home" asp-action="Register" asp-route-returnUrl="@ViewBag.ReturnUrl">สมัครสมาชิก</a>
             </p>
         </div>
     </div>

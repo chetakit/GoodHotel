@@ -10,19 +10,32 @@
 
 <div class="figures">
     <div class="figure">
-        <div class="label">รายได้สุทธิวันนี้</div>
+        <div class="label">เงินรับสุทธิวันนี้</div>
         <div class="value">@ThaiText.Baht(Model.Today.Net)</div>
         <div class="note">รับ ฿@Model.Today.Received.ToString("N0") · คืน ฿@Model.Today.Refunded.ToString("N0")</div>
     </div>
     <div class="figure">
-        <div class="label">รายได้สุทธิเดือนนี้</div>
+        <div class="label">เงินรับสุทธิเดือนนี้</div>
         <div class="value">@ThaiText.Baht(Model.ThisMonth.Net)</div>
         <div class="note">รับ ฿@Model.ThisMonth.Received.ToString("N0") · คืน ฿@Model.ThisMonth.Refunded.ToString("N0")</div>
     </div>
     <div class="figure">
-        <div class="label">รายได้สุทธิทั้งหมด</div>
+        <div class="label">เงินรับสุทธิทั้งหมด</div>
         <div class="value">@ThaiText.Baht(Model.AllTime.Net)</div>
         <div class="note">ตั้งแต่เปิดระบบ</div>
+    </div>
+</div>
+
+<div class="figures">
+    <div class="figure">
+        <div class="label">รายได้แล้ว</div>
+        <div class="value">@ThaiText.Baht(Model.AllTime.Net - Model.Advance)</div>
+        <div class="note">เข้าพักแล้ว ไม่มาเข้าพัก หรือยกเลิกโดยไม่คืนเงิน</div>
+    </div>
+    <div class="figure">
+        <div class="label">เงินรับล่วงหน้า</div>
+        <div class="value">@ThaiText.Baht(Model.Advance)</div>
+        <div class="note">จ่ายแล้วแต่ยังไม่เข้าพัก จึงยังไม่ใช่รายได้</div>
     </div>
 </div>
 
@@ -55,7 +68,7 @@
 </div>
 
 <div class="row g-3">
-    <div class="col-lg-8">
+    <div class="col-12">
         <section class="table-panel">
             <div class="panel-head">
                 <h2>รายการเงินวันนี้</h2>
@@ -71,26 +84,29 @@
             }
         </section>
     </div>
-    <div class="col-lg-4">
+    <div class="col-12">
         <section class="table-panel">
-            <div class="panel-head"><h2>เงินรับเดือนนี้ตามช่องทาง</h2></div>
+            <div class="panel-head"><h2>เงินเดือนนี้ตามช่องทาง</h2></div>
             @if (Model.MonthByMethod.Count == 0)
             {
                 <p class="panel-empty">ยังไม่มีรายการ</p>
             }
             else
             {
-                <table class="table">
+                <div class="table-responsive"><table class="table">
+                    <thead><tr><th>ช่องทาง</th><th class="text-end">รับ</th><th class="text-end">คืน</th><th class="text-end">สุทธิ</th></tr></thead>
                     <tbody>
                         @foreach (var method in Model.MonthByMethod)
                         {
                             <tr>
                                 <td>@method.Method <span class="text-muted small">(@method.Count)</span></td>
-                                <td class="text-end num">฿@method.Amount.ToString("N2")</td>
+                                <td class="text-end num">@method.Received.ToString("N2")</td>
+                                <td class="text-end num @(method.Refunded > 0 ? "money-out" : "")">@method.Refunded.ToString("N2")</td>
+                                <td class="text-end num fw-semibold">@ThaiText.Baht(method.Net)</td>
                             </tr>
                         }
                     </tbody>
-                </table>
+                </table></div>
             }
         </section>
         <p class="text-muted small mt-2 mb-0">ยอดรวมการชำระเงินจำลอง (Mock) ด้วย ไม่ใช่เงินจริง</p>

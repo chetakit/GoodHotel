@@ -321,7 +321,7 @@
                                 <td class="num">@ThaiText.Time(item.OccurredAtUtc)</td>
                                 <td>@ThaiText.Status(item.EventType)<div class="text-muted small">ชำระเงิน #@item.PaymentId · @ThaiText.PaymentMethod(item.Method)</div></td>
                                 <td>@(await Users.NameAsync(item.ActorUserId))</td>
-                                <td class="small">@ThaiText.OrDash(item.Reason)</td>
+                                <td class="small">@ThaiText.OrDash(ThaiText.Reason(item.Reason))</td>
                                 <td class="text-end num">@(item.Amount.HasValue ? ThaiText.Baht(item.Amount.Value) : "-")</td>
                             </tr>
                         }

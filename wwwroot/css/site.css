@@ -7,17 +7,19 @@
 
 /* ---------- 1) ค่ากลาง ---------- */
 :root {
-    --paper: #f5f3ef;
-    --surface: #ffffff;
+    --paper: #e8eeea;
+    --surface: #fbfcfb;
+    --tint: #d8e3dd;      /* แถบเน้น: หัวหน้าแรก โปรโมชัน เมนูหลังบ้าน */
+    --deep: #1a453f;      /* ส่วนท้าย */
     --ink: #1f2328;
     --ink-2: #474c54;
-    --muted: #6f6a63;
-    --line: #e4dfd7;
-    --line-strong: #cfc8bd;
+    --muted: #55605a;
+    --line: #d3ddd7;
+    --line-strong: #b4c3bb;
 
     --accent: #1e5a52;
     --accent-hover: #164640;
-    --accent-soft: #e4eeeb;
+    --accent-soft: #dcebe5;
 
     --ok: #2d6b42;      --ok-soft: #e5f0e8;
     --warn: #8d5a10;    --warn-soft: #f7ecd9;
@@ -54,6 +56,13 @@
 }
 
 html { scroll-behavior: smooth; }
+
+/* เปลี่ยนหน้าแบบจางต่อกัน ไม่กะพริบขาว (เบราว์เซอร์ที่ไม่รองรับจะเปลี่ยนปกติ) */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .14s; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
     font-family: var(--font);
@@ -116,11 +125,11 @@ a { text-underline-offset: 2px; }
 }
 .btn-secondary {
     --bs-btn-color: var(--ink);
-    --bs-btn-bg: #ece8e1;
-    --bs-btn-border-color: #ece8e1;
+    --bs-btn-bg: #dde5e0;
+    --bs-btn-border-color: #dde5e0;
     --bs-btn-hover-color: var(--ink);
-    --bs-btn-hover-bg: #e2ddd4;
-    --bs-btn-hover-border-color: #e2ddd4;
+    --bs-btn-hover-bg: #cfdad4;
+    --bs-btn-hover-border-color: #cfdad4;
 }
 .btn-success {
     --bs-btn-bg: var(--ok); --bs-btn-border-color: var(--ok);
@@ -178,7 +187,7 @@ a { text-underline-offset: 2px; }
 .table {
     --bs-table-bg: transparent;
     --bs-table-border-color: var(--line);
-    --bs-table-hover-bg: #faf8f5;
+    --bs-table-hover-bg: #f1f5f2;
     margin-bottom: 0;
     font-size: .925rem;
 }
@@ -200,8 +209,8 @@ a { text-underline-offset: 2px; }
 .text-bg-danger { background: var(--bad-soft) !important; color: var(--bad) !important; }
 .text-bg-info { background: var(--info-soft) !important; color: var(--info) !important; }
 .text-bg-primary { background: var(--accent-soft) !important; color: var(--accent) !important; }
-.text-bg-secondary, .text-bg-light { background: #eeebe6 !important; color: var(--ink-2) !important; }
-.text-bg-dark { background: #e7e5e1 !important; color: var(--ink) !important; }
+.text-bg-secondary, .text-bg-light { background: #e1e8e4 !important; color: var(--ink-2) !important; }
+.text-bg-dark { background: #dbe3de !important; color: var(--ink) !important; }
 
 .alert {
     border: 1px solid var(--line);
@@ -218,7 +227,7 @@ a { text-underline-offset: 2px; }
 .alert-info { border-left-color: var(--info); background: var(--info-soft); }
 .alert-light, .alert-secondary { border-left-color: var(--line-strong); }
 
-.card { border: 1px solid var(--line); border-radius: 8px; box-shadow: none; }
+.card { --bs-card-bg: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: none; }
 .card-body { padding: 1rem 1.1rem; }
 
 .nav-pills .nav-link { color: var(--ink-2); border-radius: var(--radius); padding: .35rem .8rem; font-size: .9rem; }
@@ -305,7 +314,7 @@ dd { margin-bottom: .6rem; }
 .hotel-body { min-height: 100vh; display: flex; flex-direction: column; }
 .hotel-body > main { flex: 1; }
 
-.top-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-header { background: var(--paper); border-bottom: 1px solid var(--line-strong); }
 .hotel-navbar { padding: .7rem 0; }
 .hotel-brand {
     font-family: var(--serif);
@@ -320,16 +329,17 @@ dd { margin-bottom: .6rem; }
 .user-chip small { color: var(--muted); }
 
 .content-section { padding: 2.75rem 0; }
-.content-section.bg-light { background: #efece6 !important; }
+.content-section.bg-light { background: var(--tint) !important; }
 .section-heading { margin-bottom: 1.25rem; }
 .section-heading h2 { font-family: var(--serif); font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin-bottom: .35rem; }
 .section-heading p { color: var(--muted); margin: 0; }
 
 /* หน้าแรก */
-.home-hero { padding: 3rem 0 2.5rem; }
+.home-hero { padding: 3rem 0 3rem; background: var(--tint); }
+.home-hero + .content-section { padding-top: 2.25rem !important; }
 .home-hero h1 { font-family: var(--serif); font-size: clamp(2rem, 4.5vw, 3.1rem); line-height: 1.25; margin-bottom: 1rem; }
 .home-hero .lead { color: var(--ink-2); font-size: 1.05rem; max-width: 34rem; }
-.home-hero-photo { border-radius: 8px; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #e8e3da; }
+.home-hero-photo { border-radius: 8px; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #cfdad4; }
 .stay-search {
     display: grid;
     grid-template-columns: 1fr 1fr 6.5rem;
@@ -342,7 +352,8 @@ dd { margin-bottom: .6rem; }
     margin-top: 1.75rem;
 }
 .stay-search .btn { grid-column: 1 / -1; }
-@media (max-width: 575.98px) { .stay-search { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 768px) { .stay-search.is-row { grid-template-columns: 1fr 1fr 6.5rem auto; } .stay-search.is-row .btn { grid-column: auto; } }
+@media (max-width: 575.98px) { .stay-search { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .stay-search .form-control { padding-inline: .5rem; } }
 
 .hotel-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .hotel-facts div { padding: 1rem 1.1rem; border-right: 1px solid var(--line); }
@@ -352,7 +363,7 @@ dd { margin-bottom: .6rem; }
 
 /* การ์ดห้องพัก */
 .room-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
-.room-image { width: 100%; height: 210px; object-fit: cover; background: #e8e3da; }
+.room-image { width: 100%; height: 210px; object-fit: cover; background: #cfdad4; }
 .room-body { padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: .6rem; flex: 1; }
 .room-body > .btn:last-child, .room-body > a.btn:last-of-type { margin-top: auto; }
 .room-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; }
@@ -361,7 +372,7 @@ dd { margin-bottom: .6rem; }
 .room-price small { font-size: .85rem; font-weight: 400; color: var(--muted); }
 .room-features { display: flex; flex-wrap: wrap; gap: .4rem; }
 .room-features span { font-size: .8rem; color: var(--ink-2); background: var(--paper); border: 1px solid var(--line); padding: .15rem .5rem; border-radius: 4px; }
-.badge-status { font-size: .78rem; font-weight: 500; padding: .2rem .55rem; border-radius: 4px; background: #eeebe6; color: var(--ink-2); white-space: nowrap; }
+.badge-status { font-size: .78rem; font-weight: 500; padding: .2rem .55rem; border-radius: 4px; background: #e1e8e4; color: var(--ink-2); white-space: nowrap; }
 .badge-status.available { background: var(--ok-soft); color: var(--ok); }
 .badge-status.booked { background: var(--warn-soft); color: var(--warn); }
 .badge-status.cleaning { background: var(--info-soft); color: var(--info); }
@@ -373,7 +384,7 @@ dd { margin-bottom: .6rem; }
 .feature-icon { display: none; }
 
 /* รายละเอียดห้อง */
-.room-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #e8e3da; }
+.room-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #cfdad4; }
 
 /* เกี่ยวกับเรา */
 .about-photo { width: 100%; height: clamp(160px, 28vw, 320px); object-fit: cover; border-radius: 8px; margin-bottom: 1.75rem; }
@@ -398,10 +409,12 @@ dd { margin-bottom: .6rem; }
 .promotion-feedback-error { color: var(--bad); }
 
 /* ส่วนท้าย */
-.hotel-footer { border-top: 1px solid var(--line); background: var(--surface); padding: 2rem 0 1.25rem; margin-top: 2rem; font-size: .9rem; }
-.hotel-footer h6 { font-size: .8rem; color: var(--muted); font-weight: 500; margin-bottom: .35rem; }
-.footer-copy { color: var(--ink-2); margin: 0; }
-.footer-bottom { display: flex; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--line); margin-top: 1.5rem; padding-top: 1rem; color: var(--muted); font-size: .8rem; }
+.hotel-footer { background: var(--deep); color: #e6eeea; padding: 2.25rem 0 1.25rem; font-size: .9rem; }
+.hotel-footer .hotel-brand { color: #fff !important; }
+.hotel-footer h6 { font-size: .8rem; color: #a9c4ba; font-weight: 500; margin-bottom: .35rem; }
+.hotel-footer a:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.footer-copy { color: #e6eeea; margin: 0; }
+.footer-bottom { display: flex; justify-content: space-between; gap: 1rem; border-top: 1px solid rgba(255, 255, 255, .16); margin-top: 1.5rem; padding-top: 1rem; color: #a9c4ba; font-size: .8rem; }
 
 /* ---------- 4) หลังบ้านพนักงาน ---------- */
 .bo { background: var(--paper); }
@@ -410,8 +423,8 @@ dd { margin-bottom: .6rem; }
 .bo-side {
     width: 232px;
     flex-shrink: 0;
-    background: var(--surface);
-    border-right: 1px solid var(--line);
+    background: var(--tint);
+    border-right: 1px solid var(--line-strong);
     position: sticky;
     top: 0;
     height: 100vh;
@@ -433,8 +446,8 @@ dd { margin-bottom: .6rem; }
     font-size: .925rem;
 }
 .bo-nav a:hover { background: var(--paper); color: var(--ink); }
-.bo-nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.bo-user { margin-top: auto; padding: .9rem 1.1rem 1.1rem; border-top: 1px solid var(--line); font-size: .85rem; }
+.bo-nav a.active { background: var(--accent); color: #fff; font-weight: 600; }
+.bo-user { margin-top: auto; padding: .9rem 1.1rem 1.1rem; border-top: 1px solid var(--line-strong); font-size: .85rem; }
 .bo-user-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bo-user-links { display: flex; gap: .9rem; margin-top: .3rem; }
 .bo-user-links a, .bo-user-links button { color: var(--muted); background: none; border: 0; padding: 0; font-size: .85rem; text-decoration: none; }
@@ -471,7 +484,7 @@ dd { margin-bottom: .6rem; }
 .toolbar .form-control, .toolbar .form-select { width: auto; min-width: 12rem; }
 
 /* สถานะห้องแบบตาราง */
-.status-pill { display: inline-block; font-size: .78rem; font-weight: 500; padding: .2rem .55rem; border-radius: 4px; background: #eeebe6; color: var(--ink-2); }
+.status-pill { display: inline-block; font-size: .78rem; font-weight: 500; padding: .2rem .55rem; border-radius: 4px; background: #e1e8e4; color: var(--ink-2); }
 .status-pill.occupied { background: var(--info-soft); color: var(--info); }
 .status-pill.clean { background: var(--ok-soft); color: var(--ok); }
 .status-pill.maintenance { background: var(--bad-soft); color: var(--bad); }

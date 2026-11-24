@@ -18,7 +18,7 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                     <div>
                         <h3 class="h4 mt-2 mb-1">@(booking.RoomType ?? "ห้องพัก")</h3>
-                        <span class="text-muted">@(booking.RoomNumber == null ? "ไม่ระบุ" : $"ห้อง {booking.RoomNumber}")</span>
+                        <span class="text-muted">การจอง <strong class="text-body">#@booking.BookingId</strong> · @(booking.RoomNumber == null ? "ไม่ระบุ" : $"ห้อง {booking.RoomNumber}")</span>
                     </div>
                     <span class="badge rounded-pill fs-6 @booking.StayBadgeClass">@booking.StayLabel</span>
                 </div>
@@ -67,7 +67,7 @@
                             <p class="text-warning-emphasis mb-2">คำขอคืนเงิน: รอฝ่ายบัญชีพิจารณา (การจองยังอยู่ตามเดิม)</p>
                             break;
                         case "Rejected":
-                            <p class="text-danger mb-2">คำขอคืนเงินถูกปฏิเสธ · ดูเหตุผลที่หน้าการชำระเงิน · ยังมาพักได้ตามปกติ หรือยกเลิกเองแบบไม่คืนเงิน</p>
+                            <p class="text-danger mb-2">คำขอคืนเงินถูกปฏิเสธ · ดูเหตุผลที่หน้าการชำระเงิน@(booking.CanCancel ? " · ยังมาพักได้ตามปกติ หรือยกเลิกเองแบบไม่คืนเงิน" : "")</p>
                             break;
                         case "Approved":
                             <p class="text-success mb-2">อนุมัติคืนเงินแล้ว การจองถูกยกเลิกให้อัตโนมัติ</p>

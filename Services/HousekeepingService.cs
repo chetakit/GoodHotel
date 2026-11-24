@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace GoodHotel.Services;
 
-public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvider)
+public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvider, ParallelReader reader)
 {
     // Lock users before updating tasks; multiple user locks must be taken in ID order.
     public static async Task<bool> LockUserAsync(GoodHotelDbContext db, int userId, CancellationToken ct)
@@ -233,27 +233,37 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
 
     public async Task<HousekeepingDashboardViewModel> DashboardAsync(int userId, CancellationToken ct)
     {
-        var tasks = db.HousekeepingTasks.AsNoTracking();
-        var today = timeProvider.GetUtcNow().UtcDateTime.Date;
-        var tomorrow = today.AddDays(1);
-        var available = await tasks.CountAsync(t => t.Status == "Pending" && t.AssignedToUserId == null, ct);
-        var accepted = await tasks.CountAsync(t => t.AssignedToUserId == userId && t.Status == "Accepted", ct);
-        var inProgress = await tasks.CountAsync(t => t.AssignedToUserId == userId && t.Status == "InProgress", ct);
-        var completed = await tasks.CountAsync(t => t.CompletedByUserId == userId && t.CompletedAtUtc >= today && t.CompletedAtUtc < tomorrow, ct);
-        var recent = await TaskItems(tasks.Where(t => t.AssignedToUserId == userId)
-            .OrderByDescending(t => t.TaskId).Take(5)).ToListAsync(ct);
-        return new HousekeepingDashboardViewModel(available, accepted, inProgress, completed, recent);
+        // "วันนี้" ตามเวลาไทย (เดิมตัดวันตาม UTC ช่วงเที่ยงคืนถึง 7 โมงเช้านับงานเมื่อวานด้วย)
+        var hotelToday = RoomAvailabilityService.HotelDate(timeProvider.GetUtcNow().UtcDateTime);
+        var (today, tomorrow) = FinanceLedger.UtcBounds(hotelToday, hotelToday);
+        // นับทุกตัวเลขใน query เดียว และดึงงานล่าสุดพร้อมกัน
+        var countsTask = reader.Run(c => c.Users.Where(u => u.UserId == userId).Select(_ => new
+        {
+            Available = c.HousekeepingTasks.Count(t => t.Status == "Pending" && t.AssignedToUserId == null),
+            Accepted = c.HousekeepingTasks.Count(t => t.AssignedToUserId == userId && t.Status == "Accepted"),
+            InProgress = c.HousekeepingTasks.Count(t => t.AssignedToUserId == userId && t.Status == "InProgress"),
+            Completed = c.HousekeepingTasks.Count(t => t.CompletedByUserId == userId &&
+                t.CompletedAtUtc >= today && t.CompletedAtUtc < tomorrow)
+        }).SingleOrDefaultAsync(ct));
+        var recentTask = reader.Run(c => TaskItems(c.HousekeepingTasks.AsNoTracking()
+            .Where(t => t.AssignedToUserId == userId)
+            .OrderByDescending(t => t.TaskId).Take(5)).ToListAsync(ct));
+        await Task.WhenAll(countsTask, recentTask);
+        var counts = countsTask.Result;
+        return new HousekeepingDashboardViewModel(counts?.Available ?? 0, counts?.Accepted ?? 0,
+            counts?.InProgress ?? 0, counts?.Completed ?? 0, recentTask.Result);
     }
 
     public async Task<HousekeepingTasksViewModel> TasksAsync(int userId, CancellationToken ct)
     {
-        var tasks = db.HousekeepingTasks.AsNoTracking();
-        var available = await TaskItems(tasks.Where(t => t.Status == "Pending" && t.AssignedToUserId == null)
-            .OrderBy(t => t.CreatedAtUtc)).ToListAsync(ct);
-        var assigned = await TaskItems(tasks.Where(t => t.AssignedToUserId == userId &&
-            (t.Status == "Accepted" || t.Status == "InProgress"))
-            .OrderBy(t => t.CreatedAtUtc)).ToListAsync(ct);
-        return new HousekeepingTasksViewModel(available, assigned);
+        var availableTask = reader.Run(c => TaskItems(c.HousekeepingTasks.AsNoTracking()
+            .Where(t => t.Status == "Pending" && t.AssignedToUserId == null)
+            .OrderBy(t => t.CreatedAtUtc)).ToListAsync(ct));
+        var assignedTask = reader.Run(c => TaskItems(c.HousekeepingTasks.AsNoTracking()
+            .Where(t => t.AssignedToUserId == userId && (t.Status == "Accepted" || t.Status == "InProgress"))
+            .OrderBy(t => t.CreatedAtUtc)).ToListAsync(ct));
+        await Task.WhenAll(availableTask, assignedTask);
+        return new HousekeepingTasksViewModel(availableTask.Result, assignedTask.Result);
     }
 
     public async Task<HousekeepingDetailsViewModel?> DetailsAsync(int id, int userId, CancellationToken ct)
@@ -268,16 +278,17 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
 
     public async Task<HousekeepingHistoryViewModel> HistoryAsync(int userId, CancellationToken ct)
     {
-        var completed = await TaskItems(db.HousekeepingTasks.AsNoTracking()
+        var completedTask = reader.Run(c => TaskItems(c.HousekeepingTasks.AsNoTracking()
             .Where(t => t.CompletedByUserId == userId && (t.Status == "Completed" || t.Status == "Verified"))
-            .OrderByDescending(t => t.CompletedAtUtc)).ToListAsync(ct);
-        var events = await db.HousekeepingTaskEvents.AsNoTracking()
+            .OrderByDescending(t => t.CompletedAtUtc)).ToListAsync(ct));
+        var eventsTask = reader.Run(c => c.HousekeepingTaskEvents.AsNoTracking()
             .Where(e => e.ActorUserId == userId)
             .OrderByDescending(e => e.OccurredAtUtc).ThenByDescending(e => e.EventId)
             .Select(e => new HousekeepingEventItem(e.TaskId, e.Task.Room.Room1, e.EventType,
                 e.OccurredAtUtc, e.PreviousStatus, e.NewStatus, e.Reason))
-            .ToListAsync(ct);
-        return new HousekeepingHistoryViewModel(completed, events);
+            .ToListAsync(ct));
+        await Task.WhenAll(completedTask, eventsTask);
+        return new HousekeepingHistoryViewModel(completedTask.Result, eventsTask.Result);
     }
 
     public async Task<bool> TransitionAsync(int taskId, int userId, string action, CancellationToken ct)

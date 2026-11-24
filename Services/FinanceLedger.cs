@@ -63,12 +63,32 @@ public sealed class FinanceLedger(ParallelReader reader)
         return new MoneyTotal(list.Where(e => !e.IsRefund).Sum(e => e.Amount), list.Where(e => e.IsRefund).Sum(e => e.Amount));
     }
 
-    /// <summary>เงินรับแยกตามช่องทาง (ไม่รวมเงินคืน)</summary>
+    /// <summary>
+    /// เงินรับล่วงหน้า: จ่ายแล้วแต่ยังไม่เช็คอินและยังไม่เลยวันออก จึงยังไม่ใช่รายได้
+    /// (เข้าพักแล้ว ไม่มาเข้าพัก หรือยกเลิกโดยไม่คืนเงิน ถือเป็นรายได้แล้ว)
+    /// </summary>
+    public async Task<decimal> AdvanceAsync(DateOnly today, CancellationToken ct) =>
+        await reader.Run(db => PaymentService.ConfirmedForRevenue(db.Payments)
+            .Where(p => p.Booking != null && p.Booking.Status != BookingStatuses.Cancelled &&
+                p.Booking.CheckOut > today && !db.BookingStays.Any(s => s.BookingId == p.BookingId))
+            .Select(p => (p.Amount ?? 0m) -
+                (p.Refunds.Where(r => r.Status == "Approved").Sum(r => (decimal?)r.Amount) ?? 0m))
+            .SumAsync(ct));
+
+    /// <summary>รับ/คืน/สุทธิ แยกตามช่องทาง (เงินคืนหักจากช่องทางที่จ่ายเข้ามา)</summary>
     public static IReadOnlyList<MethodTotal> ByMethod(IEnumerable<LedgerEntry> entries) =>
-        entries.Where(e => !e.IsRefund)
-            .GroupBy(e => ThaiText.PaymentMethod(e.Method))
-            .Select(g => new MethodTotal(g.Key, g.Count(), g.Sum(e => e.Amount)))
-            .OrderByDescending(m => m.Amount)
+        entries.GroupBy(e => ThaiText.PaymentMethod(e.Method))
+            .Select(g => new MethodTotal(g.Key, g.Count(e => !e.IsRefund),
+                g.Where(e => !e.IsRefund).Sum(e => e.Amount), g.Where(e => e.IsRefund).Sum(e => e.Amount)))
+            .OrderByDescending(m => m.Received)
+            .ToList();
+
+    /// <summary>เงินสดที่พนักงานแต่ละคนรับ ใช้เทียบกับเงินที่นำส่ง</summary>
+    public static IReadOnlyList<CashierTotal> Cashiers(IEnumerable<LedgerEntry> entries) =>
+        entries.Where(e => !e.IsRefund && e.Method == "Cash")
+            .GroupBy(e => ThaiText.OrDash(e.ActorName?.Trim()))
+            .Select(g => new CashierTotal(g.Key, g.Count(), g.Sum(e => e.Amount)))
+            .OrderByDescending(c => c.Amount)
             .ToList();
 
     // ช่วงวันที่ที่ใช้ได้: ไม่ระบุ = ต้นเดือนถึงวันนี้, กลับด้านให้อัตโนมัติ, ไม่เกิน 1 ปี

@@ -21,7 +21,7 @@
         <div class="note">ไม่นับที่ยกเลิก</div>
     </div>
     <div class="figure">
-        <div class="label">รายได้สุทธิ</div>
+        <div class="label">เงินรับสุทธิ</div>
         <div class="value">฿@((Model.Revenue ?? 0m).ToString("N0"))</div>
         <div class="note">รายละเอียดอยู่ที่ฝ่ายบัญชี</div>
     </div>
@@ -38,7 +38,7 @@
     </div>
     <div class="figure @(Model.OpenMaintenanceCount > 0 ? "is-alert" : "")">
         <a asp-controller="Maintenance" asp-action="Index">
-            <div class="label">งานซ่อมที่ยังไม่เริ่ม</div>
+            <div class="label">งานซ่อมที่ยังไม่เสร็จ</div>
             <div class="value">@Model.OpenMaintenanceCount</div>
         </a>
     </div>
@@ -68,7 +68,7 @@
 <div class="row g-3">
     <div class="col-xl-8">
         <section class="table-panel">
-            <div class="panel-head"><h2>การจองล่าสุด (ตามวันเข้าพัก)</h2></div>
+            <div class="panel-head"><h2>การจองล่าสุด</h2></div>
             @if (!Model.BookingsByCheckInDate.Any())
             {
                 <p class="panel-empty">ยังไม่มีการจอง</p>

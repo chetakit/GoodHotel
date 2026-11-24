@@ -10,14 +10,32 @@
         "In Progress" or "Accepted" or "InProgress" or "Completed" => "text-bg-info",
         _ => "text-bg-secondary"
     };
+    var from = Model.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    var to = Model.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
     var maxPromo = Model.PromotionUsage.Select(p => p.BookingCount).DefaultIfEmpty(0).Max();
 }
 
 @section Actions {
-    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportBookings">การจอง CSV</a>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportMaintenanceReports">งานซ่อม CSV</a>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportHousekeepingTasks">งานทำความสะอาด CSV</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportBookings" asp-route-from="@from" asp-route-to="@to">การจอง CSV</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportMaintenanceReports" asp-route-from="@from" asp-route-to="@to">งานซ่อม CSV</a>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportHousekeepingTasks" asp-route-from="@from" asp-route-to="@to">งานทำความสะอาด CSV</a>
 }
+
+<form method="get" asp-action="Reports" class="toolbar">
+    <div>
+        <label class="form-label" for="from">ตั้งแต่</label>
+        <input id="from" name="from" type="date" class="form-control" value="@from" />
+    </div>
+    <div>
+        <label class="form-label" for="to">ถึง</label>
+        <input id="to" name="to" type="date" class="form-control" value="@to" />
+    </div>
+    <button type="submit" class="btn btn-primary">ดูรายงาน</button>
+    @if (from != null || to != null)
+    {
+        <a class="btn btn-outline-secondary" asp-action="Reports">ดูทั้งหมด</a>
+    }
+</form>
 
 <div class="figures">
     <div class="figure">
@@ -104,4 +122,4 @@
         </section>
     </div>
 </div>
-<p class="text-muted small mt-2">ตัวเลขรายได้และการชำระเงินย้ายไปอยู่ที่หน้าฝ่ายบัญชี</p>
+<p class="text-muted small mt-2">การจองและโปรโมชันนับตามวันเข้าพัก ระยะเวลาเข้าพักนับตามวันเช็คเอาท์ งานนับตามวันที่สร้างหรือแจ้ง · ตัวเลขรายได้และการชำระเงินย้ายไปอยู่ที่หน้าฝ่ายบัญชี</p>

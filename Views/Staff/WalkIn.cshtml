@@ -55,6 +55,7 @@
                                 <strong>ห้อง @room.RoomNumber</strong>
                             </div>
                             <small class="text-muted">@room.RoomType · รับได้ @room.Capacity คน</small>
+                            <strong class="mt-1">@(room.Rate.HasValue ? $"฿{room.Rate.Value:N0}" : "-") <span class="text-muted small fw-normal">/คืน</span></strong>
                         </label>
                     </div>
                 }
@@ -113,6 +114,19 @@
                 </fieldset>
             }
 
+            <h3 class="h5 mt-4">3. เงินสดที่ต้องเก็บ</h3>
+            <div class="booking-panel" id="walkin-quote" data-url="@Url.Action("WalkInQuote")" aria-live="polite">
+                <p class="text-muted mb-0" data-quote-message>เลือกห้องเพื่อดูยอดที่ต้องเก็บ</p>
+                <div data-quote-lines hidden>
+                    <div class="summary-line"><span>ค่าห้อง <span data-quote-nights></span> คืน</span><strong data-quote-room></strong></div>
+                    <div class="summary-line"><span>ส่วนลด <span class="text-muted small" data-quote-promo></span></span><strong data-quote-discount></strong></div>
+                    <div class="summary-line"><span>เตียงเสริม</span><strong data-quote-bed></strong></div>
+                    <div class="summary-line"><span class="fw-bold">ยอดที่ต้องเก็บ</span><strong class="fs-5" data-quote-total></strong></div>
+                    <p class="text-muted small mb-0 mt-2" data-quote-note></p>
+                </div>
+            </div>
+            <input type="hidden" name="ExpectedTotal" id="walkin-expected" value="" />
+
             <button type="submit" class="btn btn-primary btn-lg mt-4" disabled="@(Model.AvailableRooms.Count == 0)">
                 ยืนยัน · รับเงินสด · เช็คอิน
             </button>
@@ -122,4 +136,55 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // ยอดที่ต้องเก็บ: ถามเซิร์ฟเวอร์ทุกครั้งที่เปลี่ยนห้อง เตียงเสริม หรือลูกค้า (ใช้สูตรเดียวกับตอนบันทึก)
+        (() => {
+            const box = document.getElementById("walkin-quote");
+            const expected = document.getElementById("walkin-expected");
+            const form = box?.closest("form");
+            if (!form) return;
+            const part = name => box.querySelector("[data-quote-" + name + "]");
+            const money = value => "฿" + Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2 });
+            let latest = 0, timer;
+
+            const message = text => {
+                part("message").textContent = text;
+                part("message").hidden = false;
+                part("lines").hidden = true;
+            };
+
+            const refresh = async () => {
+                const current = ++latest;
+                expected.value = "";
+                if (!form.querySelector("[name=RoomId]:checked")) { message("เลือกห้องเพื่อดูยอดที่ต้องเก็บ"); return; }
+                message("กำลังคำนวณยอด…");
+                try {
+                    const response = await fetch(box.dataset.url, { method: "POST", body: new FormData(form) });
+                    const quote = await response.json();
+                    if (current !== latest) return;
+                    if (!quote.succeeded) { message(quote.message); return; }
+                    part("nights").textContent = quote.nights;
+                    part("room").textContent = money(quote.roomSubtotal);
+                    part("promo").textContent = quote.promotionName || "";
+                    part("discount").textContent = "-" + money(quote.discount);
+                    part("bed").textContent = money(quote.extraBed);
+                    part("total").textContent = money(quote.total);
+                    part("note").textContent = quote.isFinal ? "" : "กรอกชื่อ นามสกุล และเบอร์ให้ครบ ส่วนลดอาจเปลี่ยนตามประวัติลูกค้า";
+                    if (quote.isFinal) expected.value = quote.total;
+                    part("message").hidden = true;
+                    part("lines").hidden = false;
+                } catch {
+                    if (current === latest) message("คำนวณยอดไม่สำเร็จ ลองเลือกห้องอีกครั้ง");
+                }
+            };
+
+            form.addEventListener("input", event => {
+                expected.value = "";
+                latest++;
+                clearTimeout(timer);
+                timer = setTimeout(refresh, event.target.matches("[type=radio], [type=checkbox]") ? 0 : 500);
+            });
+            refresh();
+        })();
+    </script>
 }

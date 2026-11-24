@@ -25,6 +25,7 @@ public class AccountantController(FinanceLedger ledger, ParallelReader reader, R
 
         var monthTask = ledger.EntriesAsync(startUtc, endUtc, ct);
         var allTimeTask = ledger.AllTimeAsync(ct);
+        var advanceTask = ledger.AdvanceAsync(today, ct);
         var countsTask = reader.Run(db => db.Payments.GroupBy(_ => 1).Select(g => new
         {
             AwaitingReview = g.Count(p => p.SubmittedAtUtc != null && p.VerifiedAtUtc == null &&
@@ -32,7 +33,7 @@ public class AccountantController(FinanceLedger ledger, ParallelReader reader, R
             Legacy = g.Count(p => p.SubmittedAtUtc == null && p.VerifiedAtUtc == null && p.LegacyDisposition == null)
         }).FirstOrDefaultAsync(ct));
         var refundsTask = reader.Run(db => db.PaymentRefunds.CountAsync(r => r.Status == PaymentService.RefundRequested, ct));
-        await Task.WhenAll(monthTask, allTimeTask, countsTask, refundsTask);
+        await Task.WhenAll(monthTask, allTimeTask, advanceTask, countsTask, refundsTask);
 
         var month = monthTask.Result;
         var todayEntries = month.Where(e => FinanceLedger.HotelDate(e.OccurredAtUtc) == today).ToList();
@@ -41,6 +42,7 @@ public class AccountantController(FinanceLedger ledger, ParallelReader reader, R
             FinanceLedger.Total(todayEntries),
             FinanceLedger.Total(month),
             allTimeTask.Result,
+            advanceTask.Result,
             countsTask.Result?.AwaitingReview ?? 0,
             countsTask.Result?.Legacy ?? 0,
             refundsTask.Result,
@@ -55,7 +57,8 @@ public class AccountantController(FinanceLedger ledger, ParallelReader reader, R
         var day = date ?? availability.HotelToday();
         var (startUtc, endUtc) = FinanceLedger.UtcBounds(day, day);
         var entries = await ledger.EntriesAsync(startUtc, endUtc, ct);
-        return View(new DailyCloseViewModel(day, FinanceLedger.Total(entries), FinanceLedger.ByMethod(entries), entries));
+        return View(new DailyCloseViewModel(day, FinanceLedger.Total(entries), FinanceLedger.ByMethod(entries),
+            FinanceLedger.Cashiers(entries), entries));
     }
 
     /// <summary>รายงานการเงินตามช่วงวันที่ (ค่าเริ่มต้น: ต้นเดือนถึงวันนี้)</summary>
@@ -115,13 +118,17 @@ public class AccountantController(FinanceLedger ledger, ParallelReader reader, R
     {
         var rows = await reader.Run(db => db.Payments.AsNoTracking().OrderBy(p => p.PaymentId)
             .Select(p => new { p.PaymentId, p.BookingId, p.PaymentDate, p.PaymentMethod, p.PaymentStatus, p.Amount,
-                p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition })
+                p.SubmittedAtUtc, p.VerifiedAtUtc, p.LegacyDisposition,
+                GuestName = p.Booking == null || p.Booking.User == null ? null
+                    : p.Booking.User.FirstName + " " + p.Booking.User.LastName,
+                Refunded = p.Refunds.Where(r => r.Status == "Approved").Sum(r => (decimal?)r.Amount) ?? 0m })
             .ToListAsync(ct));
         var content = CsvExport.Build(
-            ["PaymentId", "BookingId", "PaymentDate", "PaymentMethod", "PaymentStatus", "Amount", "VerifiedAtUtc", "LegacyDisposition"],
-            rows.Select(p => new[] { CsvExport.Format(p.PaymentId), CsvExport.Format(p.BookingId), CsvExport.Format(p.PaymentDate),
-                p.PaymentMethod, p.PaymentStatus, CsvExport.Format(p.Amount), CsvExport.Format(p.VerifiedAtUtc),
-                p.SubmittedAtUtc == null ? p.LegacyDisposition ?? "Requires reconciliation" : null }));
+            ["เลขที่ชำระเงิน", "เลขที่การจอง", "ลูกค้า", "วันที่ชำระ", "ช่องทาง", "สถานะ", "จำนวนเงิน", "เงินที่คืน", "เวลาที่ยืนยัน (ไทย)", "ข้อมูลเก่า"],
+            rows.Select(p => new[] { CsvExport.Format(p.PaymentId), CsvExport.Format(p.BookingId), p.GuestName,
+                ThaiText.Date(p.PaymentDate), ThaiText.PaymentMethod(p.PaymentMethod), ThaiText.Status(p.PaymentStatus),
+                CsvExport.Format(p.Amount), CsvExport.Format(p.Refunded), ThaiText.Time(p.VerifiedAtUtc),
+                p.SubmittedAtUtc == null ? ThaiText.Status(p.LegacyDisposition ?? "Requires reconciliation") : null }));
         return File(content, "text/csv; charset=utf-8", "payments.csv");
     }
 

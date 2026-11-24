@@ -69,15 +69,14 @@ namespace GoodHotel.Controllers
                 Rooms = db.Rooms.Count(r => r.RoomId > 0),
                 Users = db.Users.Count(x => x.UserId > 0),
                 Bookings = db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
-                OpenMaintenance = db.MaintenanceReports.Count(r => r.Status == "Open"),
+                OpenMaintenance = db.MaintenanceReports.Count(r => r.Status != MaintenanceReport.Resolved),
                 PendingHousekeeping = db.HousekeepingTasks.Count(t => t.Status == "Pending"),
                 AwaitingVerification = db.HousekeepingTasks.Count(t => t.Status == "Completed")
             }).SingleAsync(ct));
             var revenueTask = _reader.Run(db => RevenueAsync(db, ct));
             var recentTask = _reader.Run(db => db.Bookings
                 .Where(booking => booking.CheckIn.HasValue && booking.Status != BookingStatuses.Cancelled)
-                .OrderByDescending(booking => booking.CheckIn)
-                .ThenByDescending(booking => booking.BookingId)
+                .OrderByDescending(booking => booking.BookingId)
                 .Take(5)
                 .Select(booking => new DashboardBookingViewModel
                 {
@@ -624,27 +623,8 @@ namespace GoodHotel.Controllers
 
         private void ValidateRoom(RoomFormViewModel data)
         {
-            if (string.IsNullOrWhiteSpace(data.RoomNumber))
-            {
-                ModelState.AddModelError(
-                    nameof(data.RoomNumber),
-                    "กรุณากรอกหมายเลขห้อง");
-            }
-
-            if (string.IsNullOrWhiteSpace(data.Type))
-            {
-                ModelState.AddModelError(
-                    nameof(data.Type),
-                    "กรุณากรอกประเภทห้อง");
-            }
-
-            if (string.IsNullOrWhiteSpace(data.Status))
-            {
-                ModelState.AddModelError(
-                    nameof(data.Status),
-                    "กรุณาเลือกสถานะห้อง");
-            }
-            else if (!AllowedRoomStatuses.Contains(
+            // ช่องว่าง/ความยาว/ช่วงตัวเลข ตรวจจาก RoomFormViewModel แล้ว เหลือเช็คค่าที่อนุญาต
+            if (!string.IsNullOrWhiteSpace(data.Status) && !AllowedRoomStatuses.Contains(
                          data.Status,
                          StringComparer.Ordinal))
             {
@@ -847,9 +827,23 @@ namespace GoodHotel.Controllers
             IsActive = promotion.IsActive
         };
 
-        public IActionResult Members()
+        public async Task<IActionResult> Members(string? q, string? role, CancellationToken ct)
         {
-            var userList = _db.Users
+            var users = _db.Users.AsNoTracking();
+            if (role == "customer") users = users.Where(u => u.Role == "Customer");
+            else if (role == "staff") users = users.Where(u => u.Role != "Customer");
+
+            // ช่องค้นหาเดียว: ชื่อ อีเมล หรือเบอร์
+            q = q?.Trim();
+            if (!string.IsNullOrEmpty(q))
+            {
+                users = users.Where(u =>
+                    ((u.FirstName ?? "") + " " + (u.LastName ?? "")).Contains(q) ||
+                    (u.Email != null && u.Email.Contains(q)) ||
+                    (u.Phone != null && u.Phone.Contains(q)));
+            }
+
+            return View(await users.OrderBy(u => u.UserId)
                 .Select(user => new MemberListViewModel
                 {
                     UserId = user.UserId,
@@ -857,11 +851,10 @@ namespace GoodHotel.Controllers
                     LastName = user.LastName,
                     Email = user.Email,
                     Phone = user.Phone,
-                    Role = user.Role
+                    Role = user.Role,
+                    IsActive = user.IsActive
                 })
-                .ToList();
-
-            return View(userList);
+                .ToListAsync(ct));
         }
 
         public IActionResult EditUser(int id)
@@ -890,89 +883,88 @@ namespace GoodHotel.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult EditUser(EditUserViewModel data)
+        public async Task<IActionResult> EditUser(EditUserViewModel data, CancellationToken ct)
         {
             if (data.UserId <= 0) return BadRequest();
-            var user = (from u in _db.Users
-                        where u.UserId == data.UserId
-                        select u).FirstOrDefault();
 
-            if (user != null)
+            // ล็อกแถวผู้ใช้ก่อน: แม่บ้านรับงานก็ล็อกแถวเดียวกัน จึงไม่มีงานใหม่แทรกระหว่างเปลี่ยนบทบาท
+            await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+            if (!await HousekeepingService.LockUserAsync(_db, data.UserId, ct))
+                return RedirectToAction("Members", new { status = "EditFailed" });
+            var user = await _db.Users.SingleAsync(u => u.UserId == data.UserId, ct);
+            var isSelf = User.FindFirstValue(ClaimTypes.NameIdentifier) == user.UserId.ToString();
+
+            if (string.IsNullOrWhiteSpace(data.FirstName))
+                ModelState.AddModelError(nameof(data.FirstName), "กรุณากรอกชื่อ");
+            if (string.IsNullOrWhiteSpace(data.LastName))
+                ModelState.AddModelError(nameof(data.LastName), "กรุณากรอกนามสกุล");
+
+            // Admin เปลี่ยนบทบาทของตัวเองไม่ได้ (กันลดสิทธิ์ตัวเองจนเข้าหน้า Admin ไม่ได้อีก)
+            // ใช้ค่าเดิมจากฐานข้อมูลเสมอ ไม่เชื่อค่าที่ส่งมาจากฟอร์ม
+            if (isSelf) data.Role = user.Role;
+            if (data.Role != "Customer" && data.Role != "Staff" &&
+                data.Role != "Housekeeper" && data.Role != "Accountant" && data.Role != "Admin")
+                ModelState.AddModelError(nameof(data.Role), "กรุณาเลือกบทบาทให้ถูกต้อง");
+            else if (data.Role != user.Role && await RoleChangeBlockedAsync(user, ct) is { } blocked)
+                ModelState.AddModelError(nameof(data.Role), blocked);
+
+            // ลูกค้า Walk-in ที่ไม่มีอีเมลอยู่แล้ว เว้นว่างต่อได้
+            data.Email = data.Email?.Trim();
+            if (string.IsNullOrEmpty(data.Email))
             {
-                if (string.IsNullOrWhiteSpace(data.FirstName))
-                    ModelState.AddModelError(nameof(data.FirstName), "กรุณากรอกชื่อ");
-                if (string.IsNullOrWhiteSpace(data.LastName))
-                    ModelState.AddModelError(nameof(data.LastName), "กรุณากรอกนามสกุล");
-                if (string.IsNullOrWhiteSpace(data.Email))
+                data.Email = null;
+                if (!string.IsNullOrWhiteSpace(user.Email) || data.Role != "Customer")
                     ModelState.AddModelError(nameof(data.Email), "กรุณากรอกอีเมล");
-                else
-                {
-                    data.Email = data.Email.Trim();
-                    if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(data.Email))
-                        ModelState.AddModelError(nameof(data.Email), "กรุณากรอกอีเมลให้ถูกต้อง");
-                    else if (_db.Users.Any(u => u.UserId != data.UserId && u.Email == data.Email))
-                        ModelState.AddModelError(nameof(data.Email), "อีเมลนี้ถูกใช้งานแล้ว");
-                }
-                // Admin เปลี่ยนบทบาทของตัวเองไม่ได้ (กันลดสิทธิ์ตัวเองจนเข้าหน้า Admin ไม่ได้อีก)
-                // ใช้ค่าเดิมจากฐานข้อมูลเสมอ ไม่เชื่อค่าที่ส่งมาจากฟอร์ม
-                if (User.FindFirstValue(ClaimTypes.NameIdentifier) == user.UserId.ToString())
-                    data.Role = user.Role;
-                if (data.Role != "Customer" && data.Role != "Staff" &&
-                    data.Role != "Housekeeper" && data.Role != "Accountant" && data.Role != "Admin")
-                    ModelState.AddModelError(nameof(data.Role), "กรุณาเลือก Role ที่ถูกต้อง");
-                if (string.IsNullOrWhiteSpace(data.Phone))
-                {
-                    ModelState.AddModelError(
-                        "Phone",
-                        "กรุณากรอกเบอร์โทรศัพท์");
-                }
-                else
-                {
-                    var phone = data.Phone.Trim();
-                    var digits = new string(
-                        phone.Where(char.IsDigit).ToArray());
+            }
+            else if (await _db.Users.AnyAsync(u => u.UserId != data.UserId && u.Email == data.Email, ct))
+                ModelState.AddModelError(nameof(data.Email), "อีเมลนี้ถูกใช้งานแล้ว");
 
-                    if (phone.Any(c => !char.IsDigit(c) && c != ' '))
-                    {
-                        ModelState.AddModelError(
-                            "Phone",
-                            "กรุณากรอกเฉพาะตัวเลข");
-                    }
-                    else if (digits.Length != 10 ||
-                             (!digits.StartsWith("06") &&
-                              !digits.StartsWith("08") &&
-                              !digits.StartsWith("09")))
-                    {
-                        ModelState.AddModelError(
-                            "Phone",
-                            "กรุณากรอกเบอร์มือถือ 10 หลัก");
-                    }
-                }
+            // เบอร์ใช้กติกาเดียวกับ Walk-in ถ้าไม่ได้แก้เบอร์ ให้คงเบอร์เดิมได้ (ข้อมูลเก่าบางเบอร์ไม่ครบหลัก)
+            var phone = data.Phone?.Replace(" ", "").Trim();
+            if (!string.IsNullOrEmpty(phone) && phone != user.Phone &&
+                !System.Text.RegularExpressions.Regex.IsMatch(phone, "^0[0-9]{8,9}$"))
+                ModelState.AddModelError(nameof(data.Phone), "เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0");
 
-                if (!ModelState.IsValid)
-                {
-                    return View(data);
-                }
-
-                user.FirstName = data.FirstName!.Trim();
-                user.LastName = data.LastName!.Trim();
-                user.Email = data.Email;
-                user.Phone = new string(
-                    data.Phone!.Where(char.IsDigit).ToArray());
-
-                user.Role = data.Role;
-
-                _db.SaveChanges();
-                _userAccess.Forget(user.UserId);
-
-                return RedirectToAction(
-                    "Members",
-                    new { status = "EditSuccess" });
+            if (!string.IsNullOrEmpty(data.NewPassword))
+            {
+                if (isSelf)
+                    ModelState.AddModelError(nameof(data.NewPassword), "รหัสผ่านของตัวเองให้เปลี่ยนที่เมนูเปลี่ยนรหัสผ่าน");
+                else if (data.Email == null)
+                    ModelState.AddModelError(nameof(data.NewPassword), "ต้องมีอีเมลก่อน จึงจะตั้งรหัสผ่านได้");
             }
 
-            return RedirectToAction(
-                "Members",
-                new { status = "EditFailed" });
+            if (!ModelState.IsValid) return View(data);
+
+            user.FirstName = data.FirstName!.Trim();
+            user.LastName = data.LastName!.Trim();
+            user.Email = data.Email;
+            user.Phone = phone;
+            user.Role = data.Role;
+            if (!string.IsNullOrEmpty(data.NewPassword))
+                user.Password = _passwordHasher.HashPassword(user, data.NewPassword);
+
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            _userAccess.Forget(user.UserId);
+
+            return RedirectToAction("Members", new { status = "EditSuccess" });
+        }
+
+        /// <summary>เหตุผลที่เปลี่ยนบทบาทไม่ได้ตอนนี้ (null = เปลี่ยนได้) กันงานหรือการจองค้างไม่มีเจ้าของ</summary>
+        private async Task<string?> RoleChangeBlockedAsync(User user, CancellationToken ct)
+        {
+            if (user.Role == "Housekeeper" && await _db.HousekeepingTasks.AnyAsync(t =>
+                    t.AssignedToUserId == user.UserId && (t.Status == "Accepted" || t.Status == "InProgress"), ct))
+                return "เปลี่ยนบทบาทไม่ได้ เพราะยังมีงานทำความสะอาดค้างอยู่";
+
+            var today = _availability.HotelToday();
+            if (user.Role == "Customer" && await _db.Bookings.AnyAsync(b =>
+                    b.UserId == user.UserId && b.Status != BookingStatuses.Cancelled &&
+                    (_db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedIn") ||
+                     (b.CheckOut > today && !_db.BookingStays.Any(s => s.BookingId == b.BookingId))), ct))
+                return "เปลี่ยนบทบาทไม่ได้ เพราะยังมีการจองหรือการเข้าพักที่ไม่จบ";
+
+            return null;
         }
 
         [HttpPost]
@@ -1034,7 +1026,8 @@ namespace GoodHotel.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult AddUser(User data)
+        public IActionResult AddUser(
+            [Bind("FirstName,LastName,Email,Phone,BirthDate,Password,Role")] User data)
         {
             if (string.IsNullOrWhiteSpace(data.FirstName) ||
                 string.IsNullOrWhiteSpace(data.LastName) ||
@@ -1053,6 +1046,9 @@ namespace GoodHotel.Controllers
             {
                 var email = data.Email.Trim();
 
+                if (email.Length > 100 || !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
+                    ModelState.AddModelError("Email", "กรุณากรอกอีเมลให้ถูกต้อง");
+
                 var emailCheck = (from u in _db.Users
                                   where u.Email == email
                                   select u).FirstOrDefault();
@@ -1064,6 +1060,13 @@ namespace GoodHotel.Controllers
                         "อีเมลนี้ถูกใช้งานแล้ว");
                 }
             }
+
+            if (data.FirstName?.Trim().Length > 50)
+                ModelState.AddModelError("FirstName", "ชื่อต้องยาวไม่เกิน 50 ตัวอักษร");
+            if (data.LastName?.Trim().Length > 50)
+                ModelState.AddModelError("LastName", "นามสกุลต้องยาวไม่เกิน 50 ตัวอักษร");
+            if (!string.IsNullOrWhiteSpace(data.Password) && data.Password.Length is (< 8 or > 255))
+                ModelState.AddModelError("Password", "รหัสผ่านต้องยาว 8 ตัวอักษรขึ้นไป");
 
             if (!string.IsNullOrWhiteSpace(data.Phone))
             {
@@ -1097,7 +1100,7 @@ namespace GoodHotel.Controllers
             {
                 ModelState.AddModelError(
                     "Role",
-                    "กรุณาเลือก Role ที่ถูกต้อง");
+                    "กรุณาเลือกบทบาทให้ถูกต้อง");
             }
 
             if (!ModelState.IsValid)
@@ -1284,24 +1287,29 @@ namespace GoodHotel.Controllers
         }
 
         /// <summary>รายงานงานโรงแรม (ตัวเลขเงินย้ายไปอยู่ที่ฝ่ายบัญชีแล้ว)</summary>
-        public async Task<IActionResult> Reports(CancellationToken ct)
+        public async Task<IActionResult> Reports(DateOnly? from, DateOnly? to, CancellationToken ct)
         {
-            var bookingsTask = _reader.Run(db => db.Bookings
+            if (from > to) (from, to) = (to, from);
+            var (startUtc, endUtc) = ReportUtcBounds(from, to);
+            var bookingsTask = _reader.Run(db => BookingsBetween(db, from, to)
                 .GroupBy(b => new { Cancelled = b.Status == BookingStatuses.Cancelled, Timeout = b.CancelReason == CancelReasons.PaymentTimeout })
                 .Select(g => new { g.Key.Cancelled, g.Key.Timeout, Count = g.Count() }).ToListAsync(ct));
             var staysTask = _reader.Run(db => db.BookingStays
                 .Where(stay => stay.Status == "CheckedOut" && stay.CheckedOutAtUtc.HasValue &&
-                    stay.CheckedOutAtUtc >= stay.CheckedInAtUtc)
+                    stay.CheckedOutAtUtc >= stay.CheckedInAtUtc &&
+                    stay.CheckedOutAtUtc >= startUtc && stay.CheckedOutAtUtc < endUtc)
                 .Select(stay => new { stay.CheckedInAtUtc, CheckedOutAtUtc = stay.CheckedOutAtUtc!.Value })
                 .ToListAsync(ct));
-            var promotionsTask = _reader.Run(db => db.Bookings
+            var promotionsTask = _reader.Run(db => BookingsBetween(db, from, to)
                 .Where(b => b.Status != BookingStatuses.Cancelled && b.Promotion != null)
                 .GroupBy(b => b.Promotion!.PromotionName)
                 .Select(g => new PromotionUsageViewModel(g.Key ?? "-", g.Count(), g.Sum(b => b.Amount) ?? 0m))
                 .ToListAsync(ct));
-            var housekeepingTask = _reader.Run(db => db.HousekeepingTasks.GroupBy(t => t.Status)
+            var housekeepingTask = _reader.Run(db => db.HousekeepingTasks
+                .Where(t => t.CreatedAtUtc >= startUtc && t.CreatedAtUtc < endUtc).GroupBy(t => t.Status)
                 .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToListAsync(ct));
-            var maintenanceTask = _reader.Run(db => db.MaintenanceReports.GroupBy(r => r.Status)
+            var maintenanceTask = _reader.Run(db => db.MaintenanceReports
+                .Where(r => r.ReportedAtUtc >= startUtc && r.ReportedAtUtc < endUtc).GroupBy(r => r.Status)
                 .Select(g => new AdminOperationStatusCount(g.Key, g.Count())).ToListAsync(ct));
             await Task.WhenAll(bookingsTask, staysTask, promotionsTask, housekeepingTask, maintenanceTask);
 
@@ -1313,6 +1321,8 @@ namespace GoodHotel.Controllers
 
             var model = new AdminReportsViewModel
             {
+                From = from,
+                To = to,
                 BookingCount = bookingsTask.Result.Where(g => !g.Cancelled).Sum(g => g.Count),
                 CancelledBookingCount = bookingsTask.Result.Where(g => g.Cancelled).Sum(g => g.Count),
                 PaymentTimeoutCount = bookingsTask.Result.Where(g => g.Cancelled && g.Timeout).Sum(g => g.Count),
@@ -1326,47 +1336,78 @@ namespace GoodHotel.Controllers
             return View(model);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> ExportBookings(CancellationToken ct)
+        // ช่วงวันที่ของรายงาน (ไม่ระบุ = ทั้งหมด) การจองนับตามวันเข้าพัก
+        private static IQueryable<Booking> BookingsBetween(GoodHotelDbContext db, DateOnly? from, DateOnly? to)
         {
-            var rows = await _db.Bookings.AsNoTracking().OrderBy(b => b.BookingId)
+            var bookings = db.Bookings.AsNoTracking();
+            if (from.HasValue) bookings = bookings.Where(b => b.CheckIn >= from);
+            if (to.HasValue) bookings = bookings.Where(b => b.CheckIn <= to);
+            return bookings;
+        }
+
+        // งานและการเข้าพักเก็บเวลาเป็น UTC จึงแปลงช่วงวันที่ไทยก่อน
+        private static (DateTime StartUtc, DateTime EndUtc) ReportUtcBounds(DateOnly? from, DateOnly? to) =>
+            FinanceLedger.UtcBounds(from is { Year: >= 2000 } f ? f : new DateOnly(2000, 1, 1),
+                to is { Year: <= 2999 } t ? t : new DateOnly(2999, 12, 31));
+
+        [HttpGet]
+        public async Task<IActionResult> ExportBookings(DateOnly? from, DateOnly? to, CancellationToken ct)
+        {
+            if (from > to) (from, to) = (to, from);
+            var rows = await BookingsBetween(_db, from, to).OrderBy(b => b.BookingId)
                 .Select(b => new
                 {
-                    b.BookingId, b.UserId, b.RoomId, b.CheckIn, b.CheckOut, b.Guests, b.Amount, b.Status,
+                    b.BookingId,
+                    Guest = b.User == null ? null : (b.User.FirstName ?? "") + " " + (b.User.LastName ?? ""),
+                    Room = b.Room == null ? null : b.Room.Room1,
+                    RoomType = b.Room == null ? null : b.Room.Type,
+                    b.CheckIn, b.CheckOut, b.Guests, b.Amount, b.Status,
+                    Stay = _db.BookingStays.Where(s => s.BookingId == b.BookingId).Select(s => s.Status).FirstOrDefault(),
                     Promotion = b.Promotion == null ? null : b.Promotion.PromotionName
                 })
                 .ToListAsync(ct);
             return Csv("bookings.csv",
-                new[] { "BookingId", "UserId", "RoomId", "CheckIn", "CheckOut", "Guests", "Amount", "Status", "Promotion" },
-                rows.Select(b => new[] { Format(b.BookingId), Format(b.UserId), Format(b.RoomId),
-                    Format(b.CheckIn), Format(b.CheckOut), Format(b.Guests), Format(b.Amount),
-                    b.Status, b.Promotion }));
+                new[] { "เลขที่การจอง", "ลูกค้า", "ห้อง", "ประเภทห้อง", "วันเข้าพัก", "วันออก", "ผู้เข้าพัก", "ยอดรวม", "สถานะการจอง", "สถานะการเข้าพัก", "โปรโมชัน" },
+                rows.Select(b => new[] { Format(b.BookingId), b.Guest?.Trim(), b.Room, b.RoomType,
+                    ThaiText.Date(b.CheckIn), ThaiText.Date(b.CheckOut), Format(b.Guests), Format(b.Amount),
+                    ThaiText.Status(b.Status), b.Stay == null ? null : ThaiText.Status(b.Stay), b.Promotion }));
         }
 
         [HttpGet]
-        public async Task<IActionResult> ExportMaintenanceReports(CancellationToken ct)
+        public async Task<IActionResult> ExportMaintenanceReports(DateOnly? from, DateOnly? to, CancellationToken ct)
         {
-            var rows = await _db.MaintenanceReports.AsNoTracking().OrderBy(r => r.ReportId)
-                .Select(r => new { r.ReportId, r.RoomId, r.Description, r.Status, r.BlocksRoom,
-                    r.BlockFrom, r.BlockUntil, r.ReportedAtUtc, r.ReportedByUserId, r.ResolvedAtUtc,
-                    r.ResolvedByUserId, r.ResolutionNote }).ToListAsync(ct);
+            if (from > to) (from, to) = (to, from);
+            var (startUtc, endUtc) = ReportUtcBounds(from, to);
+            var rows = await _db.MaintenanceReports.AsNoTracking()
+                .Where(r => r.ReportedAtUtc >= startUtc && r.ReportedAtUtc < endUtc)
+                .OrderBy(r => r.ReportId)
+                .Select(r => new { r.ReportId, Room = r.Room.Room1, r.Description, r.Status, r.ReportedAtUtc,
+                    ReportedBy = (r.ReportedByUser.FirstName ?? "") + " " + (r.ReportedByUser.LastName ?? ""),
+                    r.ResolvedAtUtc,
+                    ResolvedBy = r.ResolvedByUser == null ? null
+                        : (r.ResolvedByUser.FirstName ?? "") + " " + (r.ResolvedByUser.LastName ?? ""),
+                    r.ResolutionNote }).ToListAsync(ct);
             return Csv("maintenance-reports.csv",
-                new[] { "ReportId", "RoomId", "Description", "Status", "BlocksRoom", "BlockFrom", "BlockUntilExclusive",
-                    "ReportedAtUtc", "ReportedByUserId", "ResolvedAtUtc", "ResolvedByUserId", "ResolutionNote" },
-                rows.Select(r => new[] { Format(r.ReportId), Format(r.RoomId), r.Description, r.Status,
-                    Format(r.BlocksRoom), Format(r.BlockFrom), Format(r.BlockUntil), Format(r.ReportedAtUtc),
-                    Format(r.ReportedByUserId), Format(r.ResolvedAtUtc), Format(r.ResolvedByUserId), r.ResolutionNote }));
+                new[] { "เลขที่", "ห้อง", "ปัญหา", "สถานะ", "แจ้งเมื่อ (ไทย)", "ผู้แจ้ง", "ซ่อมเสร็จเมื่อ (ไทย)", "ผู้ปิดงาน", "หมายเหตุ" },
+                rows.Select(r => new[] { Format(r.ReportId), r.Room, r.Description, ThaiText.Status(r.Status),
+                    ThaiText.Time(r.ReportedAtUtc), r.ReportedBy.Trim(), ThaiText.Time(r.ResolvedAtUtc),
+                    r.ResolvedBy?.Trim(), r.ResolutionNote }));
         }
 
         [HttpGet]
-        public async Task<IActionResult> ExportHousekeepingTasks(string? status, int? roomId, int? assigneeId, CancellationToken ct)
+        public async Task<IActionResult> ExportHousekeepingTasks(string? status, int? roomId, int? assigneeId,
+            DateOnly? from, DateOnly? to, CancellationToken ct)
         {
             if (!ValidTaskFilters(status, roomId, assigneeId)) return BadRequest();
-            var rows = await _housekeeping.AdminTasks(status, roomId, assigneeId).ToListAsync(ct);
+            if (from > to) (from, to) = (to, from);
+            var (startUtc, endUtc) = ReportUtcBounds(from, to);
+            var rows = (await _housekeeping.AdminTasks(status, roomId, assigneeId).ToListAsync(ct))
+                .Where(t => t.CreatedAtUtc >= startUtc && t.CreatedAtUtc < endUtc);
             return Csv("housekeeping-tasks.csv",
-                new[] { "TaskId", "RoomId", "RoomNumber", "TaskType", "Status", "AssignedToUserId", "CreatedAtUtc" },
-                rows.Select(t => new[] { Format(t.TaskId), Format(t.RoomId), t.RoomNumber, t.TaskType,
-                    t.Status, Format(t.AssignedToUserId), Format(t.CreatedAtUtc) }));
+                new[] { "เลขที่งาน", "ห้อง", "ประเภทงาน", "สถานะ", "แม่บ้าน", "สร้างเมื่อ (ไทย)" },
+                rows.Select(t => new[] { Format(t.TaskId), t.RoomNumber, ThaiText.Status(t.TaskType),
+                    ThaiText.Status(t.Status), $"{t.AssigneeFirstName} {t.AssigneeLastName}".Trim(),
+                    ThaiText.Time(t.CreatedAtUtc) }));
         }
 
         private FileContentResult Csv(string filename, string[] headers, IEnumerable<string?[]> rows) =>
