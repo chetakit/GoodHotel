@@ -14,8 +14,14 @@ public record StaffDashboardViewModel(
 /// <summary>หนึ่งแถวในรายการเข้า/ออกวันนี้ของหน้าแดชบอร์ด Staff</summary>
 public record FrontDeskRow(
     int BookingId, string? FirstName, string? LastName, string? Phone, string? RoomNumber,
-    DateOnly? CheckIn, DateOnly? CheckOut, int? Guests, bool RefundPending)
+    DateOnly? CheckIn, DateOnly? CheckOut, int? Guests, bool RefundPending, int? RoomId)
 {
+    /// <summary>ห้องยังเช็คอินไม่ได้เพราะอะไร เช่น "รอทำความสะอาด" (null = พร้อม)</summary>
+    public string? RoomNotReady { get; init; }
+
+    /// <summary>ติดแค่รอพนักงานตรวจห้อง กดไปตรวจได้เลย</summary>
+    public bool AwaitingInspection { get; init; }
+
     public string GuestName => $"{FirstName} {LastName}".Trim();
     public bool IsPaid { get; init; }
 }

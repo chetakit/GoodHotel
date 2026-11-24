@@ -87,8 +87,10 @@
                                     </td>
                                     <td>
                                         <span class="badge @(booking.PaymentLabel == PaymentService.PaidLabel ? "text-bg-success" : booking.PaymentLabel == PaymentService.RefundedLabel ? "text-bg-secondary" : "text-bg-warning")">
-                                            @booking.PaymentLabel
+                                            @* ลูกค้ายกเลิกเองหลังจ่าย: โรงแรมไม่คืนเงิน บอกให้ชัดว่าไม่มีอะไรค้าง *@
+                                            @(isCancelled && booking.PaymentLabel == PaymentService.PaidLabel ? "จ่ายแล้ว (ไม่คืนเงิน)" : booking.PaymentLabel)
                                         </span>
+                                        @if (booking.RefundPending) { <span class="badge text-bg-warning">ขอคืนเงินอยู่</span> }
                                         @if (!isCancelled && booking.CheckOut > (DateOnly)ViewBag.Today && booking.PaymentLabel == "ยังไม่จ่าย" && booking.StayStatus == null &&
                                              PaymentDeadline.DueAtUtc(booking.CreatedAtUtc) is DateTime due)
                                         {

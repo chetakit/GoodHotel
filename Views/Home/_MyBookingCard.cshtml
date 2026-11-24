@@ -47,7 +47,7 @@
                         <span>@(booking.Amount.HasValue ? "฿" + booking.Amount.Value.ToString("N2", culture) : "ไม่ระบุยอดรวม")</span>
                         <small>ยอดรวม</small>
                     </div>
-                    <p class="mt-2 mb-1">การชำระเงิน: @ThaiText.Status(booking.PaymentStatus)</p>
+                    <p class="mt-2 mb-1">การชำระเงิน: @ThaiText.Status(booking.PaymentStatus)@(booking.BookingStatus == GoodHotel.Models.BookingStatuses.Cancelled && booking.PaymentStatus == "Paid" ? " (ไม่คืนเงิน)" : "")</p>
                     <partial name="_PaymentDeadline" model="booking.PaymentDueAtUtc" />
                     @if (booking.IsMockPayment)
                     {

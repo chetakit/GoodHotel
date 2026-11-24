@@ -39,7 +39,7 @@
                 <dd class="col-sm-7 col-lg-8">@(noShow ? "ไม่มาเข้าพัก" : Model.StayStatus == null ? "ยังไม่เช็คอิน" : ThaiText.Status(Model.StayStatus))</dd>
                 <dt class="col-sm-5 col-lg-4">การชำระเงิน</dt>
                 <dd class="col-sm-7 col-lg-8">
-                    <span class="badge @(isPaid ? "text-bg-success" : Model.PaymentLabel == PaymentService.RefundedLabel ? "text-bg-secondary" : "text-bg-warning")">@Model.PaymentLabel</span>
+                    <span class="badge @(isPaid ? "text-bg-success" : Model.PaymentLabel == PaymentService.RefundedLabel ? "text-bg-secondary" : "text-bg-warning")">@(Model.BookingStatus == BookingStatuses.Cancelled && isPaid ? "จ่ายแล้ว (ไม่คืนเงิน)" : Model.PaymentLabel)</span>
                 </dd>
             </dl>
         </div>

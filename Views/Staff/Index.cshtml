@@ -71,7 +71,10 @@
                                 }
                                 <div class="text-muted small">@row.Phone</div>
                             </td>
-                            <td>@ThaiText.OrDash(row.RoomNumber)</td>
+                            <td>
+                                @ThaiText.OrDash(row.RoomNumber)
+                                @if (row.RoomNotReady != null) { <span class="badge text-bg-danger">@row.RoomNotReady</span> }
+                            </td>
                             <td class="num">@ThaiText.Date(row.CheckOut)</td>
                             <td>@(row.Guests?.ToString() ?? "-")</td>
                             <td>
@@ -81,7 +84,16 @@
                                 @if (row.RefundPending) { <span class="badge text-bg-warning">ขอคืนเงินอยู่</span> }
                             </td>
                             <td class="text-end">
-                                @if (row.IsPaid)
+                                @if (row.IsPaid && row.RoomNotReady != null)
+                                {
+                                    @* ห้องยังไม่พร้อม: พาไปทำขั้นที่ขาด แทนปุ่มเช็คอินที่กดแล้วโดนปฏิเสธ *@
+                                    if (row.AwaitingInspection)
+                                    {
+                                        <a asp-action="VerificationTasks" class="btn btn-sm btn-primary">ตรวจห้อง</a>
+                                    }
+                                    <a asp-action="BookingDetails" asp-route-id="@row.BookingId" class="btn btn-sm btn-outline-primary">ดูการจอง / ย้ายห้อง</a>
+                                }
+                                else if (row.IsPaid)
                                 {
                                     <form asp-action="CheckIn" method="post" class="d-inline"
                                           data-refund-pending="@(row.RefundPending ? "true" : "false")"

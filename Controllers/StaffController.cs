@@ -50,7 +50,8 @@ namespace GoodHotel.Controllers
             string BookingStatus,
             string? StayStatus,
             string? CancelReason,
-            DateTime? CreatedAtUtc)
+            DateTime? CreatedAtUtc,
+            bool RefundPending)
         {
             public string PaymentLabel { get; init; } = "";
         }
@@ -114,8 +115,20 @@ namespace GoodHotel.Controllers
                 .ToListAsync(cancellationToken);
             var arrivalLabels = await PaymentService.PaymentLabelsAsync(
                 _db, arrivals.Select(a => a.BookingId).ToList(), cancellationToken);
+            // ห้องพร้อมให้เช็คอินหรือยัง ใช้สถานะห้องชุดเดียวกับหน้าสถานะห้อง (ดึงเฉพาะเมื่อมีแขกรอ)
+            var board = arrivals.Count == 0 ? new Dictionary<int, RoomStatusItem>()
+                : (await _roomStatus.GetRoomBoardAsync(cancellationToken)).ToDictionary(r => r.RoomId);
+            string? NotReady(int? roomId) => roomId.HasValue && board.TryGetValue(roomId.Value, out var room) &&
+                room.Status is not (RoomLiveStatus.ArrivingToday or RoomLiveStatus.Available)
+                    ? RoomStatusService.Label(room.Status) : null;
             var arrivalsWithPayment = arrivals
-                .Select(row => row with { IsPaid = arrivalLabels[row.BookingId] == PaymentService.PaidLabel })
+                .Select(row => row with
+                {
+                    IsPaid = arrivalLabels[row.BookingId] == PaymentService.PaidLabel,
+                    RoomNotReady = NotReady(row.RoomId),
+                    AwaitingInspection = row.RoomId.HasValue && board.TryGetValue(row.RoomId.Value, out var live) &&
+                        live.Status == RoomLiveStatus.Inspection
+                })
                 .ToList();
 
             // แขกที่ต้องออกวันนี้ = ยังพักอยู่ และวันออกคือวันนี้หรือเลยมาแล้ว
@@ -137,7 +150,8 @@ namespace GoodHotel.Controllers
             b.User == null ? null : b.User.Phone,
             b.Room == null ? null : b.Room.Room1,
             b.CheckIn, b.CheckOut, b.Guests,
-            b.Payments.Any(p => p.Refunds.Any(r => r.Status == PaymentService.RefundRequested)));
+            b.Payments.Any(p => p.Refunds.Any(r => r.Status == PaymentService.RefundRequested)),
+            b.RoomId);
 
         [HttpGet]
         public async Task<IActionResult> Bookings(
@@ -195,7 +209,8 @@ namespace GoodHotel.Controllers
                     _db.BookingStays.Where(s => s.BookingId == booking.BookingId)
                         .Select(s => s.Status).FirstOrDefault(),
                     booking.CancelReason,
-                    booking.CreatedAtUtc))
+                    booking.CreatedAtUtc,
+                    booking.Payments.Any(p => p.Refunds.Any(r => r.Status == PaymentService.RefundRequested))))
                 .ToListAsync(cancellationToken);
 
             // เติมสถานะการจ่ายเงินให้ทุกแถวด้วย query เดียว
