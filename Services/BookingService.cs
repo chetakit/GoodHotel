@@ -35,21 +35,24 @@ public sealed record BookingSaveResult(
 public sealed class BookingService
 {
     private const string BookingIdLockName = "GoodHotel.BookingId";
-    private const int BookingIdLockTimeoutSeconds = 5;
+    private const int BookingIdLockTimeoutSeconds = 15;
 
     private readonly GoodHotelDbContext _db;
     private readonly ILogger<BookingService> _logger;
     private readonly PromotionService _promotions;
     private readonly RoomAvailabilityService _availability;
     private readonly TimeProvider _time;
+    private readonly ParallelReader _reader;
 
     public BookingService(
         GoodHotelDbContext db,
         ILogger<BookingService> logger,
         PromotionService promotions,
         RoomAvailabilityService availability,
-        TimeProvider time)
+        TimeProvider time,
+        ParallelReader reader)
     {
+        _reader = reader;
         _time = time;
         _db = db;
         _logger = logger;
@@ -72,7 +75,8 @@ public sealed class BookingService
             return model;
         }
 
-        // เช็ควันว่างพร้อมกับดึงข้อมูลห้อง (วันว่างอ่านผ่าน connection แยก ไม่ชนกับ _db)
+        // เช็ควันว่างและโหลดข้อมูลโปรพร้อมกับดึงข้อมูลห้อง (อ่านผ่าน connection แยก ไม่ชนกับ _db)
+        var promotionsTask = _promotions.LoadAsync(customerId, isNewCustomer, cancellationToken);
         var availableTask = _availability.IsAvailableAsync(
             request.RoomId,
             request.CheckIn!.Value,
@@ -83,7 +87,8 @@ public sealed class BookingService
             .SingleOrDefaultAsync(
                 item => item.RoomId == request.RoomId,
                 cancellationToken);
-        var available = await availableTask;
+        await Task.WhenAll(availableTask, promotionsTask);
+        var available = availableTask.Result;
 
         if (room == null)
         {
@@ -132,10 +137,10 @@ public sealed class BookingService
         model.ExtraBedCount = request.ExtraBedCount;
 
         // โปรที่ลูกค้าเลือก (ถ้าเลือกโปรที่ใช้ไม่ได้ หรือยังไม่เลือก ใช้โปรที่ลดได้มากที่สุด)
-        var (promotion, eligible) = await _promotions.ResolveAsync(
-            new PromotionContext(customerId, request.CheckIn!.Value, request.CheckOut!.Value, subtotal, isNewCustomer),
-            request.PromotionId,
-            cancellationToken);
+        var (promotion, eligible) = _promotions.Resolve(
+            promotionsTask.Result,
+            new PromotionContext(request.CheckIn!.Value, request.CheckOut!.Value, subtotal),
+            request.PromotionId);
         model.AvailablePromotions = eligible;
         model.PromotionId = promotion?.PromotionId;
         model.PromotionName = promotion?.Name;
@@ -156,7 +161,8 @@ public sealed class BookingService
     public async Task<BookingSaveResult> CreateAsync(
         int userId,
         CreateBookingViewModel request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        decimal? expectedAmount = null)
     {
         var validationMessage = ValidateRequest(request);
         if (validationMessage != null)
@@ -196,34 +202,16 @@ public sealed class BookingService
                 return result;
             }
 
-            var userIsCustomer = await _db.Users
+            // ล็อกห้องก่อน แล้วยิงทุกการตรวจสอบพร้อมกัน (~200ms แทนที่จะต่อคิวเกือบ 2 วินาที)
+            // ใครจะจอง เช็คอิน ย้ายห้อง หรือแจ้งซ่อมห้องนี้ต้องล็อกห้องก่อน ข้อมูลที่อ่านจึงไม่เปลี่ยนจนกว่าจะบันทึกเสร็จ
+            var room = await RoomAvailabilityService.LockAndLoadRoomAsync(_db, request.RoomId, cancellationToken);
+            var userTask = _reader.Run(db => db.Users
                 .AsNoTracking()
                 .AnyAsync(
                     user => user.UserId == userId &&
                             user.Role == "Customer",
-                    cancellationToken);
-
-            if (!userIsCustomer)
-            {
-                return await RollbackWithResultAsync(new BookingSaveResult(
-                    BookingSaveStatus.UserNotFound,
-                    Message: "ไม่พบบัญชีลูกค้าที่กำลังใช้งาน"));
-            }
-
-            var roomExists = await RoomAvailabilityService.LockRoomAsync(
-                _db,
-                activeTransaction,
-                request.RoomId,
-                cancellationToken);
-
-            if (!roomExists)
-            {
-                return await RollbackWithResultAsync(new BookingSaveResult(
-                    BookingSaveStatus.RoomNotFound,
-                    Message: "ไม่พบห้องพักที่เลือก"));
-            }
-
-            var existingRequest = await _db.Bookings
+                    cancellationToken));
+            var existingTask = _reader.Run(db => db.Bookings
                 .AsNoTracking()
                 .Where(booking =>
                     booking.Status != BookingStatuses.Cancelled &&
@@ -232,7 +220,7 @@ public sealed class BookingService
                     booking.CheckIn == request.CheckIn &&
                     booking.CheckOut == request.CheckOut &&
                     // เช็คเอาท์ไปแล้ว (เช่น ออกก่อนกำหนด) ถือว่าจบ จองห้องเดิมวันเดิมใหม่ได้
-                    !_db.BookingStays.Any(stay => stay.BookingId == booking.BookingId && stay.Status == "CheckedOut") &&
+                    !db.BookingStays.Any(stay => stay.BookingId == booking.BookingId && stay.Status == "CheckedOut") &&
                     booking.Guests == request.Guests &&
                     (booking.ExtraBed == request.ExtraBedCount ||
                      (request.ExtraBedCount == 0 && booking.ExtraBed == null)))
@@ -243,7 +231,30 @@ public sealed class BookingService
                     booking.PromotionId,
                     PromotionName = booking.Promotion == null ? null : booking.Promotion.PromotionName
                 })
-                .FirstOrDefaultAsync(cancellationToken);
+                .FirstOrDefaultAsync(cancellationToken));
+            var availableTask = _availability.IsAvailableAsync(
+                request.RoomId,
+                request.CheckIn!.Value,
+                request.CheckOut!.Value,
+                cancellationToken);
+            var promotionsTask = _promotions.LoadAsync(userId, false, cancellationToken);
+            await Task.WhenAll(userTask, existingTask, availableTask, promotionsTask);
+            var userIsCustomer = userTask.Result;
+            var existingRequest = existingTask.Result;
+
+            if (!userIsCustomer)
+            {
+                return await RollbackWithResultAsync(new BookingSaveResult(
+                    BookingSaveStatus.UserNotFound,
+                    Message: "ไม่พบบัญชีลูกค้าที่กำลังใช้งาน"));
+            }
+
+            if (room == null)
+            {
+                return await RollbackWithResultAsync(new BookingSaveResult(
+                    BookingSaveStatus.RoomNotFound,
+                    Message: "ไม่พบห้องพักที่เลือก"));
+            }
 
             // กดยืนยันซ้ำ (เช่น refresh หน้า) ให้คืนการจองเดิม ไม่สร้างใหม่
             if (existingRequest != null)
@@ -258,18 +269,6 @@ public sealed class BookingService
                     request.ExtraBedCount,
                     existingRequest.PromotionId,
                     existingRequest.PromotionName);
-            }
-
-            var room = await _db.Rooms
-                .SingleOrDefaultAsync(
-                    item => item.RoomId == request.RoomId,
-                    cancellationToken);
-
-            if (room == null)
-            {
-                return await RollbackWithResultAsync(new BookingSaveResult(
-                    BookingSaveStatus.RoomNotFound,
-                    Message: "ไม่พบห้องพักที่เลือก"));
             }
 
             if (room.Status != "Available")
@@ -295,11 +294,7 @@ public sealed class BookingService
                     Message: "ไม่สามารถยืนยันราคาให้ห้องนี้ได้"));
             }
 
-            if (!await _availability.IsAvailableAsync(
-                    room.RoomId,
-                    request.CheckIn!.Value,
-                    request.CheckOut!.Value,
-                    cancellationToken))
+            if (!availableTask.Result)
             {
                 return await RollbackWithResultAsync(new BookingSaveResult(
                     BookingSaveStatus.RoomUnavailable,
@@ -329,10 +324,10 @@ public sealed class BookingService
             }
 
             // คำนวณโปรใหม่ตอนบันทึกจริง: ตรวจว่าโปรที่ลูกค้าเลือกยังใช้ได้ (ไม่เชื่อส่วนลดจากหน้าเว็บ)
-            var (promotion, _) = await _promotions.ResolveAsync(
-                new PromotionContext(userId, request.CheckIn.Value, request.CheckOut.Value, roomSubtotal),
-                request.PromotionId,
-                cancellationToken);
+            var (promotion, _) = _promotions.Resolve(
+                promotionsTask.Result,
+                new PromotionContext(request.CheckIn.Value, request.CheckOut.Value, roomSubtotal),
+                request.PromotionId);
             var promotionId = promotion?.PromotionId;
             var discountAmount = promotion?.DiscountAmount ?? 0m;
 
@@ -359,29 +354,48 @@ public sealed class BookingService
                     Message: "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
             }
 
-            var lockResult = await GetNamedLockAsync(
-                connection,
-                dbTransaction,
-                CancellationToken.None);
-
-            if (lockResult != 1)
+            if (expectedAmount.HasValue && expectedAmount != amount)
             {
-                if (lockResult == 0)
-                {
-                    return await RollbackWithResultAsync(new BookingSaveResult(
-                        BookingSaveStatus.LockTimeout,
-                        Message: "ระบบกำลังบันทึกการจองอื่น กรุณาลองอีกครั้ง"));
-                }
-
-                throw new InvalidOperationException(
-                    "MySQL did not return a valid result for GET_LOCK.");
+                return await RollbackWithResultAsync(new BookingSaveResult(
+                    BookingSaveStatus.InvalidRate,
+                    Message: $"ยอดเปลี่ยนเป็น ฿{amount:N2} กรุณาตรวจยอดแล้วกดยืนยันอีกครั้ง"));
             }
 
-            lockAcquired = true;
-            var bookingId = await GetNextBookingIdAsync(
-                connection,
-                dbTransaction,
-                cancellationToken);
+            // ขอล็อกเลขที่การจองและอ่านเลขล่าสุดในรอบเดียว
+            int maxId;
+            await using (var command = connection.CreateCommand())
+            {
+                command.Transaction = dbTransaction;
+                command.CommandText = "SELECT GET_LOCK(@lockName, @timeoutSeconds); " +
+                    "SELECT `BookingId` FROM `bookings` ORDER BY `BookingId` DESC LIMIT 1 FOR UPDATE";
+                AddParameter(command, "@lockName", BookingIdLockName);
+                AddParameter(command, "@timeoutSeconds", BookingIdLockTimeoutSeconds);
+                await using var result = await command.ExecuteReaderAsync(CancellationToken.None);
+                await result.ReadAsync(CancellationToken.None);
+                int? lockResult = result.IsDBNull(0) ? null : Convert.ToInt32(result.GetValue(0));
+                lockAcquired = lockResult == 1;
+                await result.NextResultAsync(CancellationToken.None);
+                maxId = await result.ReadAsync(CancellationToken.None) ? Convert.ToInt32(result.GetValue(0)) : 0;
+                if (lockResult == null)
+                {
+                    throw new InvalidOperationException(
+                        "MySQL did not return a valid result for GET_LOCK.");
+                }
+            }
+
+            if (!lockAcquired)
+            {
+                return await RollbackWithResultAsync(new BookingSaveResult(
+                    BookingSaveStatus.LockTimeout,
+                    Message: "ระบบกำลังบันทึกการจองอื่น กรุณาลองอีกครั้ง"));
+            }
+
+            if (maxId == int.MaxValue)
+            {
+                throw new InvalidOperationException("No more BookingId values are available.");
+            }
+
+            var bookingId = maxId + 1;
 
             _db.Bookings.Add(new Booking
             {
@@ -486,52 +500,6 @@ public sealed class BookingService
                     "Could not close the booking database connection cleanly.");
             }
         }
-    }
-
-    private async Task<int?> GetNamedLockAsync(
-        DbConnection connection,
-        DbTransaction transaction,
-        CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT GET_LOCK(@lockName, @timeoutSeconds)";
-        AddParameter(command, "@lockName", BookingIdLockName);
-        AddParameter(command, "@timeoutSeconds", BookingIdLockTimeoutSeconds);
-
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-        if (result == null || result == DBNull.Value)
-        {
-            return null;
-        }
-
-        return Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    private async Task<int> GetNextBookingIdAsync(
-        DbConnection connection,
-        DbTransaction transaction,
-        CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText =
-            "SELECT `BookingId` FROM `bookings` ORDER BY `BookingId` DESC LIMIT 1 FOR UPDATE";
-
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-        var maxId = result == null || result == DBNull.Value
-            ? 0
-            : Convert.ToInt32(
-                result,
-                System.Globalization.CultureInfo.InvariantCulture);
-
-        if (maxId == int.MaxValue)
-        {
-            throw new InvalidOperationException(
-                "No more BookingId values are available.");
-        }
-
-        return maxId + 1;
     }
 
     private async Task ReleaseNamedLockAsync(

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GoodHotel.Controllers;
 
 [Authorize(Roles = "Housekeeper")]
-public class HousekeeperController(HousekeepingService housekeeping, GoodHotelDbContext db) : Controller
+public class HousekeeperController(HousekeepingService housekeeping) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -54,12 +54,10 @@ public class HousekeeperController(HousekeepingService housekeeping, GoodHotelDb
     public async Task<IActionResult> ClaimAndStart(int id, CancellationToken ct)
     {
         if (!ModelState.IsValid || id <= 0) return BadRequest();
-        if (!TryGetUserId(out var userId) ||
-            !await db.Users.AsNoTracking().AnyAsync(u => u.UserId == userId, ct))
-            return Forbid();
+        // คุกกี้ถูกตรวจกับตารางผู้ใช้ทุกคำขอแล้ว (UserAccessCache)
+        if (!TryGetUserId(out var userId)) return Forbid();
 
-        if (await housekeeping.TransitionAsync(id, userId, "Claim", ct) &&
-            await housekeeping.TransitionAsync(id, userId, "Start", ct))
+        if (await housekeeping.TransitionAsync(id, userId, "ClaimAndStart", ct))
             TempData["TaskSuccess"] = "รับงานแล้ว เริ่มทำได้เลย";
         else
             TempData["TaskError"] = "ทำรายการไม่ได้ งานนี้อาจมีคนรับไปแล้ว";
@@ -80,9 +78,8 @@ public class HousekeeperController(HousekeepingService housekeeping, GoodHotelDb
     private async Task<IActionResult> Transition(int id, string action, CancellationToken ct)
     {
         if (!ModelState.IsValid || id <= 0) return BadRequest();
-        if (!TryGetUserId(out var userId) ||
-            !await db.Users.AsNoTracking().AnyAsync(u => u.UserId == userId, ct))
-            return Forbid();
+        // คุกกี้ถูกตรวจกับตารางผู้ใช้ทุกคำขอแล้ว (UserAccessCache)
+        if (!TryGetUserId(out var userId)) return Forbid();
 
         if (await housekeeping.TransitionAsync(id, userId, action, ct))
             TempData["TaskSuccess"] = "อัปเดตงานแล้ว";

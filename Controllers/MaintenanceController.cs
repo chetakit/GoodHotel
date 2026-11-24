@@ -60,16 +60,9 @@ public class MaintenanceController : Controller
         MaintenanceCreateViewModel model,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId) ||
-            !await _db.Users.AsNoTracking().AnyAsync(user => user.UserId == userId, cancellationToken))
+        if (!TryGetUserId(out var userId))
         {
             return Forbid();
-        }
-
-        if (ModelState.IsValid &&
-            !await _db.Rooms.AsNoTracking().AnyAsync(room => room.RoomId == model.RoomId, cancellationToken))
-        {
-            ModelState.AddModelError(nameof(model.RoomId), "ไม่พบห้องที่เลือก");
         }
 
         if (!ModelState.IsValid)
@@ -79,10 +72,13 @@ public class MaintenanceController : Controller
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-        if (!await RoomAvailabilityService.LockRoomAsync(_db, transaction, model.RoomId, cancellationToken))
-            return NotFound();
-
-        var room = await _db.Rooms.SingleAsync(item => item.RoomId == model.RoomId, cancellationToken);
+        var room = await RoomAvailabilityService.LockAndLoadRoomAsync(_db, model.RoomId, cancellationToken, track: true);
+        if (room == null)
+        {
+            ModelState.AddModelError(nameof(model.RoomId), "ไม่พบห้องที่เลือก");
+            await PopulateRoomsAsync(model, cancellationToken);
+            return View(model);
+        }
         var hasUnresolved = await _db.MaintenanceReports.AnyAsync(
             item => item.RoomId == model.RoomId && item.Status != MaintenanceReport.Resolved, cancellationToken);
         room.PreMaintenanceStatus = MaintenanceReport.CapturePreviousRoomStatus(
@@ -143,8 +139,7 @@ public class MaintenanceController : Controller
             return BadRequest();
         }
 
-        if (!TryGetUserId(out var userId) ||
-            !await _db.Users.AsNoTracking().AnyAsync(user => user.UserId == userId, cancellationToken))
+        if (!TryGetUserId(out var userId))
         {
             return Forbid();
         }
@@ -160,8 +155,8 @@ public class MaintenanceController : Controller
             .Select(item => (int?)item.RoomId).SingleOrDefaultAsync(cancellationToken);
         if (!roomId.HasValue) return NotFound();
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-        if (!await RoomAvailabilityService.LockRoomAsync(_db, transaction, roomId.Value, cancellationToken))
-            return NotFound();
+        var room = await RoomAvailabilityService.LockAndLoadRoomAsync(_db, roomId.Value, cancellationToken, track: true);
+        if (room == null) return NotFound();
 
         var report = await _db.MaintenanceReports
             .SingleOrDefaultAsync(item => item.ReportId == id, cancellationToken);
@@ -178,7 +173,6 @@ public class MaintenanceController : Controller
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        var room = await _db.Rooms.SingleAsync(item => item.RoomId == roomId.Value, cancellationToken);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var requiresReview = false;
         report.Status = nextStatus;

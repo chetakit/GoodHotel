@@ -8,6 +8,8 @@ namespace GoodHotel.Models
         public GoodHotelDbContext(DbContextOptions<GoodHotelDbContext> options)
             : base(options)
         {
+            // EF ตั้ง savepoint ก่อน/หลังทุก SaveChanges ใน transaction เสีย 2 รอบ (~400ms) ระบบนี้พลาดแล้ว rollback ทั้งก้อน จึงไม่ใช้
+            Database.AutoSavepointsEnabled = false;
         }
 
         // Database Tables

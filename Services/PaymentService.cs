@@ -8,7 +8,7 @@ namespace GoodHotel.Services;
 
 public sealed record PaymentResult(bool Succeeded, string Message, int? PaymentId = null);
 
-public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
+public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, ParallelReader? reader = null)
 {
     private const string IdLock = "GoodHotel.PaymentId";
 
@@ -29,6 +29,45 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
         var value = await command.ExecuteScalarAsync(ct);
         return value != null && value != DBNull.Value;
     }
+
+    /// <summary>ล็อกการจองและอ่านข้อมูลในรอบเดียว (null = ไม่มีการจองนี้)</summary>
+    internal static async Task<Booking?> LockAndLoadBookingAsync(GoodHotelDbContext db, int bookingId, CancellationToken ct,
+        bool track = false)
+    {
+        if (db.Database.CurrentTransaction == null)
+            throw new InvalidOperationException("Booking locking requires a transaction.");
+        // ห้ามต่อ LINQ หลัง FromSql ไม่งั้น FOR UPDATE ไปอยู่ใน subquery
+        var query = db.Bookings.FromSqlInterpolated($"SELECT * FROM `bookings` WHERE `BookingId` = {bookingId} FOR UPDATE");
+        return (await (track ? query : query.AsNoTracking()).ToListAsync(ct)).SingleOrDefault();
+    }
+
+    private sealed record BookingChecks(bool KeyUsed, bool HasLegacy, bool HasConfirmed, bool HasPending, bool HasStay, bool HasRefund);
+
+    /// <summary>
+    /// ตรวจทุกอย่างของการจองในรอบเดียว เรียกหลังล็อกการจองแล้วเท่านั้น
+    /// (ทุกคนที่เปลี่ยนการจ่าย คืนเงิน หรือเช็คอินต้องล็อกการจองก่อน ผลจึงไม่เปลี่ยนระหว่างนี้)
+    /// </summary>
+    private async Task<(bool ActorAllowed, BookingChecks Checks)> CheckAsync(int bookingId, int actorId, string[] roles,
+        string key, CancellationToken ct)
+    {
+        var actorTask = reader!.Run(c => c.Users.AsNoTracking().Where(u => u.UserId == actorId)
+            .Select(u => new { u.Role, u.IsActive }).SingleOrDefaultAsync(ct));
+        var checksTask = reader.Run(c => c.Bookings.Where(b => b.BookingId == bookingId).Select(b => new BookingChecks(
+            c.PaymentEvents.Any(e => e.IdempotencyKey == key),
+            c.Payments.Any(p => p.BookingId == b.BookingId && p.SubmittedAtUtc == null &&
+                p.VerifiedAtUtc == null && p.LegacyDisposition == null),
+            c.Payments.Any(p => p.BookingId == b.BookingId && p.VerifiedAtUtc != null),
+            c.Payments.Any(p => p.BookingId == b.BookingId && p.SubmittedAtUtc != null &&
+                (p.PaymentStatus == "Pending" || p.PaymentStatus == "Submitted")),
+            c.BookingStays.Any(s => s.BookingId == b.BookingId),
+            c.PaymentRefunds.Any(r => r.Payment.BookingId == b.BookingId))).SingleAsync(ct));
+        await Task.WhenAll(actorTask, checksTask);
+        var actor = actorTask.Result;
+        return (actor is { IsActive: true } && roles.Contains(actor.Role, StringComparer.Ordinal), checksTask.Result);
+    }
+
+    private static string? KeyError(string key, bool used) =>
+        !ValidKey(key) ? "คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่" : used ? "คำขอนี้ถูกดำเนินการไปแล้ว" : null;
 
     private static bool ValidKey(string key) => Guid.TryParseExact(key, "N", out _);
     private static PaymentResult Error(string message) => new(false, message);
@@ -71,17 +110,29 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
     private static bool IsFullPayment(decimal? bookingAmount, decimal? recordedAmount, decimal? received) =>
         ValidAmount(bookingAmount) && recordedAmount == bookingAmount && received == bookingAmount;
 
-    private async Task<int?> LockPaymentIdAsync(CancellationToken ct)
+    /// <summary>ขอล็อกเลขที่ชำระเงินและอ่านเลขล่าสุดในรอบเดียว (null = รอล็อกไม่ไหว) onLocked เรียกทันทีที่ได้ล็อก</summary>
+    private async Task<int?> LockPaymentIdAsync(Action onLocked, CancellationToken ct)
     {
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
-        command.CommandText = "SELECT GET_LOCK(@name, 5)";
+        command.CommandText = "SELECT GET_LOCK(@name, 15); SELECT COALESCE(MAX(`PaymentId`), 0) FROM `payments`";
         var parameter = command.CreateParameter();
         parameter.ParameterName = "@name";
         parameter.Value = IdLock;
         command.Parameters.Add(parameter);
-        var result = await command.ExecuteScalarAsync(ct);
-        return result == null || result == DBNull.Value ? null : Convert.ToInt32(result);
+        // ไม่ใช้ ct: ถ้ายกเลิกกลางทางจะไม่รู้ว่าได้ล็อกแล้วหรือยัง
+        await using var result = await command.ExecuteReaderAsync(CancellationToken.None);
+        await result.ReadAsync(CancellationToken.None);
+        int? locked = result.IsDBNull(0) ? null : Convert.ToInt32(result.GetValue(0));
+        if (locked == 1) onLocked();
+        else if (locked != 0) throw new InvalidOperationException("Could not acquire the payment ID lock.");
+        await result.NextResultAsync(CancellationToken.None);
+        await result.ReadAsync(CancellationToken.None);
+        var lastId = Math.Max(0, Convert.ToInt32(result.GetValue(0)));
+        ct.ThrowIfCancellationRequested();
+        if (locked == 0) return null;
+        if (lastId == int.MaxValue) throw new InvalidOperationException("Payment IDs are exhausted.");
+        return lastId;
     }
 
     private async Task ReleasePaymentIdAsync()
@@ -206,25 +257,23 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
         try
         {
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-            if (!await ActorHasRoleAsync(actorId, ["Customer"], ct))
-                return Error("คุณชำระเงินการจองนี้ไม่ได้");
-            if (!await LockBookingAsync(bookingId, ct)) return Error("ไม่พบการจอง");
-            var booking = await db.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == bookingId, ct);
-            if (booking.UserId != actorId)
+            var booking = await LockAndLoadBookingAsync(db, bookingId, ct);
+            if (booking == null) return Error("ไม่พบการจอง");
+            var (allowed, checks) = await CheckAsync(bookingId, actorId, ["Customer"], key, ct);
+            if (!allowed || booking.UserId != actorId)
                 return Error("คุณชำระเงินการจองนี้ไม่ได้");
             if (booking.Status == BookingStatuses.Cancelled)
                 return Error("การจองนี้ถูกยกเลิกแล้ว");
             // เลยวันออกแล้ว (แขกไม่ได้มาพัก): ไม่รับชำระ ไม่งั้นลูกค้าจ่ายเงินให้คืนที่ผ่านไปแล้ว
             if (booking.CheckOut <= RoomAvailabilityService.HotelDate(time.GetUtcNow().UtcDateTime))
                 return Error("เลยวันเข้าพักของการจองนี้แล้ว ชำระเงินไม่ได้");
-            var keyError = await ValidateKeyAsync(key, ct);
+            var keyError = KeyError(key, checks.KeyUsed);
             if (keyError != null) return Error(keyError);
             if (!ValidAmount(booking.Amount)) return Error("ยอดเงินของการจองนี้ต้องตรวจสอบก่อน");
-            if (await HasUnreconciledLegacyAsync(bookingId, ct))
+            if (checks.HasLegacy)
                 return Error("มีข้อมูลการชำระเงินเก่าที่ต้องตรวจสอบก่อนชำระเงิน");
-            if (await HasConfirmedAsync(bookingId, ct)) return Error("การจองนี้ชำระเงินแล้ว");
-            if (await db.Payments.AnyAsync(p => p.BookingId == bookingId && p.SubmittedAtUtc != null &&
-                    (p.PaymentStatus == "Pending" || p.PaymentStatus == "Submitted"), ct))
+            if (checks.HasConfirmed) return Error("การจองนี้ชำระเงินแล้ว");
+            if (checks.HasPending)
                 return Error("มีการชำระเงินที่รอยืนยันอยู่แล้ว");
 
             // เลยกำหนดเวลาชำระแล้ว (ระบบยังไม่ทันยกเลิกให้): ยกเลิกตอนนี้เลย ไม่รับชำระ
@@ -240,12 +289,8 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
                 return Error("หมดเวลาชำระเงินแล้ว การจองนี้ถูกยกเลิก กรุณาจองใหม่");
             }
 
-            var lockResult = await LockPaymentIdAsync(ct);
-            if (lockResult == 0) return Error("ระบบกำลังบันทึกการชำระเงินอื่น กรุณาลองใหม่");
-            if (lockResult != 1) throw new InvalidOperationException("Could not acquire the payment ID lock.");
-            idLocked = true;
-            var lastId = Math.Max(0, await db.Payments.Select(p => (int?)p.PaymentId).MaxAsync(ct) ?? 0);
-            if (lastId == int.MaxValue) throw new InvalidOperationException("Payment IDs are exhausted.");
+            if (await LockPaymentIdAsync(() => idLocked = true, ct) is not { } lastId)
+                return Error("ระบบกำลังบันทึกการชำระเงินอื่น กรุณาลองใหม่");
             var payment = CreateSubmission(lastId + 1, bookingId, actorId, method, booking.Amount, key);
             db.Payments.Add(payment);
             await db.SaveChangesAsync(ct);
@@ -278,20 +323,18 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
         try
         {
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-            if (!await ActorHasRoleAsync(staffId, ["Staff"], ct)) return Error("เฉพาะพนักงานต้อนรับที่รับเงินที่เคาน์เตอร์ได้");
-            if (!await LockBookingAsync(bookingId, ct)) return Error("ไม่พบการจอง");
-
-            var booking = await db.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == bookingId, ct);
+            var booking = await LockAndLoadBookingAsync(db, bookingId, ct);
+            if (booking == null) return Error("ไม่พบการจอง");
+            var (allowed, checks) = await CheckAsync(bookingId, staffId, ["Staff"], "", ct);
+            if (!allowed) return Error("เฉพาะพนักงานต้อนรับที่รับเงินที่เคาน์เตอร์ได้");
             if (booking.Status == BookingStatuses.Cancelled) return Error("การจองนี้ถูกยกเลิกแล้ว");
             if (!ValidAmount(booking.Amount)) return Error("ยอดเงินของการจองนี้ต้องตรวจสอบก่อน");
-            if (await HasConfirmedAsync(bookingId, ct)) return Error("การจองนี้ชำระเงินแล้ว");
+            if (checks.HasConfirmed) return Error("การจองนี้ชำระเงินแล้ว");
 
-            var lockResult = await LockPaymentIdAsync(ct);
-            if (lockResult != 1) return Error("ระบบกำลังบันทึกการชำระเงินอื่น กรุณาลองใหม่");
-            idLocked = true;
+            if (await LockPaymentIdAsync(() => idLocked = true, ct) is not { } lastId)
+                return Error("ระบบกำลังบันทึกการชำระเงินอื่น กรุณาลองใหม่");
 
             var now = time.GetUtcNow().UtcDateTime;
-            var lastId = await db.Payments.Select(p => (int?)p.PaymentId).MaxAsync(ct) ?? 0;
             var payment = new Payment
             {
                 PaymentId = lastId + 1,
@@ -442,25 +485,22 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
         if (bookingId <= 0 || actorId <= 0 || string.IsNullOrWhiteSpace(reason) || reason.Length > 2000)
             return Error("กรุณาเลือกหรือกรอกเหตุผลที่ขอคืนเงิน");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        if (!await ActorHasRoleAsync(actorId, ["Customer"], ct)) return Error("คุณขอคืนเงินการจองนี้ไม่ได้");
-        if (!await LockBookingAsync(bookingId, ct)) return Error("ไม่พบการจอง");
-        var booking = await db.Bookings.AsNoTracking().Where(b => b.BookingId == bookingId)
-            .Select(b => new { b.UserId, b.Status, b.CheckOut,
-                HasStay = db.BookingStays.Any(s => s.BookingId == b.BookingId) })
-            .SingleAsync(ct);
-        if (booking.UserId != actorId) return Error("คุณขอคืนเงินการจองนี้ไม่ได้");
+        var booking = await LockAndLoadBookingAsync(db, bookingId, ct);
+        if (booking == null) return Error("ไม่พบการจอง");
+        var checkTask = CheckAsync(bookingId, actorId, ["Customer"], key, ct);
         var payment = await db.Payments.Where(p => p.BookingId == bookingId && p.VerifiedAtUtc != null)
             .OrderBy(p => p.PaymentId).FirstOrDefaultAsync(ct);
+        var (allowed, checks) = await checkTask;
+        if (!allowed || booking.UserId != actorId) return Error("คุณขอคืนเงินการจองนี้ไม่ได้");
         if (payment == null || !ValidAmount(payment.Amount)) return Error("การจองนี้ยังไม่มีการชำระเงินที่ยืนยันแล้ว");
-        var hasRecord = await db.PaymentRefunds.AnyAsync(r => r.Payment.BookingId == bookingId, ct);
         var today = RoomAvailabilityService.HotelDate(time.GetUtcNow().UtcDateTime);
-        if (!CanRequestRefund(booking.Status, booking.CheckOut, booking.HasStay, true, hasRecord, today))
+        if (!CanRequestRefund(booking.Status, booking.CheckOut, checks.HasStay, true, checks.HasRefund, today))
         {
-            return Error(hasRecord ? "การจองนี้เคยขอคืนเงินไปแล้ว ขอซ้ำไม่ได้"
-                : booking.HasStay ? "เช็คอินแล้ว ขอคืนเงินไม่ได้"
+            return Error(checks.HasRefund ? "การจองนี้เคยขอคืนเงินไปแล้ว ขอซ้ำไม่ได้"
+                : checks.HasStay ? "เช็คอินแล้ว ขอคืนเงินไม่ได้"
                 : "การจองนี้ขอคืนเงินไม่ได้แล้ว");
         }
-        var keyError = await ValidateKeyAsync(key, ct);
+        var keyError = KeyError(key, checks.KeyUsed);
         if (keyError != null) return Error(keyError);
         db.PaymentRefunds.Add(new PaymentRefund
         {
@@ -480,17 +520,18 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
             .Select(r => r.Payment.BookingId).SingleOrDefaultAsync(ct);
         if (!bookingId.HasValue) return Error("ไม่พบคำขอคืนเงินหรือการจอง");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        if (!await ActorHasRoleAsync(actorId, ["Accountant"], ct)) return Error("เฉพาะฝ่ายบัญชีที่อนุมัติการคืนเงินได้");
-        if (!await LockBookingAsync(bookingId.Value, ct)) return Error("ไม่พบการจอง");
+        var booking = await LockAndLoadBookingAsync(db, bookingId.Value, ct, track: true);
+        if (booking == null) return Error("ไม่พบการจอง");
+        var checkTask = CheckAsync(bookingId.Value, actorId, ["Accountant"], key, ct);
         var refund = await db.PaymentRefunds.Include(r => r.Payment)
             .SingleOrDefaultAsync(r => r.RefundId == refundId && r.Payment.BookingId == bookingId, ct);
+        var (allowed, checks) = await checkTask;
+        if (!allowed) return Error("เฉพาะฝ่ายบัญชีที่อนุมัติการคืนเงินได้");
         if (refund == null || refund.Status != RefundRequested || refund.Payment.VerifiedAtUtc == null ||
             !ValidAmount(refund.Payment.Amount)) return Error("คำขอคืนเงินนี้ไม่ได้รออนุมัติแล้ว");
-        var booking = await db.Bookings.SingleAsync(b => b.BookingId == bookingId, ct);
-        if (booking.Status != BookingStatuses.Booked ||
-            await db.BookingStays.AnyAsync(s => s.BookingId == bookingId, ct))
+        if (booking.Status != BookingStatuses.Booked || checks.HasStay)
             return Error("การจองนี้เช็คอินหรือถูกยกเลิกไปแล้ว อนุมัติคืนเงินไม่ได้");
-        var keyError = await ValidateKeyAsync(key, ct);
+        var keyError = KeyError(key, checks.KeyUsed);
         if (keyError != null) return Error(keyError);
 
         var now = time.GetUtcNow().UtcDateTime;
@@ -520,12 +561,14 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time)
             .Select(r => r.Payment.BookingId).SingleOrDefaultAsync(ct);
         if (!bookingId.HasValue) return Error("ไม่พบคำขอคืนเงินหรือการจอง");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        if (!await ActorHasRoleAsync(actorId, ["Accountant"], ct)) return Error("เฉพาะฝ่ายบัญชีที่ตรวจคำขอคืนเงินได้");
         if (!await LockBookingAsync(bookingId.Value, ct)) return Error("ไม่พบการจอง");
+        var checkTask = CheckAsync(bookingId.Value, actorId, ["Accountant"], key, ct);
         var refund = await db.PaymentRefunds.Include(r => r.Payment)
             .SingleOrDefaultAsync(r => r.RefundId == refundId && r.Payment.BookingId == bookingId, ct);
+        var (allowed, checks) = await checkTask;
+        if (!allowed) return Error("เฉพาะฝ่ายบัญชีที่ตรวจคำขอคืนเงินได้");
         if (refund == null || refund.Status != RefundRequested) return Error("คำขอคืนเงินนี้ไม่ได้รออนุมัติแล้ว");
-        var keyError = await ValidateKeyAsync(key, ct);
+        var keyError = KeyError(key, checks.KeyUsed);
         if (keyError != null) return Error(keyError);
         refund.Status = RefundRejected;
         // เหตุผลที่ปฏิเสธเก็บใน payment_events (RefundRejected) ไม่ต้องเพิ่มคอลัมน์ใหม่

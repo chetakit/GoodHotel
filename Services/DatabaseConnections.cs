@@ -1,17 +1,30 @@
+using GoodHotel.Models;
+using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 
 namespace GoodHotel.Services;
 
 /// <summary>
-/// ฐานข้อมูลอยู่ไกล (ไปกลับ ~200ms) ปกติทุกครั้งที่หยิบ connection จาก pool จะ reset ก่อน เสียฟรี 1 รอบทุกหน้า
-/// - Read: ใช้กับการเปิดหน้า (GET) ปิดการ reset เพราะอ่านอย่างเดียว ไม่มีอะไรค้างใน session
-/// - Write: ใช้กับการบันทึก (POST) และงานเบื้องหลัง ยัง reset ทุกครั้งเหมือนเดิม
-///   เพราะการจอง/ชำระเงินใช้ GET_LOCK ซึ่งผูกกับ session ถ้าค้างต้องถูกล้าง
+/// ฐานข้อมูลอยู่ไกล (ไปกลับ ~200ms) ปกติทุกครั้งที่หยิบ connection จาก pool จะ reset ก่อน เสียฟรี 1 รอบทุกคำขอ
+/// - Read (ไม่ reset): เปิดหน้า และการบันทึกทั่วไปที่จบใน transaction ของตัวเอง ไม่มีอะไรค้างใน session
+/// - Write (reset ทุกครั้ง): คำขอที่ใช้ GET_LOCK (จอง จ่ายเงิน Walk-in) และงานเบื้องหลัง
+///   ล็อกแบบนี้ผูกกับ session ถ้าค้างต้องถูกล้าง เพิ่มหน้าที่ใช้ GET_LOCK ต้องเพิ่มใน NamedLockPaths ด้วย
 /// connection string คนละค่า = คนละ pool จึงไม่ปนกัน
 /// </summary>
-public sealed class DatabaseConnections(IConfiguration configuration)
+public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFactory loggers)
 {
-    public const int WarmReaders = 6;
+    public const int WarmReaders = 10;
+
+    public static readonly MySqlServerVersion ServerVersion = new(new Version(8, 0, 0));
+
+    private static readonly string[] NamedLockPaths = ["/Home/Booking", "/Payment/Submit", "/Staff/WalkIn"];
+
+    private DbContextOptions<GoodHotelDbContext>? _readOptions;
+
+    /// <summary>ตัวเลือกของ context สำหรับอ่าน (ParallelReader)</summary>
+    public DbContextOptions<GoodHotelDbContext> ReadOptions => _readOptions ??=
+        new DbContextOptionsBuilder<GoodHotelDbContext>()
+            .UseMySql(Read, ServerVersion).UseLoggerFactory(loggers).Options;
 
     // เงียบเกินนี้แปลว่าเครื่องเพิ่ง sleep หรือเน็ตหลุด connection ที่ค้างอยู่อาจตายแล้ว
     private const long StaleMilliseconds = 100_000;
@@ -27,9 +40,10 @@ public sealed class DatabaseConnections(IConfiguration configuration)
         Keepalive = 30
     }.ConnectionString;
 
-    public string For(HttpContext? context) =>
-        context != null && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
-            ? Read : Write;
+    public string For(HttpContext? context) => context == null || UsesNamedLock(context.Request) ? Write : Read;
+
+    public static bool UsesNamedLock(HttpRequest request) => HttpMethods.IsPost(request.Method) &&
+        NamedLockPaths.Any(path => string.Equals(request.Path.Value?.TrimEnd('/'), path, StringComparison.OrdinalIgnoreCase));
 
     public void MarkAlive() => Interlocked.Exchange(ref _lastAlive, Environment.TickCount64);
 

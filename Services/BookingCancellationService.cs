@@ -28,7 +28,10 @@ public sealed class BookingCancellationService(
         var now = time.GetUtcNow().UtcDateTime;
         var today = RoomAvailabilityService.HotelDate(now);
 
-        // อัปเดตด้วยคำสั่งเดียว เงื่อนไขทั้งหมดอยู่ใน WHERE จึงไม่เกิดปัญหากดยกเลิกซ้อนกัน
+        // ล็อกการจองก่อน แล้วค่อยอัปเดตโดยมีเงื่อนไขทั้งหมดใน WHERE
+        // (ต้องล็อกเป็นคำสั่งแยก ไม่งั้นเงื่อนไขอาจอ่านข้อมูลก่อนที่การเช็คอินที่กำลังทำอยู่จะบันทึกเสร็จ)
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        await PaymentService.LockBookingAsync(db, bookingId, ct);
         var updated = await db.Bookings
             .Where(b => b.BookingId == bookingId &&
                         b.UserId == customerId &&
@@ -48,6 +51,7 @@ public sealed class BookingCancellationService(
         }
 
         await CloseOpenPaymentsAsync(bookingId, ct);
+        await tx.CommitAsync(ct);
         var wasPaid = await PaymentService.IsPaidAsync(db, bookingId, ct);
         return new CancelBookingResult(true, wasPaid
             ? $"ยกเลิกการจอง #{bookingId} เรียบร้อยแล้ว (ยกเลิกเองไม่คืนเงิน)"

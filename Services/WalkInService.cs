@@ -42,9 +42,10 @@ public sealed class WalkInService(
         }
 
         // ยอดที่พนักงานเห็นต้องตรงกับยอดที่จะบันทึก ตรวจก่อนสร้างลูกค้าและการจอง
-        if (form.ExpectedTotal.HasValue)
+        // (ลูกค้าเดิมให้ตอนจองตรวจเอง ไม่ต้องคำนวณซ้ำ)
+        if (form.ExpectedTotal.HasValue && match.UserId == null)
         {
-            var quote = await PriceAsync(form, match.UserId, isNewCustomer: match.UserId == null, ct);
+            var quote = await PriceAsync(form, null, isNewCustomer: true, ct);
             if (!quote.CanConfirm) return new WalkInResult(false, quote.StatusMessage ?? "จองห้องไม่สำเร็จ");
             if (quote.TotalAmount != form.ExpectedTotal)
                 return new WalkInResult(false, $"ยอดเปลี่ยนเป็น ฿{quote.TotalAmount:N2} กรุณาตรวจยอดแล้วกดยืนยันอีกครั้ง");
@@ -59,7 +60,7 @@ public sealed class WalkInService(
             CheckOut = form.CheckOut,
             Guests = form.Guests,
             ExtraBedCount = form.ExtraBed ? 1 : 0
-        }, ct);
+        }, ct, form.ExpectedTotal);
 
         if (booking.Status != BookingSaveStatus.Created || booking.BookingId is not int bookingId)
         {

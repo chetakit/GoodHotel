@@ -35,20 +35,14 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 
 // Database Connection
-var serverVersion = new MySqlServerVersion(
-    new Version(8, 0, 0)
-);
-
-// เปิดหน้า (GET) ใช้ pool สำหรับอ่าน ส่วนการบันทึกใช้ pool เดิม (ดูเหตุผลใน DatabaseConnections)
+// เลือก pool ตามคำขอ (ดูเหตุผลใน DatabaseConnections)
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<DatabaseConnections>();
 void ConfigureDatabase(IServiceProvider services, DbContextOptionsBuilder options) => options.UseMySql(
     services.GetRequiredService<DatabaseConnections>()
         .For(services.GetRequiredService<IHttpContextAccessor>().HttpContext),
-    serverVersion);
+    DatabaseConnections.ServerVersion);
 builder.Services.AddDbContext<GoodHotelDbContext>(ConfigureDatabase);
-// factory สำหรับ ParallelReader (สร้าง DbContext แยกเพื่อยิง query พร้อมกัน)
-builder.Services.AddDbContextFactory<GoodHotelDbContext>(ConfigureDatabase, ServiceLifetime.Scoped);
 builder.Services.AddHostedService<ReadConnectionWarmer>();
 builder.Services.AddScoped<ParallelReader>();
 builder.Services.AddScoped<FinanceLedger>();

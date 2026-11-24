@@ -89,6 +89,8 @@ public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityServi
         foreach (var id in new[] { oldRoomId.Value, newRoomId }.Order())
             if (!await RoomAvailabilityService.LockRoomAsync(db, tx, id, ct)) return "ไม่พบห้อง";
 
+        if (!await PaymentService.LockBookingAsync(db, bookingId, ct)) return "ไม่พบการจองหรือห้อง";
+
         var info = await InfoAsync(bookingId, ct);
         if (info == null || info.RoomId != oldRoomId) return "การจองนี้ย้ายห้องไม่ได้แล้ว (เช็คอิน ยกเลิก หรือมีคำขอคืนเงินอยู่)";
         var target = await db.Rooms.AsNoTracking().SingleAsync(r => r.RoomId == newRoomId, ct);

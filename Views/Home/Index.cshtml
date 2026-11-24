@@ -2,7 +2,7 @@
 
 @{
     ViewData["Title"] = "หน้าแรก";
-    var today = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    var today = GoodHotel.Services.RoomAvailabilityService.HotelDate(DateTime.UtcNow).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
     var lowestRate = Model.FeaturedRooms.Where(r => r.Rate.HasValue).Select(r => r.Rate!.Value).DefaultIfEmpty().Min();
 }
 

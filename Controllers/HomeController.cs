@@ -153,6 +153,10 @@ public class HomeController : Controller
             }
         }
 
+        // เช็ควันว่างทุกห้องพร้อมกับดึงรายการห้อง
+        var blockedTask = search.HasSearched
+            ? _availability.GetBlockedPeriodsAsync(null, search.CheckIn!.Value, search.CheckOut!.Value, HttpContext.RequestAborted)
+            : null;
         search.Rooms = await roomsQuery
             .OrderBy(room => room.Room1)
             .Select(room => new RoomListViewModel
@@ -168,11 +172,9 @@ public class HomeController : Controller
             })
             .ToListAsync();
 
-        if (search.HasSearched)
+        if (blockedTask != null)
         {
-            var blocked = await _availability.GetBlockedPeriodsAsync(
-                search.Rooms.Select(room => room.RoomId).ToArray(),
-                search.CheckIn!.Value, search.CheckOut!.Value, HttpContext.RequestAborted);
+            var blocked = await blockedTask;
             var blockedIds = blocked.Select(period => period.RoomId).ToHashSet();
             search.Rooms = search.Rooms.Where(room => !blockedIds.Contains(room.RoomId)).ToList();
         }
@@ -602,6 +604,7 @@ public class HomeController : Controller
         [FromForm] int? guests,
         [FromForm] int extraBedCount,
         [FromForm] int? promotionId,
+        [FromServices] ParallelReader reader,
         CancellationToken cancellationToken)
     {
         var parsedCheckIn = TryParseBookingDate(
@@ -675,7 +678,7 @@ public class HomeController : Controller
         if (result.Status is BookingSaveStatus.Created or
             BookingSaveStatus.AlreadyExists)
         {
-            var paymentRows = await _db.Payments.AsNoTracking()
+            var paymentRowsTask = reader.Run(db => db.Payments.AsNoTracking()
                 .Where(payment => payment.BookingId == result.BookingId)
                 .Select(payment => new
                 {
@@ -683,7 +686,10 @@ public class HomeController : Controller
                     payment.VerifiedAtUtc, payment.LegacyDisposition,
                     Refunded = payment.Refunds.Where(refund => refund.Status == "Approved")
                         .Sum(refund => (decimal?)refund.Amount) ?? 0m
-                }).ToListAsync(cancellationToken);
+                }).ToListAsync(cancellationToken));
+            var createdAtUtc = await _db.Bookings.AsNoTracking().Where(b => b.BookingId == result.BookingId)
+                .Select(b => b.CreatedAtUtc).FirstOrDefaultAsync(cancellationToken);
+            var paymentRows = await paymentRowsTask;
             var needsReview = paymentRows.Any(payment => payment.SubmittedAtUtc == null &&
                 payment.VerifiedAtUtc == null && payment.LegacyDisposition == null);
             var confirmed = paymentRows.Where(payment => payment.VerifiedAtUtc != null)
@@ -697,8 +703,6 @@ public class HomeController : Controller
                     : paymentRows.Where(payment => payment.SubmittedAtUtc != null)
                         .OrderByDescending(payment => payment.PaymentId)
                         .Select(payment => payment.PaymentStatus).FirstOrDefault() ?? "Not submitted";
-            var createdAtUtc = await _db.Bookings.AsNoTracking().Where(b => b.BookingId == result.BookingId)
-                .Select(b => b.CreatedAtUtc).FirstOrDefaultAsync(cancellationToken);
             var dueAtUtc = confirmed == null && !pending ? PaymentDeadline.DueAtUtc(createdAtUtc) : null;
             return View(new BookingConfirmationViewModel
             {
@@ -780,7 +784,7 @@ public class HomeController : Controller
             checkOut?.ToString(
                 "yyyy-MM-dd",
                 System.Globalization.CultureInfo.InvariantCulture) ?? "<null>",
-            DateOnly.FromDateTime(DateTime.Today).ToString(
+            _availability.HotelToday().ToString(
                 "yyyy-MM-dd",
                 System.Globalization.CultureInfo.InvariantCulture),
             string.IsNullOrEmpty(modelStateErrors)

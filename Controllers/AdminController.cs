@@ -178,9 +178,8 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> Rooms(CancellationToken ct)
         {
             // สถานะจริงตอนนี้ (รวมการเข้าพัก งานทำความสะอาด งานซ่อม) แสดงคู่กับสถานะที่ Admin ตั้งไว้
-            ViewBag.LiveStatus = (await _roomStatus.GetRoomBoardAsync(ct)).ToDictionary(r => r.RoomId);
-
-            var rooms = _db.Rooms
+            var boardTask = _roomStatus.GetRoomBoardAsync(ct);
+            var rooms = await _db.Rooms
                 .OrderBy(room => room.Room1)
                 .Select(room => new RoomListViewModel
                 {
@@ -193,7 +192,8 @@ namespace GoodHotel.Controllers
                     ImagePath = room.ImagePath,
                     Description = room.Description
                 })
-                .ToList();
+                .ToListAsync(ct);
+            ViewBag.LiveStatus = (await boardTask).ToDictionary(r => r.RoomId);
 
             foreach (var room in rooms)
             {

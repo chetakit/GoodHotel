@@ -5,11 +5,13 @@ namespace GoodHotel.Services;
 
 /// <summary>ข้อมูลการจองที่ใช้ตรวจเงื่อนไขโปร</summary>
 public sealed record PromotionContext(
-    int? CustomerId,
     DateOnly CheckIn,
     DateOnly CheckOut,
-    decimal RoomSubtotal,
-    bool IsNewCustomer = false);
+    decimal RoomSubtotal);
+
+public sealed record CustomerHistory(bool IsKnown, int? BirthMonth, int ActiveBookingCount, int CompletedStayCount);
+
+public sealed record PromotionData(IReadOnlyList<Promotion> Candidates, CustomerHistory Customer);
 
 public sealed record AppliedPromotion(int PromotionId, string Name, decimal DiscountAmount);
 
@@ -18,31 +20,23 @@ public sealed record AppliedPromotion(int PromotionId, string Name, decimal Disc
 /// กติกา: 1 การจองใช้ได้ 1 โปร ลูกค้าเลือกเองจากโปรที่เข้าเงื่อนไข (ค่าเริ่มต้น = โปรที่ลดได้มากที่สุด)
 /// ส่วนลดคิดจากค่าห้องเท่านั้น (ไม่รวมเตียงเสริม)
 /// </summary>
-public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityService availability, ParallelReader reader)
+public sealed class PromotionService(RoomAvailabilityService availability, ParallelReader reader)
 {
-    /// <summary>โปรทั้งหมดที่การจองนี้ใช้ได้ เรียงจากลดมากไปน้อย</summary>
-    public async Task<IReadOnlyList<AppliedPromotion>> FindEligibleAsync(PromotionContext booking, CancellationToken ct)
+    /// <summary>ข้อมูลที่ใช้ตัดสินโปร (โปรที่เปิดอยู่ + ประวัติลูกค้า) โหลดไว้ก่อนได้โดยยังไม่ต้องรู้ราคา</summary>
+    public async Task<PromotionData> LoadAsync(int? customerId, bool isNewCustomer, CancellationToken ct)
     {
-        Task<List<Promotion>> Candidates(GoodHotelDbContext c) => c.Promotions.AsNoTracking()
+        var candidatesTask = reader.Run(c => c.Promotions.AsNoTracking()
             .Where(p => p.IsActive && p.RuleType != null && p.DiscountType != null && p.DiscountValue > 0)
-            .ToListAsync(ct);
+            .ToListAsync(ct));
+        var customerTask = reader.Run(c => LoadCustomerHistoryAsync(c, customerId, isNewCustomer, ct));
+        await Task.WhenAll(candidatesTask, customerTask);
+        return new PromotionData(candidatesTask.Result, customerTask.Result);
+    }
 
-        List<Promotion> candidates;
-        CustomerHistory customer;
-        if (db.Database.CurrentTransaction != null)
-        {
-            // กำลังจองอยู่ใน transaction ต้องอ่านผ่าน connection เดิมทีละ query
-            candidates = await Candidates(db);
-            customer = await LoadCustomerHistoryAsync(db, booking, ct);
-        }
-        else
-        {
-            var candidatesTask = reader.Run(Candidates);
-            var customerTask = reader.Run(c => LoadCustomerHistoryAsync(c, booking, ct));
-            await Task.WhenAll(candidatesTask, customerTask);
-            candidates = candidatesTask.Result;
-            customer = customerTask.Result;
-        }
+    /// <summary>โปรทั้งหมดที่การจองนี้ใช้ได้ เรียงจากลดมากไปน้อย</summary>
+    private IReadOnlyList<AppliedPromotion> FindEligible(PromotionData data, PromotionContext booking)
+    {
+        var (candidates, customer) = data;
         var today = availability.HotelToday();
 
         return candidates
@@ -54,17 +48,14 @@ public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityServ
             .ToList();
     }
 
-    public async Task<AppliedPromotion?> FindBestAsync(PromotionContext booking, CancellationToken ct) =>
-        (await FindEligibleAsync(booking, ct)).FirstOrDefault();
-
     /// <summary>
     /// โปรที่จะใช้จริง: ถ้าลูกค้าเลือกโปรที่ใช้ได้ ใช้โปรนั้น ไม่งั้น (ไม่ได้เลือก/เลือกโปรที่ใช้ไม่ได้) ใช้โปรที่ดีที่สุด
     /// ตรวจจากฝั่ง server ทุกครั้ง ไม่เชื่อค่าที่ส่งมาจากหน้าเว็บ
     /// </summary>
-    public async Task<(AppliedPromotion? Chosen, IReadOnlyList<AppliedPromotion> Eligible)> ResolveAsync(
-        PromotionContext booking, int? selectedPromotionId, CancellationToken ct)
+    public (AppliedPromotion? Chosen, IReadOnlyList<AppliedPromotion> Eligible) Resolve(
+        PromotionData data, PromotionContext booking, int? selectedPromotionId)
     {
-        var eligible = await FindEligibleAsync(booking, ct);
+        var eligible = FindEligible(data, booking);
         var chosen = (selectedPromotionId.HasValue
             ? eligible.FirstOrDefault(p => p.PromotionId == selectedPromotionId.Value)
             : null) ?? eligible.FirstOrDefault();
@@ -118,17 +109,15 @@ public sealed class PromotionService(GoodHotelDbContext db, RoomAvailabilityServ
             .Select(i => checkIn.AddDays(i).DayOfWeek)
             .All(day => day is not (DayOfWeek.Friday or DayOfWeek.Saturday));
 
-    private sealed record CustomerHistory(bool IsKnown, int? BirthMonth, int ActiveBookingCount, int CompletedStayCount);
 
     // ทุกตัวเลขอยู่ใน query เดียว (แต่ละ query ไปฐานข้อมูลใช้ ~200ms)
     private static async Task<CustomerHistory> LoadCustomerHistoryAsync(
-        GoodHotelDbContext c, PromotionContext booking, CancellationToken ct)
+        GoodHotelDbContext c, int? customerId, bool isNewCustomer, CancellationToken ct)
     {
-        var customerId = booking.CustomerId;
         if (customerId is not > 0)
         {
             // ลูกค้าใหม่ที่กำลังจะถูกสร้าง (Walk-in) = รู้แน่ว่ายังไม่เคยจอง
-            return new CustomerHistory(booking.IsNewCustomer, null, 0, 0);
+            return new CustomerHistory(isNewCustomer, null, 0, 0);
         }
 
         var history = await c.Users.AsNoTracking()

@@ -160,57 +160,72 @@ namespace GoodHotel.Controllers
             string? q,
             string? when,
             int? page,
+            [FromServices] ParallelReader reader,
             CancellationToken cancellationToken)
         {
             const int pageSize = 20;
-            var query = _db.Bookings.AsNoTracking();
-
-            // ช่องค้นหาเดียว: พิมพ์เลขที่การจอง ชื่อ นามสกุล หรือเบอร์โทรก็ได้
-            // ขึ้นต้นด้วย # (เช่น #12) = ค้นเฉพาะเลขที่การจอง
-            var keyword = q?.Trim();
-            if (keyword?.StartsWith('#') == true)
-            {
-                query = int.TryParse(keyword[1..], out var id)
-                    ? query.Where(b => b.BookingId == id)
-                    : query.Where(b => false);
-            }
-            else if (!string.IsNullOrEmpty(keyword))
-            {
-                var isNumber = int.TryParse(keyword, out var number);
-                query = query.Where(b =>
-                    (isNumber && b.BookingId == number) ||
-                    (b.User != null && (
-                        (b.User.FirstName + " " + b.User.LastName).Contains(keyword) ||
-                        (b.User.Phone != null && b.User.Phone.Contains(keyword)))));
-            }
-
-            // ตัวกรองช่วงเวลา: today = เข้าหรือออกวันนี้, upcoming = ยังไม่ถึงวันเข้าพัก, staying = พักอยู่ตอนนี้
+            // สร้าง query จาก context ที่ส่งมา เพื่อนับจำนวนกับดึงรายการพร้อมกันได้
             var today = _availability.HotelToday();
-            query = when switch
+            IQueryable<Booking> Filter(GoodHotelDbContext db)
             {
-                "today" => query.Where(b => b.CheckIn == today || b.CheckOut == today),
-                "upcoming" => query.Where(b => b.Status != BookingStatuses.Cancelled && b.CheckIn > today),
-                "noshow" => query.Where(b => b.Status != BookingStatuses.Cancelled && b.CheckOut <= today &&
-                    !_db.BookingStays.Any(s => s.BookingId == b.BookingId)),
-                "staying" => query.Where(b => _db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedIn")),
-                "cancelled" => query.Where(b => b.Status == BookingStatuses.Cancelled),
-                "all" => query,
-                // ค่าเริ่มต้นไม่แสดงที่ยกเลิก แต่ถ้ากำลังค้นหา ต้องหาเจอทุกการจอง
-                _ => string.IsNullOrEmpty(keyword) ? query.Where(b => b.Status != BookingStatuses.Cancelled) : query
-            };
+                var query = db.Bookings.AsNoTracking();
 
-            var total = await query.CountAsync(cancellationToken);
+                // ช่องค้นหาเดียว: พิมพ์เลขที่การจอง ชื่อ นามสกุล หรือเบอร์โทรก็ได้
+                // ขึ้นต้นด้วย # (เช่น #12) = ค้นเฉพาะเลขที่การจอง
+                var keyword = q?.Trim();
+                if (keyword?.StartsWith('#') == true)
+                {
+                    query = int.TryParse(keyword[1..], out var id)
+                        ? query.Where(b => b.BookingId == id)
+                        : query.Where(b => false);
+                }
+                else if (!string.IsNullOrEmpty(keyword))
+                {
+                    var isNumber = int.TryParse(keyword, out var number);
+                    query = query.Where(b =>
+                        (isNumber && b.BookingId == number) ||
+                        (b.User != null && (
+                            (b.User.FirstName + " " + b.User.LastName).Contains(keyword) ||
+                            (b.User.Phone != null && b.User.Phone.Contains(keyword)))));
+                }
+
+                // ตัวกรองช่วงเวลา: today = เข้าหรือออกวันนี้, upcoming = ยังไม่ถึงวันเข้าพัก, staying = พักอยู่ตอนนี้
+                query = when switch
+                {
+                    "today" => query.Where(b => b.CheckIn == today || b.CheckOut == today),
+                    "upcoming" => query.Where(b => b.Status != BookingStatuses.Cancelled && b.CheckIn > today),
+                    "noshow" => query.Where(b => b.Status != BookingStatuses.Cancelled && b.CheckOut <= today &&
+                        !db.BookingStays.Any(s => s.BookingId == b.BookingId)),
+                    "staying" => query.Where(b => db.BookingStays.Any(s => s.BookingId == b.BookingId && s.Status == "CheckedIn")),
+                    "cancelled" => query.Where(b => b.Status == BookingStatuses.Cancelled),
+                    "all" => query,
+                    // ค่าเริ่มต้นไม่แสดงที่ยกเลิก แต่ถ้ากำลังค้นหา ต้องหาเจอทุกการจอง
+                    _ => string.IsNullOrEmpty(keyword) ? query.Where(b => b.Status != BookingStatuses.Cancelled) : query
+                };
+
+                return query;
+            }
+
+            var countTask = reader.Run(db => Filter(db).CountAsync(cancellationToken));
+            var currentPage = Math.Clamp(page ?? 1, 1, 100_000);
+            var bookings = await LoadPageAsync(currentPage);
+            var total = await countTask;
             var totalPages = Math.Max(1, (total + pageSize - 1) / pageSize);
-            var currentPage = Math.Clamp(page ?? 1, 1, totalPages);
+            if (currentPage > totalPages)
+            {
+                currentPage = totalPages;
+                bookings = await LoadPageAsync(currentPage);
+            }
             ViewBag.Total = total;
             ViewBag.Page = currentPage;
             ViewBag.TotalPages = totalPages;
 
             ViewBag.Today = today;
-            var bookings = await query
+
+            Task<List<BookingListItem>> LoadPageAsync(int number) => Filter(_db)
                 .OrderByDescending(booking => booking.CheckIn)
                 .ThenByDescending(booking => booking.BookingId)
-                .Skip((currentPage - 1) * pageSize)
+                .Skip((number - 1) * pageSize)
                 .Take(pageSize)
                 .Select(booking => new BookingListItem(
                     booking.BookingId,
@@ -426,15 +441,17 @@ namespace GoodHotel.Controllers
             var guests = form.Guests ?? 1;
 
             // ความจุ + เตียงเสริม 1 เตียง ต้องรับจำนวนคนได้
-            var freeNow = (await _roomStatus.GetRoomBoardAsync(ct))
+            var boardTask = _roomStatus.GetRoomBoardAsync(ct);
+            var blockedTask = form.CheckOut > form.Today
+                ? _availability.GetBlockedPeriodsAsync(null, form.Today, form.CheckOut.Value, ct)
+                : null;
+            var freeNow = (await boardTask)
                 .Where(r => r.Status == RoomLiveStatus.Available && (r.Capacity ?? 0) + 1 >= guests)
                 .ToList();
 
-            if (form.CheckOut > form.Today && freeNow.Count > 0)
+            if (blockedTask != null)
             {
-                var blocked = await _availability.GetBlockedPeriodsAsync(
-                    freeNow.Select(r => r.RoomId).ToArray(), form.Today, form.CheckOut.Value, ct);
-                var blockedIds = blocked.Select(b => b.RoomId).ToHashSet();
+                var blockedIds = (await blockedTask).Select(b => b.RoomId).ToHashSet();
                 freeNow = freeNow.Where(r => !blockedIds.Contains(r.RoomId)).ToList();
             }
 
@@ -519,12 +536,8 @@ namespace GoodHotel.Controllers
             return RedirectToAction("Index", "Maintenance");
         }
 
-        private async Task<int?> GetActorIdAsync(CancellationToken ct)
-        {
-            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) || id <= 0 ||
-                !await _db.Users.AsNoTracking().AnyAsync(u => u.UserId == id, ct))
-                return null;
-            return id;
-        }
+        // คุกกี้ถูกตรวจกับตารางผู้ใช้ทุกคำขอแล้ว (UserAccessCache) ไม่ต้องถามซ้ำ
+        private Task<int?> GetActorIdAsync(CancellationToken ct) => Task.FromResult<int?>(
+            int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0 ? id : null);
     }
 }

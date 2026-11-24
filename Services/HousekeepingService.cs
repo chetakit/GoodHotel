@@ -25,6 +25,11 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return result != null && result != DBNull.Value;
     }
 
+    /// <summary>ล็อกผู้ใช้และอ่านข้อมูลในรอบเดียว</summary>
+    private static async Task<User?> LockAndLoadUserAsync(GoodHotelDbContext db, int userId, CancellationToken ct) =>
+        (await db.Users.FromSqlInterpolated($"SELECT * FROM `users` WHERE `UserId` = {userId} FOR UPDATE")
+            .AsNoTracking().ToListAsync(ct)).SingleOrDefault();
+
     public IQueryable<AdminHousekeepingTaskItem> AdminTasks(string? status, int? roomId, int? assigneeId)
     {
         var tasks = db.HousekeepingTasks.AsNoTracking();
@@ -167,16 +172,16 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
     public async Task<bool> VerifyAsync(int taskId, int actorId, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
+        var assignee = await db.HousekeepingTasks.AsNoTracking().Where(t => t.TaskId == taskId)
+            .Select(t => t.AssignedToUserId).SingleOrDefaultAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var changed = await db.HousekeepingTasks
-            .Where(t => t.TaskId == taskId && t.Status == "Completed" &&
+            .Where(t => t.TaskId == taskId && t.Status == "Completed" && t.AssignedToUserId == assignee &&
                 t.AssignedToUserId != actorId && t.CompletedByUserId != actorId)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, "Verified")
                 .SetProperty(t => t.VerifiedAtUtc, now)
                 .SetProperty(t => t.VerifiedByUserId, actorId), ct);
         if (changed != 1) return false;
-        var assignee = await db.HousekeepingTasks.Where(t => t.TaskId == taskId)
-            .Select(t => t.AssignedToUserId).SingleAsync(ct);
         db.HousekeepingTaskEvents.Add(new HousekeepingTaskEvent
         {
             TaskId = taskId, ActorUserId = actorId, EventType = "Verify", OccurredAtUtc = now,
@@ -294,10 +299,11 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
     public async Task<bool> TransitionAsync(int taskId, int userId, string action, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        await using var transaction = action == "Claim"
+        await using var transaction = action is "Claim" or "ClaimAndStart"
             ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
             : await db.Database.BeginTransactionAsync(ct);
-        if (!await LockUserAsync(db, userId, ct)) return false;
+        var user = await LockAndLoadUserAsync(db, userId, ct);
+        if (user == null) return false;
         int changed;
         string previous;
         string next;
@@ -305,9 +311,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         switch (action)
         {
             case "Claim":
-                if (!await db.Users.AsNoTracking().AnyAsync(u =>
-                        u.UserId == userId && u.Role == "Housekeeper" && u.IsActive, ct))
-                    return false;
+                if (user is not { Role: "Housekeeper", IsActive: true }) return false;
                 previous = "Pending";
                 next = "Accepted";
                 previousAssignee = null;
@@ -316,6 +320,26 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
                     .ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, next)
                         .SetProperty(t => t.AssignedToUserId, userId)
                         .SetProperty(t => t.AcceptedAtUtc, now), ct);
+                break;
+            // ปุ่มเดียว รับงานแล้วเริ่มทำ: ทำใน transaction เดียว แต่ประวัติยังบันทึก 2 ขั้น
+            case "ClaimAndStart":
+                if (user is not { Role: "Housekeeper", IsActive: true }) return false;
+                previous = "Accepted";
+                next = "InProgress";
+                previousAssignee = userId;
+                action = "Start";
+                changed = await db.HousekeepingTasks
+                    .Where(t => t.TaskId == taskId && t.Status == "Pending" && t.AssignedToUserId == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, next)
+                        .SetProperty(t => t.AssignedToUserId, userId)
+                        .SetProperty(t => t.AcceptedAtUtc, now)
+                        .SetProperty(t => t.StartedAtUtc, now), ct);
+                if (changed == 1)
+                    db.HousekeepingTaskEvents.Add(new HousekeepingTaskEvent
+                    {
+                        TaskId = taskId, ActorUserId = userId, EventType = "Claim", OccurredAtUtc = now,
+                        PreviousStatus = "Pending", NewStatus = "Accepted", NewAssignee = userId
+                    });
                 break;
             case "Start":
                 previous = "Accepted";
