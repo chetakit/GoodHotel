@@ -36,6 +36,9 @@ public class MyBookingViewModel
 
     public bool CanRequestRefund { get; set; }
 
+    // ย้ายห้องครั้งล่าสุด (null = ไม่เคยย้าย)
+    public string? RoomMoved { get; set; }
+
     // คำขอคืนเงินล่าสุด: null = ไม่เคยขอ, Requested / Approved / Rejected / Closed
     public string? RefundStatus { get; set; }
 

@@ -21,10 +21,12 @@
         {
             <div class="alert alert-warning" role="alert">@error</div>
         }
-        @if (ViewData["RefundNotices"] is int refundNotices && refundNotices > 0)
+        @if (ViewData["Notices"] is NoticeCount { Total: > 0 } notices)
         {
             <div class="alert alert-info" role="status">
-                ฝ่ายบัญชีพิจารณาคำขอคืนเงินของคุณแล้ว @refundNotices รายการ ดูผลได้ที่การ์ดการจองด้านล่าง
+                @if (notices.Refunds > 0) { <div>ฝ่ายบัญชีพิจารณาคำขอคืนเงินของคุณแล้ว @notices.Refunds รายการ</div> }
+                @if (notices.Moves > 0) { <div>โรงแรมย้ายห้องให้คุณ @notices.Moves ครั้ง กรุณาดูห้องใหม่ก่อนมาเข้าพัก</div> }
+                <div class="small">ดูรายละเอียดได้ที่การ์ดการจองด้านล่าง</div>
             </div>
         }
 

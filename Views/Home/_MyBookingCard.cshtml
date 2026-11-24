@@ -57,6 +57,10 @@
                     {
                         <p>ยอดคงค้าง: @(booking.OutstandingAmount.HasValue ? $"฿{booking.OutstandingAmount:N2}" : "ต้องตรวจสอบ")</p>
                     }
+                    @if (booking.RoomMoved != null)
+                    {
+                        <p class="text-primary-emphasis mb-2">โรงแรมย้ายห้องให้: @booking.RoomMoved · ไม่มีค่าใช้จ่ายเพิ่ม</p>
+                    }
                     @switch (booking.RefundStatus)
                     {
                         case "Requested":

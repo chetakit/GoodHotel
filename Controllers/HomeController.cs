@@ -342,7 +342,7 @@ public class HomeController : Controller
     [HttpGet]
     [Authorize(Roles = "Customer")]
     public async Task<IActionResult> MyBookings(
-        [FromServices] RefundNotices notices,
+        [FromServices] CustomerNotices notices,
         CancellationToken cancellationToken)
     {
         if (!int.TryParse(
@@ -442,8 +442,19 @@ public class HomeController : Controller
             }
         }
 
+        // การย้ายห้องล่าสุดของแต่ละการจอง (เช่น "Room 101 → Room 202: แอร์เสีย") ดึงเฉพาะเมื่อมีการจองที่ยังไม่จบ
+        if (bookings.Any(b => !b.IsHistory))
+        {
+            var moves = await _db.PaymentEvents.AsNoTracking()
+                .Where(e => e.EventType == "RoomMoved" && e.Payment.Booking != null && e.Payment.Booking.UserId == userId)
+                .OrderByDescending(e => e.EventId)
+                .Select(e => new { e.Payment.BookingId, e.Reason }).ToListAsync(cancellationToken);
+            foreach (var booking in bookings.Where(b => !b.IsHistory))
+                booking.RoomMoved = moves.FirstOrDefault(m => m.BookingId == booking.BookingId)?.Reason;
+        }
+
         // ผลคำขอคืนเงินใหม่ที่ยังไม่เคยเห็น: แจ้งบนหน้านี้ แล้วนับว่าเห็นแล้ว (ตัวเลขที่เมนูหายไป)
-        ViewData["RefundNotices"] = await notices.UnseenAsync(HttpContext, _db, userId, cancellationToken);
+        ViewData["Notices"] = await notices.UnseenAsync(HttpContext, _db, userId, cancellationToken, fresh: true);
         notices.MarkSeen(HttpContext, userId);
         return View(bookings);
     }

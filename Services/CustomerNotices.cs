@@ -6,18 +6,23 @@ using Microsoft.Extensions.Caching.Memory;
 namespace GoodHotel.Services;
 
 /// <summary>
-/// แจ้งลูกค้าว่าฝ่ายบัญชีพิจารณาคำขอคืนเงินแล้ว (อนุมัติ/ปฏิเสธ) ด้วยตัวเลขที่เมนู "การจองของฉัน"
+/// แจ้งลูกค้าด้วยตัวเลขที่เมนู "การจองของฉัน" เมื่อฝ่ายบัญชีพิจารณาคำขอคืนเงินแล้ว หรือพนักงานย้ายห้องให้
 /// - "เห็นแล้ว" = เวลาที่เปิดหน้าการจองของฉันครั้งล่าสุด เก็บใน cookie (ไม่ต้องเพิ่มคอลัมน์ในฐานข้อมูล)
 /// - จำตัวเลขไว้ 1 นาทีต่อผู้ใช้ ไม่ให้ทุกหน้าของลูกค้าต้องถามฐานข้อมูลเพิ่ม (~200ms ต่อ query บน Railway)
 /// </summary>
-public sealed class RefundNotices(IMemoryCache cache)
+public sealed record NoticeCount(int Refunds, int Moves)
+{
+    public int Total => Refunds + Moves;
+}
+
+public sealed class CustomerNotices(IMemoryCache cache)
 {
     // แยก cookie ตามผู้ใช้: เบราว์เซอร์เดียวกันอาจมีลูกค้าหลายคนสลับกันล็อกอิน
     private static string SeenCookie(int userId) => $"gh_refund_seen_{userId}";
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan LookBack = TimeSpan.FromDays(14);
 
-    private static string Key(int userId) => $"refund-notices:{userId}";
+    private static string Key(int userId) => $"customer-notices:{userId}";
 
     private static DateTime SeenAtUtc(HttpContext context, int userId)
     {
@@ -29,15 +34,20 @@ public sealed class RefundNotices(IMemoryCache cache)
             : floor;
     }
 
-    /// <summary>จำนวนผลการพิจารณาคำขอคืนเงินที่ลูกค้ายังไม่ได้เปิดดู</summary>
-    public async Task<int> UnseenAsync(HttpContext context, GoodHotelDbContext db, int userId, CancellationToken ct)
+    /// <summary>จำนวนเรื่องที่ลูกค้ายังไม่ได้เปิดดู</summary>
+    /// <param name="fresh">true = ไม่ใช้ค่าที่จำไว้ (หน้าที่กำลังจะนับว่า "เห็นแล้ว" ต้องใช้ค่าล่าสุด ไม่งั้นเรื่องที่เพิ่งเกิดจะหายไปโดยไม่เคยแจ้ง)</param>
+    public async Task<NoticeCount> UnseenAsync(HttpContext context, GoodHotelDbContext db, int userId,
+        CancellationToken ct, bool fresh = false)
     {
-        if (cache.TryGetValue(Key(userId), out int count)) return count;
+        if (!fresh && cache.TryGetValue(Key(userId), out NoticeCount? known) && known != null) return known;
         var seen = SeenAtUtc(context, userId);
-        count = await db.PaymentEvents.AsNoTracking()
+        var types = await db.PaymentEvents.AsNoTracking()
             // เขียน == ตรงๆ: array.Contains ใน .NET 10 ผูกกับ Span ทำให้ EF แปลงเป็น SQL ไม่ได้
-            .CountAsync(e => (e.EventType == "RefundApproved" || e.EventType == "RefundRejected") && e.OccurredAtUtc > seen &&
-                             e.Payment.Booking != null && e.Payment.Booking.UserId == userId, ct);
+            .Where(e => (e.EventType == "RefundApproved" || e.EventType == "RefundRejected" || e.EventType == "RoomMoved") &&
+                        e.OccurredAtUtc > seen && e.Payment.Booking != null && e.Payment.Booking.UserId == userId)
+            .Select(e => e.EventType).ToListAsync(ct);
+        var moves = types.Count(t => t == "RoomMoved");
+        var count = new NoticeCount(types.Count - moves, moves);
         cache.Set(Key(userId), count, Lifetime);
         return count;
     }
@@ -48,6 +58,6 @@ public sealed class RefundNotices(IMemoryCache cache)
         context.Response.Cookies.Append(SeenCookie(userId), DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture),
             new CookieOptions { HttpOnly = true, IsEssential = true, SameSite = SameSiteMode.Lax,
                 Secure = context.Request.IsHttps, Expires = DateTimeOffset.UtcNow.Add(LookBack) });
-        cache.Set(Key(userId), 0, Lifetime);
+        cache.Set(Key(userId), new NoticeCount(0, 0), Lifetime);
     }
 }

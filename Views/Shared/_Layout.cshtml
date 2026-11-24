@@ -1,14 +1,14 @@
-﻿@inject GoodHotel.Services.RefundNotices RefundNotices
+﻿@inject GoodHotel.Services.CustomerNotices Notices
 @inject GoodHotel.Models.GoodHotelDbContext LayoutDb
 @{
     var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
     var signedIn = User.Identity?.IsAuthenticated == true;
 
-    // ลูกค้า: ผลคำขอคืนเงินที่ยังไม่ได้เปิดดู (จำไว้ 1 นาที ไม่ถามฐานข้อมูลทุกหน้า)
-    var refundNotices = 0;
+    // ลูกค้า: ผลคำขอคืนเงินและการย้ายห้องที่ยังไม่ได้เปิดดู (จำไว้ 1 นาที ไม่ถามฐานข้อมูลทุกหน้า)
+    var noticeCount = 0;
     if (role == "Customer" && int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var layoutUserId))
     {
-        refundNotices = await RefundNotices.UnseenAsync(Context, LayoutDb, layoutUserId, Context.RequestAborted);
+        noticeCount = (await Notices.UnseenAsync(Context, LayoutDb, layoutUserId, Context.RequestAborted)).Total;
     }
     var action = ViewContext.RouteData.Values["Action"]?.ToString() ?? "";
     string Active(string name) => action.Equals(name, StringComparison.OrdinalIgnoreCase) ? "active" : "";
@@ -55,9 +55,9 @@
                         {
                             <li class="nav-item"><a class="nav-link @Active("MyBookings")" asp-controller="Home" asp-action="MyBookings">
                                 <span>การจองของฉัน</span>
-                                @if (refundNotices > 0)
+                                @if (noticeCount > 0)
                                 {
-                                    <span class="badge rounded-pill text-bg-danger ms-1" title="ฝ่ายบัญชีพิจารณาคำขอคืนเงินแล้ว">@refundNotices<span class="visually-hidden"> ผลคำขอคืนเงินใหม่</span></span>
+                                    <span class="badge rounded-pill text-bg-danger ms-1" title="มีเรื่องใหม่เกี่ยวกับการจองของคุณ">@noticeCount<span class="visually-hidden"> เรื่องใหม่</span></span>
                                 }
                             </a></li>
                         }
