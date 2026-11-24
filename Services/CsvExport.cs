@@ -18,15 +18,19 @@ public static class CsvExport
     }
 
     // กันสูตร Excel (ค่าที่ขึ้นต้นด้วย = + - @) ไม่ให้ถูกรันตอนเปิดไฟล์
+    // ยกเว้นจำนวนติดลบ เช่น -7650.00 (ยอดคืนเงิน) ไม่งั้น Excel มองเป็นข้อความแล้ว SUM ไม่หักให้
     private static string Escape(string? value)
     {
         value ??= string.Empty;
         var trimmed = value.TrimStart();
         if (value.StartsWith('\t') || value.StartsWith('\r') || value.StartsWith('\n') ||
-            (trimmed.Length > 0 && "=+-@".Contains(trimmed[0])))
+            (trimmed.Length > 0 && "=+-@".Contains(trimmed[0]) && !IsNegativeNumber(value)))
             value = "'" + value;
         return "\"" + value.Replace("\"", "\"\"") + "\"";
     }
+
+    private static bool IsNegativeNumber(string value) => value.StartsWith('-') &&
+        decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _);
 
     /// <summary>แปลงตัวเลข/วันที่เป็นข้อความรูปแบบกลาง (ข้อความธรรมดาส่งตรงได้เลย ไม่ต้องผ่านตัวนี้)</summary>
     public static string? Format(object? value) => value switch

@@ -217,4 +217,10 @@ Check(ProfileViewModel.NormalizePhone("089 111 2233") == "0891112233" && Profile
     ProfileViewModel.NormalizePhone("9911122334") == null && ProfileViewModel.NormalizePhone("08911x2233") == null &&
     ProfileViewModel.NormalizePhone(null) == null, "Profile phone must be a Thai mobile number.");
 
+var csvText = System.Text.Encoding.UTF8.GetString(CsvExport.Build(["h"],
+    [["-7650.00"], ["-5"], ["=1+1"], ["-1+cmd"], ["-2+3"], ["+66811112222"], ["@x"], [" -5"], ["--5"]]));
+Check(csvText.Contains("\"-7650.00\"") && csvText.Contains("\"-5\""), "Negative amounts must stay numbers in CSV.");
+foreach (var risky in new[] { "=1+1", "-1+cmd", "-2+3", "+66811112222", "@x", " -5", "--5" })
+    Check(csvText.Contains($"\"'{risky}\""), $"CSV must still neutralise {risky}.");
+
 Console.WriteLine("Payment workflow regression checks passed.");
