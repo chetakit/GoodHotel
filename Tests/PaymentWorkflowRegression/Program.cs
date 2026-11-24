@@ -183,4 +183,15 @@ Check(WalkInService.MatchCustomer(samePhone, "มานี", "มีสุข", 
 WalkInCustomer[] twins = [new(1, "ก", "ข", false), new(2, "ก", "ข", true)];
 Check(WalkInService.MatchCustomer(twins, "ก", "ข", null) == (null, true), "Duplicate names need a staff choice.");
 
+// รหัสผ่านเก่า: ค่า hash ในฐานข้อมูลต้องใช้แทนรหัสผ่านไม่ได้
+var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+var hash = hasher.HashPassword(new User(), "secret");
+Check(LegacyPassword.IsHash(hash) && !LegacyPassword.Matches(hash, hash), "A stored hash must not work as a password.");
+var v2 = new Microsoft.AspNetCore.Identity.PasswordHasher<User>(Microsoft.Extensions.Options.Options.Create(
+    new Microsoft.AspNetCore.Identity.PasswordHasherOptions
+    { CompatibilityMode = Microsoft.AspNetCore.Identity.PasswordHasherCompatibilityMode.IdentityV2 })).HashPassword(new User(), "secret");
+Check(!LegacyPassword.Matches(v2, v2), "An Identity V2 hash must not work as a password.");
+Check(LegacyPassword.Matches("plain123", "plain123") && LegacyPassword.Matches("AAAA", "AAAA"), "Old plain-text passwords still migrate.");
+Check(!LegacyPassword.Matches("plain123", "other"), "A wrong plain-text password is refused.");
+
 Console.WriteLine("Payment workflow regression checks passed.");

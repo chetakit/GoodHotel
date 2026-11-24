@@ -820,8 +820,8 @@ public class HomeController : Controller
 
         if (passwordResult == PasswordVerificationResult.Failed)
         {
-            // ตรวจสอบรหัสผ่านเก่า
-            if (user.Password != data.Password)
+            // ตรวจสอบรหัสผ่านเก่า (เฉพาะที่ยังไม่ใช่ hash)
+            if (!LegacyPassword.Matches(user.Password, data.Password))
             {
                 ViewBag.Status = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
                 return View(data);

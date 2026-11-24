@@ -229,6 +229,8 @@ public sealed class BookingService
                     booking.RoomId == request.RoomId &&
                     booking.CheckIn == request.CheckIn &&
                     booking.CheckOut == request.CheckOut &&
+                    // เช็คเอาท์ไปแล้ว (เช่น ออกก่อนกำหนด) ถือว่าจบ จองห้องเดิมวันเดิมใหม่ได้
+                    !_db.BookingStays.Any(stay => stay.BookingId == booking.BookingId && stay.Status == "CheckedOut") &&
                     booking.Guests == request.Guests &&
                     (booking.ExtraBed == request.ExtraBedCount ||
                      (request.ExtraBedCount == 0 && booking.ExtraBed == null)))
