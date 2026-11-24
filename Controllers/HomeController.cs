@@ -187,6 +187,33 @@ public class HomeController : Controller
         return View(search);
     }
 
+    /// <summary>รายละเอียดห้อง ถ้ามาจากการค้นหาจะพกวันที่และจำนวนคนมาด้วย กดจองต่อได้เลย</summary>
+    [HttpGet]
+    public async Task<IActionResult> RoomDetails(int id, DateOnly? checkIn, DateOnly? checkOut, int? guests,
+        CancellationToken ct)
+    {
+        var room = await _db.Rooms.AsNoTracking().Where(r => r.RoomId == id)
+            .Select(r => new RoomListViewModel
+            {
+                RoomId = r.RoomId, RoomNumber = r.Room1, Type = r.Type, Rate = r.Rate, Capacity = r.Capacity,
+                Status = r.Status, ImagePath = r.ImagePath, Description = r.Description
+            }).SingleOrDefaultAsync(ct);
+        if (room == null) return NotFound();
+        room.ImagePath = RoomImageStorage.GetDisplayPath(_environment.WebRootPath, room.ImagePath);
+
+        var today = _availability.HotelToday();
+        ViewData["HotelToday"] = today;
+        // วันที่ผิดหรือห้องไม่ว่างช่วงนั้น: ไม่แสดงปุ่มจองตรง ให้เลือกวันใหม่จากปฏิทิน
+        if (ModelState.IsValid && checkIn >= today && checkOut > checkIn && guests > 0 && room.Capacity >= guests &&
+            room.Status == "Available" && await _availability.IsAvailableAsync(id, checkIn.Value, checkOut.Value, ct))
+        {
+            ViewData["CheckIn"] = checkIn;
+            ViewData["CheckOut"] = checkOut;
+            ViewData["Guests"] = guests;
+        }
+        return View(room);
+    }
+
     [HttpGet]
     public async Task<IActionResult> RoomAvailability(
         int? roomId,

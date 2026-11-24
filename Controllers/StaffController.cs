@@ -433,7 +433,7 @@ namespace GoodHotel.Controllers
             var actorId = await GetActorIdAsync(ct);
             if (!actorId.HasValue) return Forbid();
             var error = await _housekeeping.ReworkAsync(id, actorId.Value, reason, ct);
-            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "ส่งงานกลับให้แม่บ้านทำใหม่แล้ว ห้องยังจองไม่ได้จนกว่าจะตรวจผ่าน";
+            TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "ส่งงานกลับให้แม่บ้านทำใหม่แล้ว ห้องยังเช็คอินไม่ได้จนกว่าจะตรวจผ่าน";
             return RedirectToAction(nameof(VerificationTasks));
         }
 
@@ -458,7 +458,7 @@ namespace GoodHotel.Controllers
             if (!actorId.HasValue) return Forbid();
             var verified = await _housekeeping.VerifyAsync(id, actorId.Value, ct);
             TempData[verified ? "StaffSuccess" : "StaffError"] = verified
-                ? "ตรวจผ่านแล้ว ห้องกลับมาว่างให้จองได้"
+                ? "ตรวจผ่านแล้ว ห้องพร้อมให้เข้าพัก"
                 : "ตรวจงานนี้ไม่ได้ (งานถูกเปลี่ยนไปแล้ว หรือคุณเป็นคนทำงานนี้เอง)";
             return RedirectToAction(nameof(VerificationTasks));
         }

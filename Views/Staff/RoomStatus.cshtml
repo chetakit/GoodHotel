@@ -12,7 +12,7 @@
         RoomLiveStatus.Available => "ok",
         RoomLiveStatus.ArrivingToday => "accent",
         RoomLiveStatus.Occupied => "info",
-        RoomLiveStatus.Cleaning => "warn",
+        RoomLiveStatus.Cleaning or RoomLiveStatus.Inspection => "warn",
         RoomLiveStatus.Maintenance => "bad",
         _ => "none"
     };

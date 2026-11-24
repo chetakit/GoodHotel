@@ -73,4 +73,14 @@ Check(RoomAvailabilityService.CurrentStays(db.BookingStays, 1).ToQueryString().C
 Check(RoomAvailabilityService.PendingCheckoutCleaning(db.HousekeepingTasks, 1).ToQueryString().Contains("CheckoutCleaning"),
     "The cleaning filter must translate for MySQL.");
 
+// รอทำความสะอาด: กันถึงวันนี้ จองล่วงหน้าได้
+var dirty = RoomAvailabilityService.CleaningPeriod(1, new DateTime(2026, 11, 14, 5, 0, 0, DateTimeKind.Utc), today);
+Check(dirty.Overlaps(today, today.AddDays(1)), "A room awaiting cleaning cannot be booked for today.");
+Check(!dirty.Overlaps(today.AddDays(1), today.AddDays(2)), "A room awaiting cleaning can be booked from tomorrow.");
+var forgotten = RoomAvailabilityService.CleaningPeriod(1, new DateTime(2026, 11, 10, 5, 0, 0, DateTimeKind.Utc), today);
+Check(forgotten.Overlaps(today, today.AddDays(1)) && !forgotten.Overlaps(today.AddDays(1), today.AddDays(2)),
+    "Cleaning left over from earlier days still blocks today only.");
+Check(RoomStatusService.Label(RoomLiveStatus.Inspection) != RoomStatusService.Label(RoomLiveStatus.Cleaning),
+    "Staff can tell inspection from cleaning.");
+
 Console.WriteLine("Maintenance workflow regression checks passed.");

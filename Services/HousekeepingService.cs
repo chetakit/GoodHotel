@@ -190,7 +190,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
 
     /// <summary>
     /// ตรวจไม่ผ่าน: ส่งกลับให้แม่บ้านคนเดิมทำใหม่ (ถ้าคนเดิมใช้งานไม่ได้แล้ว ส่งกลับเข้ากองให้คนอื่นรับ)
-    /// ห้องยังจองไม่ได้ เพราะงานทำความสะอาดยังไม่ Verified
+    /// ห้องยังเช็คอินไม่ได้ เพราะงานทำความสะอาดยังไม่ Verified
     /// </summary>
     public async Task<string?> ReworkAsync(int taskId, int actorId, string? reason, CancellationToken ct)
     {

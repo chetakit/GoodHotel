@@ -10,7 +10,8 @@ public enum RoomLiveStatus
     Available,      // ว่าง พร้อมขาย
     ArrivingToday,  // ว่าง แต่มีลูกค้าจองเข้าพักวันนี้
     Occupied,       // มีผู้เข้าพัก
-    Cleaning,       // เช็คเอาท์แล้ว รอแม่บ้านทำความสะอาด / รอตรวจ
+    Cleaning,       // เช็คเอาท์แล้ว รอแม่บ้านทำความสะอาด
+    Inspection,     // แม่บ้านทำเสร็จแล้ว รอพนักงานต้อนรับตรวจ
     Maintenance,    // ซ่อมบำรุง
     Closed          // Admin ตั้งไว้ว่าไม่พร้อมขาย (เช่น Reserved)
 }
@@ -37,6 +38,7 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
         RoomLiveStatus.ArrivingToday => "รอเช็คอิน",
         RoomLiveStatus.Occupied => "มีผู้เข้าพัก",
         RoomLiveStatus.Cleaning => "รอทำความสะอาด",
+        RoomLiveStatus.Inspection => "รอตรวจห้อง",
         RoomLiveStatus.Maintenance => "ซ่อมบำรุง",
         _ => "ไม่พร้อมขาย"
     };
@@ -114,7 +116,13 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
                 return Item(room, RoomLiveStatus.Maintenance, "Admin ตั้งเป็นซ่อมบำรุงไว้ (ไม่มีงานซ่อมค้าง) เปิดห้องได้ที่หน้าจัดการห้อง");
 
             if (cleaning != null)
-                return Item(room, RoomLiveStatus.Cleaning, $"งานทำความสะอาด: {ThaiText.Status(cleaning.Status)}");
+            {
+                // มีแขกจองเข้าวันนี้ด้วย: บอกพนักงานให้รีบ เพราะเช็คอินไม่ได้จนกว่าจะตรวจผ่าน
+                var waiting = arrival == null ? "" : $" · {arrival.GuestName} รอเช็คอินวันนี้";
+                return cleaning.Status == "Completed"
+                    ? Item(room, RoomLiveStatus.Inspection, "แม่บ้านทำเสร็จแล้ว รอพนักงานต้อนรับตรวจ" + waiting, arrival?.BookingId)
+                    : Item(room, RoomLiveStatus.Cleaning, $"งานทำความสะอาด: {ThaiText.Status(cleaning.Status)}{waiting}", arrival?.BookingId);
+            }
 
             // Admin ปิดขายห้องไว้ (รวมค่า Occupied เก่าที่เคยให้ Admin ตั้งเอง: ไม่มีแขกจริง จึงถือเป็นปิดขาย)
             if (room.Status != "Available")

@@ -1,0 +1,65 @@
+@model GoodHotel.Models.ViewModels.RoomListViewModel
+@{
+    ViewData["Title"] = $"{Model.Type} · {Model.RoomNumber}";
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    var checkIn = (DateOnly?)ViewData["CheckIn"];
+    var checkOut = (DateOnly?)ViewData["CheckOut"];
+    var guests = (int?)ViewData["Guests"];
+    var hasDates = checkIn.HasValue && checkOut.HasValue && guests.HasValue;
+    string? Iso(DateOnly? d) => d?.ToString("yyyy-MM-dd", culture);
+}
+
+<section class="content-section">
+    <div class="container">
+        <p class="mb-3">
+            <a asp-action="Rooms" asp-route-CheckIn="@Iso(checkIn)" asp-route-CheckOut="@Iso(checkOut)" asp-route-Guests="@guests">← ห้องพักทั้งหมด</a>
+        </p>
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <img class="room-photo" src="@Model.ImagePath" alt="ห้อง @Model.Type หมายเลข @Model.RoomNumber"
+                     onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+            </div>
+            <div class="col-lg-5">
+                <div class="feature-box">
+                    <h2 class="h4 mb-1">@ThaiText.OrDash(Model.Type)</h2>
+                    <p class="text-muted mb-3">@Model.RoomNumber</p>
+                    <div class="room-price mb-3">
+                        @(Model.Rate.HasValue ? $"฿{Model.Rate.Value.ToString("N2", culture)}" : "ราคาไม่ระบุ")
+                        <small>/คืน</small>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.Description)) { <p>@Model.Description</p> }
+                    <dl class="about-contact">
+                        <dt>รับได้</dt><dd>@(Model.Capacity.HasValue ? $"{Model.Capacity} คน" : "ไม่ระบุ")</dd>
+                        <dt>เตียงเสริม</dt><dd>1 เตียง ฿500 ต่อคืน เลือกได้ตอนจอง</dd>
+                        <dt>การชำระเงิน</dt><dd>ออนไลน์ ภายใน @((int)PaymentDeadline.Window.TotalMinutes) นาทีหลังจอง</dd>
+                        <dt>การยกเลิก</dt><dd>ยังไม่ชำระยกเลิกฟรี ชำระแล้วขอคืนเงินได้ก่อนเช็คอิน · <a asp-action="About">ดูเงื่อนไข</a></dd>
+                    </dl>
+                    @if (Model.Status != "Available")
+                    {
+                        <button type="button" class="btn btn-outline-secondary w-100" disabled>ไม่พร้อมให้จอง</button>
+                    }
+                    else
+                    {
+                        if (hasDates)
+                        {
+                            <a class="btn btn-primary w-100" asp-action="Booking" asp-route-roomId="@Model.RoomId"
+                               asp-route-checkIn="@Iso(checkIn)" asp-route-checkOut="@Iso(checkOut)" asp-route-guests="@guests">
+                                จองวันที่ @ThaiText.Date(checkIn) – @ThaiText.Date(checkOut)
+                            </a>
+                        }
+                        <button type="button" class="btn @(hasDates ? "btn-link mt-1" : "btn-primary") w-100 js-open-room-calendar"
+                                data-room-id="@Model.RoomId"
+                                data-room-number="@Model.RoomNumber"
+                                data-room-type="@Model.Type"
+                                data-room-rate="@(Model.Rate?.ToString(culture) ?? "")"
+                                data-room-capacity="@(Model.Capacity?.ToString(culture) ?? "")">
+                            @(hasDates ? "เปลี่ยนวันที่" : "ดูวันว่างและจอง")
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<partial name="_RoomCalendar" />

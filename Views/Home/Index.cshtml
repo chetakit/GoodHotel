@@ -83,7 +83,7 @@
                                 {
                                     <div class="room-features"><span>พักได้ @room.Capacity.Value คน</span></div>
                                 }
-                                <a asp-controller="Home" asp-action="Rooms" class="btn btn-outline-primary w-100">เลือกวันที่เข้าพัก</a>
+                                <a asp-action="RoomDetails" asp-route-id="@room.RoomId" class="btn btn-outline-primary w-100">ดูรายละเอียดและวันว่าง</a>
                             </div>
                         </article>
                     </div>

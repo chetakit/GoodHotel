@@ -372,6 +372,9 @@ dd { margin-bottom: .6rem; }
 .feature-box h4 { margin-bottom: .35rem; }
 .feature-icon { display: none; }
 
+/* รายละเอียดห้อง */
+.room-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #e8e3da; }
+
 /* เกี่ยวกับเรา */
 .about-steps { padding-left: 1.25rem; margin: 0; }
 .about-steps li { margin-bottom: .6rem; }

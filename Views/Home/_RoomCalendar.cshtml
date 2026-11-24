@@ -1,0 +1,95 @@
+@* ปฏิทินวันว่างและเลือกวันจอง ใช้ร่วมกันในหน้าห้องพักและหน้ารายละเอียดห้อง (site.js เปิดจากปุ่ม .js-open-room-calendar) *@
+@{
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    var hotelToday = (DateOnly)ViewData["HotelToday"]!;
+}
+<div id="room-calendar-modal"
+     class="calendar-modal"
+     data-availability-url="@Url.Action("RoomAvailability", "Home")"
+     data-booking-url="@Url.Action("Booking", "Home")"
+     data-today="@hotelToday.ToString("yyyy-MM-dd", culture)"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="calendar-title"
+     aria-hidden="true"
+     hidden>
+    <div class="calendar-dialog">
+        <button type="button"
+                class="calendar-close"
+                data-calendar-close
+                aria-label="ปิดปฏิทิน">
+            &times;
+        </button>
+        <div class="calendar-heading">
+            <h2 id="calendar-title">เลือกวันเข้าพัก</h2>
+            <p id="calendar-room-details" class="text-muted mb-0"></p>
+        </div>
+
+        <div class="calendar-month-navigation">
+            <button type="button"
+                    id="calendar-previous-month"
+                    class="calendar-month-button"
+                    aria-label="เดือนก่อนหน้า">
+                &lsaquo;
+            </button>
+            <h3 id="calendar-month-label" class="h5 mb-0"></h3>
+            <button type="button"
+                    id="calendar-next-month"
+                    class="calendar-month-button"
+                    aria-label="เดือนถัดไป">
+                &rsaquo;
+            </button>
+        </div>
+
+        <div class="calendar-weekdays" aria-hidden="true">
+            <span>อา.</span><span>จ.</span><span>อ.</span><span>พ.</span>
+            <span>พฤ.</span><span>ศ.</span><span>ส.</span>
+        </div>
+        <div id="calendar-days" class="calendar-days" aria-live="polite"></div>
+        <div class="calendar-legend">
+            <span><i class="legend-dot available"></i>ว่าง</span>
+            <span><i class="legend-dot occupied"></i>ไม่พร้อมให้จอง</span>
+            <span><i class="legend-dot selected"></i>วันที่เลือก</span>
+        </div>
+
+        <div id="calendar-error" class="alert alert-danger py-2 mt-3" role="alert" hidden></div>
+        <div id="calendar-selection-prompt" class="calendar-prompt" aria-live="polite">
+            เลือกวันที่เข้าพักเพื่อเริ่มต้น
+        </div>
+
+        <div class="calendar-booking-controls">
+            <div>
+                <label for="calendar-guests" class="form-label">จำนวนผู้เข้าพัก</label>
+                <input id="calendar-guests"
+                       class="form-control"
+                       type="number"
+                       min="1"
+                       step="1"
+                       value="1"
+                       required />
+            </div>
+            <div class="calendar-estimate">
+                <small>จำนวนคืน</small>
+                <strong id="calendar-night-count">-</strong>
+            </div>
+            <div class="calendar-estimate">
+                <small>ยอดประมาณการ</small>
+                <strong id="calendar-total">-</strong>
+            </div>
+        </div>
+
+        <div class="calendar-actions">
+            <button type="button"
+                    class="btn btn-outline-primary hotel-secondary-btn"
+                    data-calendar-close>
+                ยกเลิก
+            </button>
+            <button type="button"
+                    id="calendar-continue"
+                    class="btn btn-primary hotel-primary-btn"
+                    disabled>
+                ดำเนินการจอง
+            </button>
+        </div>
+    </div>
+</div>

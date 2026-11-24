@@ -3,7 +3,6 @@
 @{
     ViewData["Title"] = "ห้องพัก";
     var culture = System.Globalization.CultureInfo.InvariantCulture;
-    var hotelToday = (DateOnly)ViewData["HotelToday"]!;
 }
 
 <section class="content-section">
@@ -58,10 +57,15 @@
                 {
                     <div class="col-lg-4 col-md-6">
                         <article class="room-card h-100">
+                            <a asp-action="RoomDetails" asp-route-id="@room.RoomId"
+                               asp-route-checkIn="@(Model.HasSearched ? Model.CheckIn?.ToString("yyyy-MM-dd", culture) : null)"
+                               asp-route-checkOut="@(Model.HasSearched ? Model.CheckOut?.ToString("yyyy-MM-dd", culture) : null)"
+                               asp-route-guests="@(Model.HasSearched ? Model.Guests : null)">
                             <img class="room-image w-100"
                                  src="@room.ImagePath"
                                  alt="@room.Type room @room.RoomNumber"
                                  onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+                            </a>
                             <div class="room-body">
                                 <div class="room-meta">
                                     <div>
@@ -69,7 +73,8 @@
                                         <span class="text-muted">@room.RoomNumber</span>
                                     </div>
                                     <span class="badge-status @(room.Status == "Available" ? "available" : "booked")">
-                                        @(room.Status == "Available" ? "ว่าง" : ThaiText.Status(room.Status))
+                                        @* ยังไม่ค้นวันที่ = ยังไม่รู้ว่าว่างวันไหน บอกได้แค่ว่าเปิดให้จอง *@
+                                        @(room.Status == "Available" ? (Model.HasSearched ? "ว่าง" : "เปิดให้จอง") : "ไม่พร้อมให้จอง")
                                     </span>
                                 </div>
                                 <div class="room-price">
@@ -90,6 +95,10 @@
                                         <span>ไม่ระบุจำนวนผู้เข้าพัก</span>
                                     }
                                 </div>
+                                <a class="btn btn-outline-primary w-100" asp-action="RoomDetails" asp-route-id="@room.RoomId"
+                               asp-route-checkIn="@(Model.HasSearched ? Model.CheckIn?.ToString("yyyy-MM-dd", culture) : null)"
+                               asp-route-checkOut="@(Model.HasSearched ? Model.CheckOut?.ToString("yyyy-MM-dd", culture) : null)"
+                               asp-route-guests="@(Model.HasSearched ? Model.Guests : null)">ดูรายละเอียด</a>
                                 @if (room.Status == "Available" && Model.HasSearched && ViewData.ModelState.IsValid)
                                 {
                                     @* ค้นหาด้วยวันที่มาแล้ว: ไปหน้ายืนยันการจองได้เลย ไม่ต้องเลือกวันซ้ำ *@
@@ -138,93 +147,4 @@
     </div>
 </section>
 
-<div id="room-calendar-modal"
-     class="calendar-modal"
-     data-availability-url="@Url.Action("RoomAvailability", "Home")"
-     data-booking-url="@Url.Action("Booking", "Home")"
-     data-today="@hotelToday.ToString("yyyy-MM-dd", culture)"
-     role="dialog"
-     aria-modal="true"
-     aria-labelledby="calendar-title"
-     aria-hidden="true"
-     hidden>
-    <div class="calendar-dialog">
-        <button type="button"
-                class="calendar-close"
-                data-calendar-close
-                aria-label="ปิดปฏิทิน">
-            &times;
-        </button>
-        <div class="calendar-heading">
-            <h2 id="calendar-title">เลือกวันเข้าพัก</h2>
-            <p id="calendar-room-details" class="text-muted mb-0"></p>
-        </div>
-
-        <div class="calendar-month-navigation">
-            <button type="button"
-                    id="calendar-previous-month"
-                    class="calendar-month-button"
-                    aria-label="เดือนก่อนหน้า">
-                &lsaquo;
-            </button>
-            <h3 id="calendar-month-label" class="h5 mb-0"></h3>
-            <button type="button"
-                    id="calendar-next-month"
-                    class="calendar-month-button"
-                    aria-label="เดือนถัดไป">
-                &rsaquo;
-            </button>
-        </div>
-
-        <div class="calendar-weekdays" aria-hidden="true">
-            <span>อา.</span><span>จ.</span><span>อ.</span><span>พ.</span>
-            <span>พฤ.</span><span>ศ.</span><span>ส.</span>
-        </div>
-        <div id="calendar-days" class="calendar-days" aria-live="polite"></div>
-        <div class="calendar-legend">
-            <span><i class="legend-dot available"></i>ว่าง</span>
-            <span><i class="legend-dot occupied"></i>ไม่พร้อมให้จอง</span>
-            <span><i class="legend-dot selected"></i>วันที่เลือก</span>
-        </div>
-
-        <div id="calendar-error" class="alert alert-danger py-2 mt-3" role="alert" hidden></div>
-        <div id="calendar-selection-prompt" class="calendar-prompt" aria-live="polite">
-            เลือกวันที่เข้าพักเพื่อเริ่มต้น
-        </div>
-
-        <div class="calendar-booking-controls">
-            <div>
-                <label for="calendar-guests" class="form-label">จำนวนผู้เข้าพัก</label>
-                <input id="calendar-guests"
-                       class="form-control"
-                       type="number"
-                       min="1"
-                       step="1"
-                       value="1"
-                       required />
-            </div>
-            <div class="calendar-estimate">
-                <small>จำนวนคืน</small>
-                <strong id="calendar-night-count">-</strong>
-            </div>
-            <div class="calendar-estimate">
-                <small>ยอดประมาณการ</small>
-                <strong id="calendar-total">-</strong>
-            </div>
-        </div>
-
-        <div class="calendar-actions">
-            <button type="button"
-                    class="btn btn-outline-primary hotel-secondary-btn"
-                    data-calendar-close>
-                ยกเลิก
-            </button>
-            <button type="button"
-                    id="calendar-continue"
-                    class="btn btn-primary hotel-primary-btn"
-                    disabled>
-                ดำเนินการจอง
-            </button>
-        </div>
-    </div>
-</div>
+<partial name="_RoomCalendar" />

@@ -36,8 +36,12 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
         return scheduledCheckOut.HasValue && scheduledCheckOut.Value < actual ? scheduledCheckOut : actual;
     }
 
-    public static RoomBlockedPeriod CleaningPeriod(int roomId, DateTime? checkedOutAtUtc) =>
-        new(roomId, checkedOutAtUtc.HasValue ? HotelDate(checkedOutAtUtc.Value) : null, null);
+    /// <summary>
+    /// รอทำความสะอาด/รอตรวจ: กันถึงวันนี้เท่านั้น จองล่วงหน้าตั้งแต่พรุ่งนี้ได้
+    /// (เช็คอินยังต้องตรวจห้องผ่านก่อนเสมอ ตรวจใน StayService)
+    /// </summary>
+    public static RoomBlockedPeriod CleaningPeriod(int roomId, DateTime? checkedOutAtUtc, DateOnly today) =>
+        new(roomId, checkedOutAtUtc.HasValue ? HotelDate(checkedOutAtUtc.Value) : null, today.AddDays(1));
 
     public async Task<IReadOnlyList<RoomBlockedPeriod>> GetBlockedPeriodsAsync(
         IReadOnlyCollection<int> roomIds, DateOnly start, DateOnly end, CancellationToken ct)
@@ -95,7 +99,7 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
                     CheckedOutAtUtc = stay == null || stay.Status != "CheckedOut" || stay.Booking.RoomId != task.RoomId
                         ? null : stay.CheckedOutAtUtc
                 }).ToListAsync(ct))
-                .Select(t => CleaningPeriod(t.RoomId, t.CheckedOutAtUtc))
+                .Select(t => CleaningPeriod(t.RoomId, t.CheckedOutAtUtc, today))
         };
 
         var periods = new List<RoomBlockedPeriod>();
