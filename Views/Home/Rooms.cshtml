@@ -63,14 +63,14 @@
                                asp-route-guests="@(Model.HasSearched ? Model.Guests : null)">
                             <img class="room-image w-100"
                                  src="@room.ImagePath"
-                                 alt="@room.Type room @room.RoomNumber"
+                                 alt="@room.Type หมายเลข @room.RoomNumber"
                                  onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
                             </a>
                             <div class="room-body">
                                 <div class="room-meta">
                                     <div>
                                         <h4 class="mb-1">@room.Type</h4>
-                                        <span class="text-muted">@room.RoomNumber</span>
+                                        <span class="text-muted">ห้อง @room.RoomNumber</span>
                                     </div>
                                     <span class="badge-status @(room.Status == "Available" ? "available" : "booked")">
                                         @* ยังไม่ค้นวันที่ = ยังไม่รู้ว่าว่างวันไหน บอกได้แค่ว่าเปิดให้จอง *@

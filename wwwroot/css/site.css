@@ -376,6 +376,7 @@ dd { margin-bottom: .6rem; }
 .room-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #e8e3da; }
 
 /* เกี่ยวกับเรา */
+.about-photo { width: 100%; height: clamp(160px, 28vw, 320px); object-fit: cover; border-radius: 8px; margin-bottom: 1.75rem; }
 .about-steps { padding-left: 1.25rem; margin: 0; }
 .about-steps li { margin-bottom: .6rem; }
 .about-steps strong { display: block; }

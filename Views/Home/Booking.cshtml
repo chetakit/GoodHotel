@@ -99,7 +99,7 @@
                         {
                             <dl class="row mb-0">
                                 <dt class="col-sm-5">ห้อง</dt>
-                                <dd class="col-sm-7">@Model.RoomType - @Model.RoomNumber</dd>
+                                <dd class="col-sm-7">@Model.RoomType · ห้อง @Model.RoomNumber</dd>
                                 <dt class="col-sm-5">ราคา</dt>
                                 <dd class="col-sm-7">@(Model.Rate.HasValue ? $"฿{Model.Rate.Value:N2} / คืน" : "ไม่ระบุ")</dd>
                                 <dt class="col-sm-5">รับได้</dt>

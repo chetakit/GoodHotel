@@ -16,13 +16,13 @@
         </p>
         <div class="row g-4">
             <div class="col-lg-7">
-                <img class="room-photo" src="@Model.ImagePath" alt="ห้อง @Model.Type หมายเลข @Model.RoomNumber"
+                <img class="room-photo" src="@Model.ImagePath" alt="@Model.Type หมายเลข @Model.RoomNumber"
                      onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
             </div>
             <div class="col-lg-5">
                 <div class="feature-box">
                     <h2 class="h4 mb-1">@ThaiText.OrDash(Model.Type)</h2>
-                    <p class="text-muted mb-3">@Model.RoomNumber</p>
+                    <p class="text-muted mb-3">ห้อง @Model.RoomNumber</p>
                     <div class="room-price mb-3">
                         @(Model.Rate.HasValue ? $"฿{Model.Rate.Value.ToString("N2", culture)}" : "ราคาไม่ระบุ")
                         <small>/คืน</small>

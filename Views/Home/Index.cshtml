@@ -3,8 +3,6 @@
 @{
     ViewData["Title"] = "หน้าแรก";
     var today = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-    var heroPhoto = Model.FeaturedRooms.Select(r => r.ImagePath).FirstOrDefault(p => !string.IsNullOrEmpty(p))
-        ?? Url.Content("~/images/default-room.svg");
     var lowestRate = Model.FeaturedRooms.Where(r => r.Rate.HasValue).Select(r => r.Rate!.Value).DefaultIfEmpty().Min();
 }
 
@@ -38,8 +36,7 @@
                 </form>
             </div>
             <div class="col-lg-6">
-                <img class="home-hero-photo" src="@heroPhoto" alt="ห้องพักของ Good Hotel"
-                     onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
+                <img class="home-hero-photo" src="~/images/bangkok-skyline.jpg" alt="ตึกสูงใจกลางกรุงเทพฯ ยามเย็น" />
             </div>
         </div>
     </div>
@@ -66,7 +63,7 @@
                 {
                     <div class="col-lg-4 col-md-6">
                         <article class="room-card h-100">
-                            <img class="room-image" src="@room.ImagePath" alt="ห้อง @room.Type หมายเลข @room.RoomNumber" loading="lazy"
+                            <img class="room-image" src="@room.ImagePath" alt="@room.Type หมายเลข @room.RoomNumber" loading="lazy"
                                  onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
                             <div class="room-body">
                                 <div class="room-meta">

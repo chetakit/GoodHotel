@@ -10,7 +10,7 @@
         <div class="booking-panel mb-3">
             <dl class="row mb-0">
                 <dt class="col-sm-4">ลูกค้า</dt><dd class="col-sm-8">@ThaiText.OrDash(Model.GuestName?.Trim())</dd>
-                <dt class="col-sm-4">ห้องเดิม</dt><dd class="col-sm-8">@Model.RoomNumber · @Model.RoomType · ฿@Model.Rate?.ToString("N2") / คืน</dd>
+                <dt class="col-sm-4">ห้องเดิม</dt><dd class="col-sm-8">ห้อง @Model.RoomNumber · @Model.RoomType · ฿@Model.Rate?.ToString("N2") / คืน</dd>
                 <dt class="col-sm-4">วันเข้าพัก</dt><dd class="col-sm-8">@ThaiText.Date(Model.CheckIn) – @ThaiText.Date(Model.CheckOut)</dd>
                 <dt class="col-sm-4">ผู้เข้าพัก</dt><dd class="col-sm-8">@Model.Guests คน · เตียงเสริม @Model.ExtraBed</dd>
             </dl>
@@ -33,7 +33,7 @@
                     <div class="form-check mb-2">
                         <input class="form-check-input" type="radio" name="newRoomId" id="room-@room.RoomId" value="@room.RoomId" required />
                         <label class="form-check-label" for="room-@room.RoomId">
-                            <strong>@room.RoomNumber</strong> · @room.Type · รับได้ @room.Capacity คน · ฿@room.Rate?.ToString("N2") / คืน
+                            <strong>ห้อง @room.RoomNumber</strong> · @room.Type · รับได้ @room.Capacity คน · ฿@room.Rate?.ToString("N2") / คืน
                         </label>
                     </div>
                 }

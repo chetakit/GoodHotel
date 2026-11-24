@@ -110,7 +110,7 @@ public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityServi
         {
             PaymentId = payment.PaymentId, ActorUserId = staffId, EventType = "RoomMoved",
             OccurredAtUtc = time.GetUtcNow().UtcDateTime, PaymentMethod = payment.PaymentMethod,
-            Reason = $"{info.RoomNumber} → {target.Room1}: {reason}", IdempotencyKey = Guid.NewGuid().ToString("N")
+            Reason = $"ห้อง {info.RoomNumber} → ห้อง {target.Room1}: {reason}", IdempotencyKey = Guid.NewGuid().ToString("N")
         });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

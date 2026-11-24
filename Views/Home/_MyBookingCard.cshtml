@@ -10,7 +10,7 @@
         <div class="col-md-4 col-lg-3">
             <img class="room-image w-100 h-100"
                  src="@booking.ImagePath"
-                 alt="@booking.RoomType room @booking.RoomNumber"
+                 alt="@booking.RoomType หมายเลข @booking.RoomNumber"
                  onerror="this.onerror=null;this.src='@Url.Content("~/images/default-room.svg")';" />
         </div>
         <div class="col-md-8 col-lg-9">
@@ -18,7 +18,7 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                     <div>
                         <h3 class="h4 mt-2 mb-1">@(booking.RoomType ?? "ห้องพัก")</h3>
-                        <span class="text-muted">@(booking.RoomNumber ?? "ไม่ระบุ")</span>
+                        <span class="text-muted">@(booking.RoomNumber == null ? "ไม่ระบุ" : $"ห้อง {booking.RoomNumber}")</span>
                     </div>
                     <span class="badge rounded-pill fs-6 @booking.StayBadgeClass">@booking.StayLabel</span>
                 </div>

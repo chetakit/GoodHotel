@@ -179,7 +179,7 @@
             Number.isInteger(result.capacity) &&
             result.capacity > 0;
         roomDetails.textContent =
-            `ห้อง ${result.roomNumber || "-"} · ${result.roomType || "Room"} · ` +
+            `ห้อง ${result.roomNumber || "-"} · ${result.roomType || "ไม่ระบุประเภท"} · ` +
             (state.rate > 0 ? `${moneyFormatter.format(state.rate)} / คืน` : "ไม่พบราคา");
 
         if (Number.isInteger(state.capacity) && state.capacity > 0) {
@@ -415,7 +415,7 @@
         guestsInput.value = "1";
         guestsInput.removeAttribute("max");
         roomDetails.textContent =
-            `ห้อง ${state.roomNumber || "-"} · ${state.roomType || "Room"}`;
+            `ห้อง ${state.roomNumber || "-"} · ${state.roomType || "ไม่ระบุประเภท"}`;
         setError("");
         showPrompt("กำลังโหลดปฏิทิน...");
         modal.hidden = false;
