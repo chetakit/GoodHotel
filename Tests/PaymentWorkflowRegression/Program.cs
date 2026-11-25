@@ -213,6 +213,9 @@ Check(typeof(AuditController).GetCustomAttribute<AuthorizeAttribute>()?.Roles ==
     !typeof(AuditController).GetMethods().Any(m => m.IsDefined(typeof(HttpPostAttribute))),
     "Audit is read-only for Accountant and Admin; other accounting pages stay Accountant-only.");
 
+Check(ProfileViewModel.IsValidBirthDate(new DateOnly(1999, 5, 5), new DateOnly(2026, 11, 25)) &&
+    !ProfileViewModel.IsValidBirthDate(new DateOnly(2542, 5, 5), new DateOnly(2026, 11, 25)) &&
+    !ProfileViewModel.IsValidBirthDate(new DateOnly(1800, 1, 1), new DateOnly(2026, 11, 25)), "Birth dates must be real Gregorian dates.");
 Check(ProfileViewModel.NormalizePhone("089 111 2233") == "0891112233" && ProfileViewModel.NormalizePhone("021112233") == null &&
     ProfileViewModel.NormalizePhone("9911122334") == null && ProfileViewModel.NormalizePhone("08911x2233") == null &&
     ProfileViewModel.NormalizePhone(null) == null, "Profile phone must be a Thai mobile number.");

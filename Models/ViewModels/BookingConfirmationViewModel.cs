@@ -22,6 +22,11 @@ public class BookingConfirmationViewModel : CreateBookingViewModel
     // โปรทั้งหมดที่การจองนี้ใช้ได้ (ตัวเลือกใน dropdown) เรียงจากลดมากไปน้อย
     public IReadOnlyList<GoodHotel.Services.AppliedPromotion> AvailablePromotions { get; set; } = [];
 
+    // ผลเช็คสิทธิ์ทุกโปรและประวัติที่ใช้เช็ค (หน้า Walk-in)
+    public IReadOnlyList<GoodHotel.Services.PromotionCheck> PromotionChecks { get; set; } = [];
+
+    public GoodHotel.Services.CustomerHistory? Customer { get; set; }
+
     public decimal? DiscountAmount { get; set; }
 
     public decimal? ExtraBedAmount { get; set; }

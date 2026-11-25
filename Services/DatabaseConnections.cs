@@ -13,7 +13,8 @@ namespace GoodHotel.Services;
 /// </summary>
 public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFactory loggers)
 {
-    public const int WarmReaders = 10;
+    public const int WarmReaders = 14;
+    public const int WarmWriters = 2;
 
     public static readonly MySqlServerVersion ServerVersion = new(new Version(8, 0, 0));
 
@@ -30,7 +31,13 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
     private const long StaleMilliseconds = 100_000;
     private long _lastAlive = Environment.TickCount64;
 
-    public string Write { get; } = configuration.GetConnectionString("DefaultConnection") ?? "";
+    public string Write { get; } = new MySqlConnectionStringBuilder(
+        configuration.GetConnectionString("DefaultConnection") ?? "")
+    {
+        AllowUserVariables = true,
+        UseAffectedRows = false,
+        Keepalive = 30
+    }.ConnectionString;
 
     public string Read { get; } = new MySqlConnectionStringBuilder(
         configuration.GetConnectionString("DefaultConnection") ?? "")
@@ -60,8 +67,11 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
 
     public void ClearRead()
     {
-        using var connection = new MySqlConnection(Read);
-        MySqlConnection.ClearPool(connection);
+        foreach (var text in new[] { Read, Write })
+        {
+            using var connection = new MySqlConnection(text);
+            MySqlConnection.ClearPool(connection);
+        }
     }
 }
 
@@ -78,12 +88,14 @@ public sealed class ReadConnectionWarmer(DatabaseConnections connections, ILogge
             {
                 connections.DropIfStale();
                 // เปิดพร้อมกันเพื่อให้ได้คนละเส้น แล้ว ping ทุกเส้น
-                await Task.WhenAll(Enumerable.Range(0, DatabaseConnections.WarmReaders).Select(async _ =>
+                var warm = Enumerable.Repeat(connections.Read, DatabaseConnections.WarmReaders)
+                    .Concat(Enumerable.Repeat(connections.Write, DatabaseConnections.WarmWriters));
+                await Task.WhenAll(warm.Select(async text =>
                 {
-                    await using var connection = new MySqlConnection(connections.Read);
+                    await using var connection = new MySqlConnection(text);
                     await connection.OpenAsync(stoppingToken);
                     if (!await connection.PingAsync(stoppingToken))
-                        throw new InvalidOperationException("Read connection did not answer ping.");
+                        throw new InvalidOperationException("Database connection did not answer ping.");
                 }));
                 connections.MarkAlive();
             }
@@ -94,7 +106,7 @@ public sealed class ReadConnectionWarmer(DatabaseConnections connections, ILogge
             catch (Exception ex)
             {
                 connections.ClearRead();
-                logger.LogWarning(ex, "Read connection check failed; the pool was cleared.");
+                logger.LogWarning(ex, "Database connection check failed; the pools were cleared.");
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }

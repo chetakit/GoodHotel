@@ -20,10 +20,15 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
     public static DateOnly HotelDate(DateTime utc) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), HotelTimeZone));
 
+    /// <summary>
+    /// แขกที่พักอยู่: กันถึงวันออก ถ้าถึงกำหนดหรือเลยกำหนดแล้วยังไม่เช็คเอาท์ กันถึงวันนี้ (เลื่อนไปทีละวันจนกว่าจะเช็คเอาท์)
+    /// ห้องจึงยังจองล่วงหน้าได้ และเช็คอินซ้อนไม่ได้เพราะตรวจแขกที่พักอยู่เสมอ
+    /// </summary>
     public static RoomBlockedPeriod ActiveStayPeriod(int roomId, DateTime checkedInAtUtc,
         DateOnly? scheduledCheckout, DateOnly today) =>
         new(roomId, HotelDate(checkedInAtUtc),
-            scheduledCheckout.HasValue && scheduledCheckout.Value > today ? scheduledCheckout : null);
+            !scheduledCheckout.HasValue ? null
+                : scheduledCheckout.Value > today ? scheduledCheckout : today.AddDays(1));
 
     /// <summary>
     /// วันที่การจองนี้ปล่อยห้องจริง: ถ้าแขกเช็คเอาท์ก่อนกำหนด ใช้วันที่เช็คเอาท์จริง ไม่ใช่วันที่จองไว้

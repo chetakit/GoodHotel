@@ -10,22 +10,22 @@ public sealed record WalkInResult(bool Succeeded, string Message, int? BookingId
 
 /// <param name="IsFinal">false = ยังไม่รู้ว่าเป็นลูกค้าคนไหน ส่วนลดอาจเปลี่ยน</param>
 public sealed record WalkInQuote(bool Succeeded, string? Message, int? Nights = null, decimal? RoomSubtotal = null,
-    string? PromotionName = null, decimal? Discount = null, decimal? ExtraBed = null, decimal? Total = null, bool IsFinal = false);
+    string? PromotionName = null, decimal? Discount = null, decimal? ExtraBed = null, decimal? Total = null, bool IsFinal = false,
+    int? PromotionId = null, IReadOnlyList<PromotionCheck>? Promotions = null, string? CustomerNote = null);
 
 public sealed record WalkInCustomer(int UserId, string? FirstName, string? LastName, bool CanLogin);
 
 /// <summary>
-/// ลูกค้า Walk-in: พนักงานต้อนรับจองแทนลูกค้าที่เคาน์เตอร์ แล้วรับเงินสดและ check-in ให้ในขั้นตอนเดียว
+/// ลูกค้า Walk-in: พนักงานต้อนรับจองแทนลูกค้าที่เคาน์เตอร์ แล้วรับเงินสดและ check-in ใน transaction เดียว
 /// 1) หา/สร้างบัญชีลูกค้าจากเบอร์โทรและชื่อ  2) จองห้องคืนนี้  3) รับเงินสด  4) check-in
 /// </summary>
 public sealed class WalkInService(
     GoodHotelDbContext db,
     BookingService bookings,
-    PaymentService payments,
-    StayService stays,
-    BookingCancellationService cancellation,
     RoomAvailabilityService availability)
 {
+    public const string PromotionRefused = "โปรที่เลือกใช้กับการเข้าพักนี้ไม่ได้ กรุณาเลือกโปรใหม่";
+
     public async Task<WalkInResult> CreateAsync(WalkInViewModel form, int staffId, CancellationToken ct)
     {
         var phone = form.Phone!.Trim();
@@ -43,11 +43,12 @@ public sealed class WalkInService(
 
         // ยอดที่พนักงานเห็นต้องตรงกับยอดที่จะบันทึก ตรวจก่อนสร้างลูกค้าและการจอง
         // (ลูกค้าเดิมให้ตอนจองตรวจเอง ไม่ต้องคำนวณซ้ำ)
-        if (form.ExpectedTotal.HasValue && match.UserId == null)
+        if ((form.ExpectedTotal.HasValue || form.PromotionId.HasValue) && match.UserId == null)
         {
             var quote = await PriceAsync(form, null, isNewCustomer: true, ct);
             if (!quote.CanConfirm) return new WalkInResult(false, quote.StatusMessage ?? "จองห้องไม่สำเร็จ");
-            if (quote.TotalAmount != form.ExpectedTotal)
+            if (form.PromotionId.HasValue && quote.PromotionId != form.PromotionId) return new WalkInResult(false, PromotionRefused);
+            if (form.ExpectedTotal.HasValue && quote.TotalAmount != form.ExpectedTotal)
                 return new WalkInResult(false, $"ยอดเปลี่ยนเป็น ฿{quote.TotalAmount:N2} กรุณาตรวจยอดแล้วกดยืนยันอีกครั้ง");
         }
 
@@ -59,30 +60,13 @@ public sealed class WalkInService(
             CheckIn = availability.HotelToday(),
             CheckOut = form.CheckOut,
             Guests = form.Guests,
-            ExtraBedCount = form.ExtraBed ? 1 : 0
-        }, ct, form.ExpectedTotal);
+            ExtraBedCount = form.ExtraBed ? 1 : 0,
+            PromotionId = form.PromotionId
+        }, ct, form.ExpectedTotal, requireSelectedPromotion: true, deskStaffId: staffId);
 
         if (booking.Status != BookingSaveStatus.Created || booking.BookingId is not int bookingId)
         {
             return new WalkInResult(false, booking.Message ?? "จองห้องไม่สำเร็จ");
-        }
-
-        var payment = await payments.RecordDeskCashAsync(bookingId, staffId, ct);
-        if (!payment.Succeeded)
-        {
-            // รับเงินสดทีหลังไม่ได้ (การจองทั่วไปชำระออนไลน์เท่านั้น) จึงยกเลิกให้แล้วทำใหม่ ไม่ปล่อยการจองค้าง
-            // ถ้ายกเลิกไม่ได้เพราะเงินถูกบันทึกไปแล้วจริงๆ การจองยังอยู่ ให้พนักงานเปิดดู
-            var cancelled = await cancellation.CancelByStaffAsync(bookingId, ct);
-            return cancelled.Succeeded
-                ? new WalkInResult(false, $"บันทึกเงินสดไม่สำเร็จ ({payment.Message}) ยกเลิกการจอง #{bookingId} แล้ว กรุณาทำรายการใหม่")
-                : new WalkInResult(false, $"บันทึกเงินสดไม่สำเร็จ ({payment.Message}) กรุณาตรวจสอบการจองนี้", bookingId);
-        }
-
-        // เช็คอินไม่ผ่าน: จ่ายเงินแล้ว การจองยังอยู่ พนักงานกดเช็คอินต่อที่หน้ารายละเอียดการจองได้
-        var checkInError = await stays.CheckInAsync(bookingId, staffId, "Walk-in", closeRefund: false, ct);
-        if (checkInError != null)
-        {
-            return new WalkInResult(false, $"จองและรับเงินแล้ว แต่ check-in ไม่สำเร็จ: {checkInError}", bookingId);
         }
 
         return new WalkInResult(true,
@@ -96,6 +80,7 @@ public sealed class WalkInService(
 
         int? customerId = null;
         var isFinal = false;
+        var customerNote = "ยังไม่ได้ระบุลูกค้า โปรที่ดูจากประวัติจะเช็คได้เมื่อกรอกชื่อ นามสกุล และเบอร์";
         var phone = form.Phone?.Trim();
         if (!string.IsNullOrEmpty(phone) && !string.IsNullOrWhiteSpace(form.FirstName) && !string.IsNullOrWhiteSpace(form.LastName))
         {
@@ -107,12 +92,15 @@ public sealed class WalkInService(
                 form.CustomerChoiceFor == form.CustomerKey ? form.CustomerChoice : null);
             customerId = match.UserId;
             isFinal = !match.NeedsChoice;
+            customerNote = match.NeedsChoice ? "เบอร์นี้มีลูกค้าในระบบแต่ชื่อไม่ตรง ระบบจะให้เลือกลูกค้าตอนกดยืนยัน"
+                : customerId == null ? "ลูกค้าใหม่" : "ลูกค้าเดิม";
         }
 
         var quote = await PriceAsync(form, customerId, isNewCustomer: isFinal && customerId == null, ct);
         return quote.CanConfirm
             ? new WalkInQuote(true, null, quote.NightCount, quote.RoomSubtotal, quote.PromotionName,
-                quote.DiscountAmount, quote.ExtraBedAmount, quote.TotalAmount, isFinal)
+                quote.DiscountAmount, quote.ExtraBedAmount, quote.TotalAmount, isFinal, quote.PromotionId, quote.PromotionChecks,
+                customerId == null ? customerNote : $"{customerNote} · เข้าพักจบแล้ว {quote.Customer?.CompletedStayCount ?? 0} ครั้ง")
             : new WalkInQuote(false, quote.StatusMessage ?? "คำนวณยอดไม่ได้");
     }
 
@@ -124,7 +112,8 @@ public sealed class WalkInService(
             CheckIn = availability.HotelToday(),
             CheckOut = form.CheckOut,
             Guests = form.Guests,
-            ExtraBedCount = form.ExtraBed ? 1 : 0
+            ExtraBedCount = form.ExtraBed ? 1 : 0,
+            PromotionId = form.PromotionId
         }, customerId, ct, isNewCustomer);
 
     /// <summary>
@@ -154,10 +143,8 @@ public sealed class WalkInService(
             email = null;
         }
 
-        var lastId = await db.Users.MaxAsync(u => (int?)u.UserId, ct) ?? 0;
         var customer = new User
         {
-            UserId = lastId + 1,
             FirstName = form.FirstName!.Trim(),
             LastName = form.LastName!.Trim(),
             Phone = phone,
@@ -166,8 +153,12 @@ public sealed class WalkInService(
             Password = null, // ลูกค้า Walk-in ยังไม่มีรหัสผ่าน จึง login ไม่ได้จนกว่าจะสมัครเอง
             IsActive = true
         };
-        db.Users.Add(customer);
-        await db.SaveChangesAsync(ct);
+        // อีเมลถูกใช้ไปพอดี: บันทึกโดยไม่มีอีเมล
+        if (!await NewUser.AddAsync(db, customer, ct))
+        {
+            customer.Email = null;
+            await NewUser.AddAsync(db, customer, ct);
+        }
         return customer.UserId;
     }
 }

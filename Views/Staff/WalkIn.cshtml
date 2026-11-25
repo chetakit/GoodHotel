@@ -114,7 +114,28 @@
                 </fieldset>
             }
 
-            <h3 class="h5 mt-4">3. เงินสดที่ต้องเก็บ</h3>
+            <h3 class="h5 mt-4">3. โปรโมชัน</h3>
+            <div class="booking-panel" id="walkin-promo" aria-live="polite">
+                <p class="text-muted mb-0" data-promo-message>เลือกห้องเพื่อเช็คสิทธิ์โปรโมชัน</p>
+                <div data-promo-body hidden>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-7">
+                            <label class="form-label" for="walkin-promotion">เลือกโปร (1 การจองใช้ได้ 1 โปร)</label>
+                            <select id="walkin-promotion" name="PromotionId" class="form-select" data-selected="@Model.PromotionId"></select>
+                        </div>
+                        <div class="col-md-5 text-muted small" data-promo-customer></div>
+                    </div>
+                    <p class="text-danger small mb-0 mt-2" data-promo-warning hidden></p>
+                    <div class="table-responsive mt-3">
+                        <table class="table mb-0">
+                            <thead><tr><th>โปรโมชัน</th><th>เงื่อนไข</th><th class="text-end">ส่วนลด</th><th>สิทธิ์</th></tr></thead>
+                            <tbody data-promo-rows></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="h5 mt-4">4. เงินสดที่ต้องเก็บ</h3>
             <div class="booking-panel" id="walkin-quote" data-url="@Url.Action("WalkInQuote")" aria-live="polite">
                 <p class="text-muted mb-0" data-quote-message>เลือกห้องเพื่อดูยอดที่ต้องเก็บ</p>
                 <div data-quote-lines hidden>
@@ -153,16 +174,93 @@
                 part("lines").hidden = true;
             };
 
+            // ---------- โปรโมชัน: ตัวเลือกและผลเช็คสิทธิ์ ----------
+            const promoBox = document.getElementById("walkin-promo");
+            const promo = name => promoBox.querySelector("[data-promo-" + name + "]");
+            const select = document.getElementById("walkin-promotion");
+            // โปรที่พนักงานตั้งใจเลือก ("" = ให้ระบบเลือก)
+            let chosen = select.dataset.selected || "";
+            select.addEventListener("change", () => { chosen = select.value; });
+
+            const promoMessage = text => {
+                promo("message").textContent = text;
+                promo("message").hidden = false;
+                promo("body").hidden = true;
+            };
+
+            const cell = (row, text, className) => {
+                const td = document.createElement("td");
+                td.textContent = text;
+                if (className) td.className = className;
+                row.append(td);
+                return td;
+            };
+
+            const showPromotions = quote => {
+                const list = quote.promotions || [];
+                const usable = list.filter(item => !item.reason);
+                const lost = chosen && !usable.some(item => String(item.promotionId) === chosen)
+                    ? list.find(item => String(item.promotionId) === chosen) : null;
+                if (lost || (chosen && !usable.some(item => String(item.promotionId) === chosen))) chosen = "";
+                promo("warning").hidden = !lost;
+                if (lost) promo("warning").textContent = "โปร " + lost.name + " ใช้ไม่ได้แล้ว (" + lost.reason + ") ระบบเลือกโปรที่คุ้มที่สุดให้แทน";
+
+                select.replaceChildren();
+                const auto = usable.find(item => item.promotionId === quote.promotionId);
+                select.append(new Option(usable.length === 0 ? "ไม่มีโปรที่ใช้ได้"
+                    : "ให้ระบบเลือก (คุ้มที่สุด" + (usable[0] ? ": " + usable[0].name : "") + ")", ""));
+                for (const item of list) {
+                    const option = new Option(item.reason ? item.name + " · ใช้ไม่ได้: " + item.reason
+                        : item.name + " · ลด " + money(item.discount), item.promotionId);
+                    option.disabled = Boolean(item.reason);
+                    select.append(option);
+                }
+                select.value = chosen;
+
+                promo("rows").replaceChildren();
+                for (const item of list) {
+                    const row = document.createElement("tr");
+                    const name = cell(row, item.name, "fw-semibold");
+                    if (auto && item.promotionId === auto.promotionId) {
+                        const using = document.createElement("span");
+                        using.className = "badge text-bg-primary ms-2";
+                        using.textContent = "ใช้อยู่";
+                        name.append(using);
+                    }
+                    cell(row, item.condition, "small");
+                    cell(row, item.reason ? item.discountText : money(item.discount), "text-end num");
+                    const badge = document.createElement("span");
+                    badge.className = "badge " + (item.reason ? "text-bg-secondary" : "text-bg-success");
+                    badge.textContent = item.reason ? "ใช้ไม่ได้" : "ใช้ได้";
+                    const status = cell(row, "");
+                    status.append(badge);
+                    if (item.reason) {
+                        const why = document.createElement("div");
+                        why.className = "small text-muted mt-1";
+                        why.textContent = item.reason;
+                        status.append(why);
+                    }
+                    promo("rows").append(row);
+                }
+                promo("customer").textContent = quote.customerNote || "";
+                promo("message").hidden = true;
+                promo("body").hidden = false;
+            };
+
             const refresh = async () => {
                 const current = ++latest;
                 expected.value = "";
-                if (!form.querySelector("[name=RoomId]:checked")) { message("เลือกห้องเพื่อดูยอดที่ต้องเก็บ"); return; }
+                if (!form.querySelector("[name=RoomId]:checked")) { message("เลือกห้องเพื่อดูยอดที่ต้องเก็บ"); promoMessage("เลือกห้องเพื่อเช็คสิทธิ์โปรโมชัน"); return; }
                 message("กำลังคำนวณยอด…");
                 try {
-                    const response = await fetch(box.dataset.url, { method: "POST", body: new FormData(form) });
+                    // ใช้ค่าที่พนักงานตั้งใจเลือก เพราะตัวเลือกใน dropdown ถูกสร้างใหม่ทุกครั้ง
+                    const data = new FormData(form);
+                    data.set("PromotionId", chosen);
+                    const response = await fetch(box.dataset.url, { method: "POST", body: data });
                     const quote = await response.json();
                     if (current !== latest) return;
-                    if (!quote.succeeded) { message(quote.message); return; }
+                    if (!quote.succeeded) { message(quote.message); promoMessage(quote.message); return; }
+                    showPromotions(quote);
                     part("nights").textContent = quote.nights;
                     part("room").textContent = money(quote.roomSubtotal);
                     part("promo").textContent = quote.promotionName || "";
@@ -182,7 +280,8 @@
                 expected.value = "";
                 latest++;
                 clearTimeout(timer);
-                timer = setTimeout(refresh, event.target.matches("[type=radio], [type=checkbox]") ? 0 : 500);
+                if (event.target === select) chosen = select.value;
+                timer = setTimeout(refresh, event.target.matches("[type=radio], [type=checkbox], select") ? 0 : 500);
             });
             refresh();
         })();

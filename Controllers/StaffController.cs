@@ -110,24 +110,31 @@ namespace GoodHotel.Controllers
 
             // แขกที่รอเช็คอิน = ไม่ได้ยกเลิก ยังไม่เช็คอิน และวันนี้อยู่ในช่วงที่จองไว้
             // รวมแขกที่มาช้ากว่าวันเข้าพัก (ระบบยังให้เช็คอินได้จนถึงวันออก) ไม่งั้นจะหายไปจากหน้านี้
-            var arrivals = await _db.Bookings.AsNoTracking()
+            IQueryable<Booking> Waiting(GoodHotelDbContext db) => db.Bookings.AsNoTracking()
                 .Where(b => b.Status != BookingStatuses.Cancelled && b.CheckIn <= today && b.CheckOut > today &&
-                    !_db.BookingStays.Any(s => s.BookingId == b.BookingId))
+                    !db.BookingStays.Any(s => s.BookingId == b.BookingId));
+            // การจ่ายเงินและสถานะห้องยิงพร้อมกับรายการแขก ไม่ต้องรอกัน
+            var labelTask = reader.Run(db =>
+            {
+                var listed = Waiting(db);
+                return PaymentService.PaymentLabelLookupAsync(db.Payments.AsNoTracking()
+                    .Where(p => listed.Any(b => b.BookingId == p.BookingId)), cancellationToken);
+            });
+            var boardTask = _roomStatus.GetRoomBoardAsync(cancellationToken);
+            var arrivals = await Waiting(_db)
                 .OrderBy(b => b.Room!.Room1)
                 .Select(FrontDeskRowProjection)
                 .ToListAsync(cancellationToken);
-            var arrivalLabels = await PaymentService.PaymentLabelsAsync(
-                _db, arrivals.Select(a => a.BookingId).ToList(), cancellationToken);
-            // ห้องพร้อมให้เช็คอินหรือยัง ใช้สถานะห้องชุดเดียวกับหน้าสถานะห้อง (ดึงเฉพาะเมื่อมีแขกรอ)
-            var board = arrivals.Count == 0 ? new Dictionary<int, RoomStatusItem>()
-                : (await _roomStatus.GetRoomBoardAsync(cancellationToken)).ToDictionary(r => r.RoomId);
+            var arrivalLabel = await labelTask;
+            // ห้องพร้อมให้เช็คอินหรือยัง ใช้สถานะห้องชุดเดียวกับหน้าสถานะห้อง
+            var board = (await boardTask).ToDictionary(r => r.RoomId);
             string? NotReady(int? roomId) => roomId.HasValue && board.TryGetValue(roomId.Value, out var room) &&
                 room.Status is not (RoomLiveStatus.ArrivingToday or RoomLiveStatus.Available)
                     ? RoomStatusService.Label(room.Status) : null;
             var arrivalsWithPayment = arrivals
                 .Select(row => row with
                 {
-                    IsPaid = arrivalLabels[row.BookingId] == PaymentService.PaidLabel,
+                    IsPaid = arrivalLabel(row.BookingId) == PaymentService.PaidLabel,
                     RoomNotReady = NotReady(row.RoomId),
                     AwaitingInspection = row.RoomId.HasValue && board.TryGetValue(row.RoomId.Value, out var live) &&
                         live.Status == RoomLiveStatus.Inspection
@@ -207,6 +214,12 @@ namespace GoodHotel.Controllers
             }
 
             var countTask = reader.Run(db => Filter(db).CountAsync(cancellationToken));
+            var labelTask = reader.Run(db =>
+            {
+                var listed = Filter(db);
+                return PaymentService.PaymentLabelLookupAsync(db.Payments.AsNoTracking()
+                    .Where(p => listed.Any(b => b.BookingId == p.BookingId)), cancellationToken);
+            });
             var currentPage = Math.Clamp(page ?? 1, 1, 100_000);
             var bookings = await LoadPageAsync(currentPage);
             var total = await countTask;
@@ -244,11 +257,8 @@ namespace GoodHotel.Controllers
                     booking.Payments.Any(p => p.Refunds.Any(r => r.Status == PaymentService.RefundRequested))))
                 .ToListAsync(cancellationToken);
 
-            // เติมสถานะการจ่ายเงินให้ทุกแถวด้วย query เดียว
-            var labels = await PaymentService.PaymentLabelsAsync(
-                _db, bookings.Select(b => b.BookingId).ToList(), cancellationToken);
-
-            return View(bookings.Select(b => b with { PaymentLabel = labels[b.BookingId] }).ToList());
+            var label = await labelTask;
+            return View(bookings.Select(b => b with { PaymentLabel = label(b.BookingId) }).ToList());
         }
 
         [HttpGet]

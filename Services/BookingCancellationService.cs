@@ -14,7 +14,8 @@ public sealed record CancelBookingResult(bool Succeeded, string Message);
 /// </summary>
 public sealed class BookingCancellationService(
     GoodHotelDbContext db,
-    TimeProvider time)
+    TimeProvider time,
+    ParallelReader reader)
 {
     public static bool CanCancel(string status, DateOnly? checkOut, bool hasStay, bool refundPending, DateOnly today) =>
         status == BookingStatuses.Booked &&
@@ -32,6 +33,8 @@ public sealed class BookingCancellationService(
         // (ต้องล็อกเป็นคำสั่งแยก ไม่งั้นเงื่อนไขอาจอ่านข้อมูลก่อนที่การเช็คอินที่กำลังทำอยู่จะบันทึกเสร็จ)
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         await PaymentService.LockBookingAsync(db, bookingId, ct);
+        // การจองถูกล็อกแล้ว สถานะการจ่ายไม่เปลี่ยน จึงอ่านพร้อมกันได้
+        var paidTask = reader.Run(c => PaymentService.IsPaidAsync(c, bookingId, ct));
         var updated = await db.Bookings
             .Where(b => b.BookingId == bookingId &&
                         b.UserId == customerId &&
@@ -45,6 +48,7 @@ public sealed class BookingCancellationService(
                 .SetProperty(x => x.CancelledAtUtc, now)
                 .SetProperty(x => x.CancelReason, CancelReasons.Customer), ct);
 
+        var wasPaid = await paidTask;
         if (updated == 0)
         {
             return new CancelBookingResult(false, await ExplainWhyNotCancelledAsync(bookingId, customerId, today, ct));
@@ -52,7 +56,6 @@ public sealed class BookingCancellationService(
 
         await CloseOpenPaymentsAsync(bookingId, ct);
         await tx.CommitAsync(ct);
-        var wasPaid = await PaymentService.IsPaidAsync(db, bookingId, ct);
         return new CancelBookingResult(true, wasPaid
             ? $"ยกเลิกการจอง #{bookingId} เรียบร้อยแล้ว (ยกเลิกเองไม่คืนเงิน)"
             : $"ยกเลิกการจอง #{bookingId} เรียบร้อยแล้ว");

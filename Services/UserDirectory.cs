@@ -11,6 +11,9 @@ public sealed class UserDirectory(GoodHotelDbContext db)
 {
     private readonly Dictionary<int, string> _cache = new();
 
+    public void Remember(int userId, string? firstName, string? lastName) =>
+        _cache[userId] = $"{firstName} {lastName}".Trim();
+
     public async Task<string> NameAsync(int? userId)
     {
         if (userId is not int id) return "-";

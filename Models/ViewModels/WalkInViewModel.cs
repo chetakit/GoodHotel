@@ -41,6 +41,9 @@ public class WalkInViewModel
 
     public string CustomerKey => $"{Phone?.Trim()}|{FirstName?.Trim()}|{LastName?.Trim()}";
 
+    // โปรที่พนักงานเลือก (null = ให้ระบบเลือกโปรที่ลดได้มากที่สุด)
+    public int? PromotionId { get; set; }
+
     // ยอดที่พนักงานเห็นบนหน้าจอก่อนกดยืนยัน ถ้าไม่ตรงกับยอดจริงต้องยืนยันใหม่ (กันเก็บเงินผิด)
     public decimal? ExpectedTotal { get; set; }
 

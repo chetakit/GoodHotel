@@ -35,6 +35,7 @@ public sealed record BookingSaveResult(
 public sealed class BookingService
 {
     private const string BookingIdLockName = "GoodHotel.BookingId";
+    // ลำดับล็อกทั้งระบบ: ห้อง → เลขการจอง → เลขชำระเงิน (ตอนจ่ายออนไลน์ใช้เฉพาะเลขชำระเงิน จึงไม่ล็อกไขว้กัน)
     private const int BookingIdLockTimeoutSeconds = 15;
 
     private readonly GoodHotelDbContext _db;
@@ -137,10 +138,10 @@ public sealed class BookingService
         model.ExtraBedCount = request.ExtraBedCount;
 
         // โปรที่ลูกค้าเลือก (ถ้าเลือกโปรที่ใช้ไม่ได้ หรือยังไม่เลือก ใช้โปรที่ลดได้มากที่สุด)
-        var (promotion, eligible) = _promotions.Resolve(
-            promotionsTask.Result,
-            new PromotionContext(request.CheckIn!.Value, request.CheckOut!.Value, subtotal),
-            request.PromotionId);
+        var context = new PromotionContext(request.CheckIn!.Value, request.CheckOut!.Value, subtotal);
+        var (promotion, eligible) = _promotions.Resolve(promotionsTask.Result, context, request.PromotionId);
+        model.PromotionChecks = _promotions.CheckAll(promotionsTask.Result, context);
+        model.Customer = promotionsTask.Result.Customer;
         model.AvailablePromotions = eligible;
         model.PromotionId = promotion?.PromotionId;
         model.PromotionName = promotion?.Name;
@@ -162,7 +163,9 @@ public sealed class BookingService
         int userId,
         CreateBookingViewModel request,
         CancellationToken cancellationToken = default,
-        decimal? expectedAmount = null)
+        decimal? expectedAmount = null,
+        bool requireSelectedPromotion = false,
+        int? deskStaffId = null)
     {
         var validationMessage = ValidateRequest(request);
         if (validationMessage != null)
@@ -184,6 +187,7 @@ public sealed class BookingService
         IDbContextTransaction? transaction = null;
         var transactionCompleted = false;
         var lockAcquired = false;
+        var paymentLockAcquired = false;
 
         try
         {
@@ -238,9 +242,18 @@ public sealed class BookingService
                 request.CheckOut!.Value,
                 cancellationToken);
             var promotionsTask = _promotions.LoadAsync(userId, false, cancellationToken);
-            await Task.WhenAll(userTask, existingTask, availableTask, promotionsTask);
+            var staffTask = deskStaffId == null ? Task.FromResult(true) : _reader.Run(db => db.Users.AsNoTracking()
+                .AnyAsync(user => user.UserId == deskStaffId && user.Role == "Staff" && user.IsActive, cancellationToken));
+            await Task.WhenAll(userTask, existingTask, availableTask, promotionsTask, staffTask);
             var userIsCustomer = userTask.Result;
             var existingRequest = existingTask.Result;
+
+            if (!staffTask.Result)
+            {
+                return await RollbackWithResultAsync(new BookingSaveResult(
+                    BookingSaveStatus.InvalidRequest,
+                    Message: "เฉพาะพนักงานต้อนรับที่รับเงินที่เคาน์เตอร์ได้"));
+            }
 
             if (!userIsCustomer)
             {
@@ -329,6 +342,13 @@ public sealed class BookingService
                 new PromotionContext(request.CheckIn.Value, request.CheckOut.Value, roomSubtotal),
                 request.PromotionId);
             var promotionId = promotion?.PromotionId;
+            // พนักงานเลือกโปรเอง: ถ้าโปรนั้นใช้ไม่ได้ให้บอก ไม่เปลี่ยนเป็นโปรอื่นเงียบๆ
+            if (requireSelectedPromotion && request.PromotionId.HasValue && promotionId != request.PromotionId)
+            {
+                return await RollbackWithResultAsync(new BookingSaveResult(
+                    BookingSaveStatus.InvalidRequest,
+                    Message: WalkInService.PromotionRefused));
+            }
             var discountAmount = promotion?.DiscountAmount ?? 0m;
 
             decimal extraBedAmount;
@@ -361,21 +381,41 @@ public sealed class BookingService
                     Message: $"ยอดเปลี่ยนเป็น ฿{amount:N2} กรุณาตรวจยอดแล้วกดยืนยันอีกครั้ง"));
             }
 
-            // ขอล็อกเลขที่การจองและอ่านเลขล่าสุดในรอบเดียว
+            if (deskStaffId != null && amount <= 0)
+            {
+                return await RollbackWithResultAsync(new BookingSaveResult(
+                    BookingSaveStatus.InvalidRate,
+                    Message: "ยอดเงินของการจองนี้ต้องตรวจสอบก่อน"));
+            }
+
+            // ขอล็อกเลขที่การจอง (และเลขชำระเงินถ้ารับเงินสดเลย) พร้อมอ่านเลขล่าสุดในรอบเดียว
             int maxId;
+            var maxPaymentId = 0;
             await using (var command = connection.CreateCommand())
             {
                 command.Transaction = dbTransaction;
                 command.CommandText = "SELECT GET_LOCK(@lockName, @timeoutSeconds); " +
-                    "SELECT `BookingId` FROM `bookings` ORDER BY `BookingId` DESC LIMIT 1 FOR UPDATE";
+                    "SELECT MAX(`BookingId`) FROM `bookings`" +
+                    (deskStaffId == null ? "" : "; SELECT GET_LOCK(@paymentLock, @timeoutSeconds); SELECT COALESCE(MAX(`PaymentId`), 0) FROM `payments`");
                 AddParameter(command, "@lockName", BookingIdLockName);
                 AddParameter(command, "@timeoutSeconds", BookingIdLockTimeoutSeconds);
+                if (deskStaffId != null) AddParameter(command, "@paymentLock", PaymentService.IdLock);
                 await using var result = await command.ExecuteReaderAsync(CancellationToken.None);
                 await result.ReadAsync(CancellationToken.None);
                 int? lockResult = result.IsDBNull(0) ? null : Convert.ToInt32(result.GetValue(0));
                 lockAcquired = lockResult == 1;
                 await result.NextResultAsync(CancellationToken.None);
-                maxId = await result.ReadAsync(CancellationToken.None) ? Convert.ToInt32(result.GetValue(0)) : 0;
+                // ล็อกชื่อถือไว้จนหลัง commit อ่านธรรมดาก็เห็นทุกเลข ไม่ต้องล็อกแถวล่าสุด (ซึ่งต้องรอคนที่กำลังจ่ายการจองนั้น)
+                maxId = await result.ReadAsync(CancellationToken.None) && !result.IsDBNull(0) ? Convert.ToInt32(result.GetValue(0)) : 0;
+                if (deskStaffId != null)
+                {
+                    await result.NextResultAsync(CancellationToken.None);
+                    await result.ReadAsync(CancellationToken.None);
+                    paymentLockAcquired = !result.IsDBNull(0) && Convert.ToInt32(result.GetValue(0)) == 1;
+                    await result.NextResultAsync(CancellationToken.None);
+                    await result.ReadAsync(CancellationToken.None);
+                    maxPaymentId = Convert.ToInt32(result.GetValue(0));
+                }
                 if (lockResult == null)
                 {
                     throw new InvalidOperationException(
@@ -383,7 +423,7 @@ public sealed class BookingService
                 }
             }
 
-            if (!lockAcquired)
+            if (!lockAcquired || (deskStaffId != null && !paymentLockAcquired))
             {
                 return await RollbackWithResultAsync(new BookingSaveResult(
                     BookingSaveStatus.LockTimeout,
@@ -410,6 +450,19 @@ public sealed class BookingService
                 Amount = amount,
                 CreatedAtUtc = _time.GetUtcNow().UtcDateTime
             });
+
+            // Walk-in: รับเงินสดและเช็คอินใน transaction เดียวกับการจอง (สำเร็จทั้งหมดหรือไม่เกิดอะไรเลย)
+            // ห้องถูกล็อกและเพิ่งตรวจแล้วว่าวันนี้ไม่มีแขก ไม่รอทำความสะอาด และไม่ติดซ่อม
+            if (deskStaffId is { } staffId)
+            {
+                var now = _time.GetUtcNow().UtcDateTime;
+                _db.Payments.Add(PaymentService.DeskCash(maxPaymentId + 1, bookingId, staffId, amount, now));
+                _db.BookingStays.Add(new BookingStay
+                {
+                    BookingId = bookingId, Status = "CheckedIn", CheckedInAtUtc = now,
+                    CheckedInByUserId = staffId, CheckInNote = "Walk-in"
+                });
+            }
 
             await _db.SaveChangesAsync(cancellationToken);
             await activeTransaction.CommitAsync(cancellationToken);
@@ -448,7 +501,7 @@ public sealed class BookingService
         }
         finally
         {
-            if (lockAcquired)
+            if (lockAcquired || paymentLockAcquired)
             {
                 try
                 {
@@ -459,6 +512,8 @@ public sealed class BookingService
                             transactionCompleted
                                 ? null
                                 : transaction?.GetDbTransaction(),
+                            lockAcquired,
+                            paymentLockAcquired,
                             CancellationToken.None);
                     }
                     else
@@ -505,23 +560,32 @@ public sealed class BookingService
     private async Task ReleaseNamedLockAsync(
         DbConnection connection,
         DbTransaction? transaction,
+        bool bookingLock,
+        bool paymentLock,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "SELECT RELEASE_LOCK(@lockName)";
-        AddParameter(command, "@lockName", BookingIdLockName);
+        // ปล่อยทุกล็อกที่ถืออยู่ในรอบเดียว
+        command.CommandText = (bookingLock, paymentLock) switch
+        {
+            (true, true) => "SELECT RELEASE_LOCK(@paymentLock) + RELEASE_LOCK(@lockName)",
+            (true, false) => "SELECT RELEASE_LOCK(@lockName)",
+            _ => "SELECT RELEASE_LOCK(@paymentLock)"
+        };
+        if (bookingLock) AddParameter(command, "@lockName", BookingIdLockName);
+        if (paymentLock) AddParameter(command, "@paymentLock", PaymentService.IdLock);
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
         if (result == null || result == DBNull.Value ||
             Convert.ToInt32(
                 result,
-                System.Globalization.CultureInfo.InvariantCulture) != 1)
+                System.Globalization.CultureInfo.InvariantCulture) != (bookingLock ? 1 : 0) + (paymentLock ? 1 : 0))
         {
             _logger.LogError(
-                "MySQL did not confirm release of the BookingId named lock.");
+                "MySQL did not confirm release of the booking named locks.");
             throw new InvalidOperationException(
-                "Could not confirm release of the BookingId named lock.");
+                "Could not confirm release of the booking named locks.");
         }
     }
 

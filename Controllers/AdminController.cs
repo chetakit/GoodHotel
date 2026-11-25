@@ -1026,8 +1026,8 @@ namespace GoodHotel.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult AddUser(
-            [Bind("FirstName,LastName,Email,Phone,BirthDate,Password,Role")] User data)
+        public async Task<IActionResult> AddUser(
+            [Bind("FirstName,LastName,Email,Phone,BirthDate,Password,Role")] User data, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(data.FirstName) ||
                 string.IsNullOrWhiteSpace(data.LastName) ||
@@ -1061,6 +1061,8 @@ namespace GoodHotel.Controllers
                 }
             }
 
+            if (data.BirthDate is { } birthDate && !ProfileViewModel.IsValidBirthDate(birthDate, _availability.HotelToday()))
+                ModelState.AddModelError("BirthDate", "วันเกิดไม่ถูกต้อง กรุณาใช้ปี ค.ศ. เช่น 1999");
             if (data.FirstName?.Trim().Length > 50)
                 ModelState.AddModelError("FirstName", "ชื่อต้องยาวไม่เกิน 50 ตัวอักษร");
             if (data.LastName?.Trim().Length > 50)
@@ -1115,22 +1117,17 @@ namespace GoodHotel.Controllers
                 data.Phone!.Where(char.IsDigit).ToArray());
             data.IsActive = true;
 
-            var lastUser = _db.Users
-                .OrderByDescending(u => u.UserId)
-                .FirstOrDefault();
-
-            data.UserId = lastUser == null
-                ? 1
-                : lastUser.UserId + 1;
-
             // เข้ารหัส Password ก่อนบันทึกลงฐานข้อมูล
             data.Password = _passwordHasher.HashPassword(
                 data,
                 data.Password!
             );
 
-            _db.Users.Add(data);
-            _db.SaveChanges();
+            if (!await NewUser.AddAsync(_db, data, ct))
+            {
+                ModelState.AddModelError("Email", "อีเมลนี้ถูกใช้งานแล้ว");
+                return View(data);
+            }
 
             TempData["SuccessMessage"] = "เพิ่มบัญชีสมาชิกสำเร็จ";
             return RedirectToAction("Members");

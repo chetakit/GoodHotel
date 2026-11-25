@@ -99,7 +99,11 @@ public class PaymentController(
             .OrderByDescending(r => r.RefundId)
             .Select(r => new PaymentRefundItem(r.RefundId, r.PaymentId, r.Payment.BookingId, r.Amount, r.Status, r.Reason,
                 r.RequestedByUserId, r.RequestedAtUtc, r.ApprovedByUserId, r.ApprovedAtUtc)).ToListAsync(ct));
-        await Task.WhenAll(bookingTask, listTask, historyTask, refundsTask);
+        var namesTask = reader.Run(c => c.Users.AsNoTracking()
+            .Where(u => c.PaymentEvents.Any(e => e.ActorUserId == u.UserId && e.Payment.BookingId == id) ||
+                        c.PaymentRefunds.Any(r => r.RequestedByUserId == u.UserId && r.Payment.BookingId == id))
+            .Select(u => new { u.UserId, u.FirstName, u.LastName }).ToListAsync(ct));
+        await Task.WhenAll(bookingTask, listTask, historyTask, refundsTask, namesTask);
 
         var booking = bookingTask.Result;
         if (booking == null) return NotFound();
@@ -107,8 +111,7 @@ public class PaymentController(
         var list = listTask.Result;
         var history = historyTask.Result;
         var refunds = refundsTask.Result;
-        await users.PreloadAsync(history.Select(h => (int?)h.ActorUserId)
-            .Concat(refunds.Select(r => (int?)r.RequestedByUserId)), ct);
+        foreach (var person in namesTask.Result) users.Remember(person.UserId, person.FirstName, person.LastName);
         var confirmedPayment = list.Where(p => p.IsVerified).OrderBy(p => p.PaymentId).FirstOrDefault();
         var confirmed = confirmedPayment?.Amount ?? 0m;
         var refunded = refunds.Where(r => r.Status == "Approved" && r.PaymentId == confirmedPayment?.PaymentId)

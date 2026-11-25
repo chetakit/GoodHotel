@@ -480,7 +480,7 @@ public class HomeController : Controller
             return Forbid();
         }
 
-        var stay = await _db.Bookings.AsNoTracking()
+        var stay = !findAnotherRoom ? null : await _db.Bookings.AsNoTracking()
             .Where(b => b.BookingId == bookingId && b.UserId == userId)
             .Select(b => new { b.CheckIn, b.CheckOut, b.Guests })
             .FirstOrDefaultAsync(cancellationToken);
@@ -996,11 +996,12 @@ public class HomeController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Register(
+    public async Task<IActionResult> Register(
         User data,
         string? ConfirmPassword,
         bool AgreeToTerms,
-        string? returnUrl)
+        string? returnUrl,
+        CancellationToken cancellationToken)
     {
         ViewBag.ReturnUrl = returnUrl = CustomerReturnUrl(returnUrl);
         if (string.IsNullOrWhiteSpace(data.FirstName))
@@ -1079,6 +1080,10 @@ public class HomeController : Controller
         {
             ModelState.AddModelError("BirthDate", "กรุณาเลือกวันเกิด");
         }
+        else if (!ProfileViewModel.IsValidBirthDate(data.BirthDate.Value, _availability.HotelToday()))
+        {
+            ModelState.AddModelError("BirthDate", "วันเกิดไม่ถูกต้อง กรุณาใช้ปี ค.ศ. เช่น 1999");
+        }
 
         if (string.IsNullOrWhiteSpace(data.Password))
         {
@@ -1154,11 +1159,7 @@ public class HomeController : Controller
         }
         else
         {
-            var lastUser = _db.Users
-                .OrderByDescending(u => u.UserId)
-                .FirstOrDefault();
-            user = new User { UserId = lastUser == null ? 1 : lastUser.UserId + 1, Role = "Customer" };
-            _db.Add(user);
+            user = new User { Role = "Customer" };
         }
 
         user.FirstName = firstName;
@@ -1175,7 +1176,18 @@ public class HomeController : Controller
 
         try
         {
-            _db.SaveChanges();
+            if (walkInAccount != null)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            else if (!await NewUser.AddAsync(_db, user, cancellationToken))
+            {
+                ViewBag.Status =
+                    "อีเมลนี้ได้ลงทะเบียนไว้แล้ว กรุณาใช้อีเมลอื่นหรือเข้าสู่ระบบ";
+                ViewBag.ConfirmPassword = ConfirmPassword;
+                ViewBag.AgreeToTerms = AgreeToTerms;
+                return View(data);
+            }
         }
         catch (Microsoft.EntityFrameworkCore.DbUpdateException exception)
         {

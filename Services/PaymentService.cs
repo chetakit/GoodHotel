@@ -10,7 +10,7 @@ public sealed record PaymentResult(bool Succeeded, string Message, int? PaymentI
 
 public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, ParallelReader? reader = null)
 {
-    private const string IdLock = "GoodHotel.PaymentId";
+    internal const string IdLock = "GoodHotel.PaymentId";
 
     private Task<bool> LockBookingAsync(int bookingId, CancellationToken ct) => LockBookingAsync(db, bookingId, ct);
 
@@ -192,8 +192,19 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
     {
         if (bookingIds.Count == 0) return [];
 
-        var rows = await db.Payments.AsNoTracking()
-            .Where(p => p.BookingId != null && bookingIds.Contains(p.BookingId.Value))
+        var label = await PaymentLabelLookupAsync(db.Payments.AsNoTracking()
+            .Where(p => p.BookingId != null && bookingIds.Contains(p.BookingId.Value)), ct);
+        return bookingIds.Distinct().ToDictionary(id => id, label);
+    }
+
+    /// <summary>
+    /// สถานะการจ่ายจากรายการชำระที่กรองมาแล้ว (กรองด้วย subquery ได้ จึงไม่ต้องรอรายการจองก่อน)
+    /// การจองที่ไม่มีรายการชำระ = ยังไม่จ่าย
+    /// </summary>
+    public static async Task<Func<int, string>> PaymentLabelLookupAsync(IQueryable<Payment> payments, CancellationToken ct)
+    {
+        var rows = await payments
+            .Where(p => p.BookingId != null)
             .Select(p => new
             {
                 BookingId = p.BookingId!.Value,
@@ -207,14 +218,14 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
             .ToListAsync(ct);
 
         var byBooking = rows.ToLookup(r => r.BookingId);
-        return bookingIds.Distinct().ToDictionary(id => id, id =>
+        return id =>
         {
-            var payments = byBooking[id].ToList();
-            var firstVerified = payments.Where(p => p.Verified).MinBy(p => p.PaymentId);
+            var found = byBooking[id].ToList();
+            var firstVerified = found.Where(p => p.Verified).MinBy(p => p.PaymentId);
             if (firstVerified != null && firstVerified.Amount > firstVerified.Refunded) return PaidLabel;
             if (firstVerified != null && firstVerified.Refunded > 0) return RefundedLabel;
-            return payments.Any(p => p.Pending) ? "รอตรวจสอบการชำระเงิน" : "ยังไม่จ่าย";
-        });
+            return found.Any(p => p.Pending) ? "รอตรวจสอบการชำระเงิน" : "ยังไม่จ่าย";
+        };
     }
 
     public static bool IsMockMethod(string? method) =>
@@ -248,7 +259,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         CancellationToken ct)
     {
         // จองออนไลน์: ลูกค้าชำระผ่านช่องทางออนไลน์ (จำลอง) เท่านั้น ไม่มีจ่ายเงินสดที่โรงแรม
-        // (เงินสดมีเฉพาะลูกค้า Walk-in ที่พนักงานรับที่เคาน์เตอร์ ผ่าน RecordDeskCashAsync)
+        // (เงินสดมีเฉพาะลูกค้า Walk-in ที่พนักงานรับที่เคาน์เตอร์ ดู BookingService.CreateAsync)
         if (bookingId <= 0 || actorId <= 0 || !IsMockMethod(method))
             return Error("กรุณาเลือกวิธีชำระเงินออนไลน์");
 
@@ -311,62 +322,23 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
     }
 
     /// <summary>
-    /// พนักงานต้อนรับรับเงินสดที่เคาน์เตอร์ (ใช้กับลูกค้า Walk-in)
-    /// บันทึกเป็นยืนยันแล้วทันที เพราะพนักงานรับเงินเอง
+    /// เงินสดที่พนักงานต้อนรับรับที่เคาน์เตอร์ (ลูกค้า Walk-in) ยืนยันแล้วทันทีเพราะพนักงานรับเงินเอง
     /// </summary>
-    public async Task<PaymentResult> RecordDeskCashAsync(int bookingId, int staffId, CancellationToken ct)
+    internal static Payment DeskCash(int paymentId, int bookingId, int staffId, decimal amount, DateTime now)
     {
-        if (bookingId <= 0 || staffId <= 0) return Error("คำขอชำระเงินไม่ถูกต้อง");
-
-        await db.Database.OpenConnectionAsync(ct);
-        var idLocked = false;
-        try
+        var payment = new Payment
         {
-            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-            var booking = await LockAndLoadBookingAsync(db, bookingId, ct);
-            if (booking == null) return Error("ไม่พบการจอง");
-            var (allowed, checks) = await CheckAsync(bookingId, staffId, ["Staff"], "", ct);
-            if (!allowed) return Error("เฉพาะพนักงานต้อนรับที่รับเงินที่เคาน์เตอร์ได้");
-            if (booking.Status == BookingStatuses.Cancelled) return Error("การจองนี้ถูกยกเลิกแล้ว");
-            if (!ValidAmount(booking.Amount)) return Error("ยอดเงินของการจองนี้ต้องตรวจสอบก่อน");
-            if (checks.HasConfirmed) return Error("การจองนี้ชำระเงินแล้ว");
-
-            if (await LockPaymentIdAsync(() => idLocked = true, ct) is not { } lastId)
-                return Error("ระบบกำลังบันทึกการชำระเงินอื่น กรุณาลองใหม่");
-
-            var now = time.GetUtcNow().UtcDateTime;
-            var payment = new Payment
-            {
-                PaymentId = lastId + 1,
-                BookingId = bookingId,
-                Amount = booking.Amount,
-                PaymentMethod = "Cash",
-                PaymentStatus = "Paid",
-                PaymentDate = RoomAvailabilityService.HotelDate(now),
-                SubmittedAtUtc = now,
-                SubmittedByUserId = staffId,
-                VerifiedAtUtc = now,
-                VerifiedByUserId = staffId
-            };
-            AddEvent(payment, staffId, "DeskCashReceived", Guid.NewGuid().ToString("N"), booking.Amount,
-                "รับเงินสดที่เคาน์เตอร์");
-
-            db.Payments.Add(payment);
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-            return Success(payment.PaymentId, "บันทึกรับเงินสดแล้ว");
-        }
-        finally
+            PaymentId = paymentId, BookingId = bookingId, Amount = amount, PaymentMethod = "Cash", PaymentStatus = "Paid",
+            PaymentDate = RoomAvailabilityService.HotelDate(now), SubmittedAtUtc = now, SubmittedByUserId = staffId,
+            VerifiedAtUtc = now, VerifiedByUserId = staffId
+        };
+        payment.Events.Add(new PaymentEvent
         {
-            try
-            {
-                if (idLocked) await ReleasePaymentIdAsync();
-            }
-            finally
-            {
-                await db.Database.CloseConnectionAsync();
-            }
-        }
+            ActorUserId = staffId, EventType = "DeskCashReceived", OccurredAtUtc = now, Amount = amount,
+            PaymentMethod = payment.PaymentMethod, Reason = "รับเงินสดที่เคาน์เตอร์",
+            IdempotencyKey = Guid.NewGuid().ToString("N")
+        });
+        return payment;
     }
 
     public async Task<PaymentResult> ReviewAsync(int paymentId, int actorId, bool confirm, decimal? received,

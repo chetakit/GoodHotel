@@ -12,6 +12,9 @@ appsettings.json
 appsettings.Development.json
 secrets.json
 
+# ไฟล์สำรองจากคำสั่ง seed-demo (มีข้อมูลลูกค้า)
+backups/
+
 # ไฟล์ตั้งค่าของ Claude Code (มีบัญชีทดสอบ) ไม่ต้องใช้บนเครื่องอื่น
 .claude/
 

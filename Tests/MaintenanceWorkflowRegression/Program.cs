@@ -35,6 +35,10 @@ var tasks = new[]
     new HousekeepingTask { RoomId = 2, TaskType = "CheckoutCleaning", Status = "Verified" },
     new HousekeepingTask { RoomId = 3, TaskType = "Other", Status = "Pending" }
 }.AsQueryable();
+var dueToday = new DateOnly(2026, 11, 25);
+var dueStay = RoomAvailabilityService.ActiveStayPeriod(1, new DateTime(2026, 11, 23, 7, 0, 0), dueToday, dueToday);
+Check(dueStay.Overlaps(dueToday, dueToday.AddDays(1)) && !dueStay.Overlaps(dueToday.AddDays(1), dueToday.AddDays(2)),
+    "A guest due out today blocks tonight only.");
 Check(RoomAvailabilityService.PendingCheckoutCleaning(tasks, 1).Any(), "Unverified cleaning must restrict restoration.");
 Check(!RoomAvailabilityService.PendingCheckoutCleaning(tasks, 2).Any(), "Verified cleaning must not restrict restoration.");
 Check(!RoomAvailabilityService.PendingCheckoutCleaning(tasks, 3).Any(), "Other tasks must retain existing behavior.");

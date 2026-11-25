@@ -13,6 +13,9 @@ public sealed record CustomerHistory(bool IsKnown, int? BirthMonth, int ActiveBo
 
 public sealed record PromotionData(IReadOnlyList<Promotion> Candidates, CustomerHistory Customer);
 
+/// <summary>ผลเช็คสิทธิ์ของโปรหนึ่งตัว Reason = เหตุผลที่ใช้ไม่ได้ (null = ใช้ได้)</summary>
+public sealed record PromotionCheck(int PromotionId, string Name, string DiscountText, string Condition, decimal Discount, string? Reason);
+
 public sealed record AppliedPromotion(int PromotionId, string Name, decimal DiscountAmount);
 
 /// <summary>
@@ -34,17 +37,30 @@ public sealed class PromotionService(RoomAvailabilityService availability, Paral
     }
 
     /// <summary>โปรทั้งหมดที่การจองนี้ใช้ได้ เรียงจากลดมากไปน้อย</summary>
-    private IReadOnlyList<AppliedPromotion> FindEligible(PromotionData data, PromotionContext booking)
+    public static IReadOnlyList<AppliedPromotion> FindEligible(PromotionData data, PromotionContext booking, DateOnly today)
     {
         var (candidates, customer) = data;
-        var today = availability.HotelToday();
 
         return candidates
-            .Where(p => IsEligible(p, booking, customer, today))
+            .Where(p => IneligibleReason(p, booking, customer, today) == null)
             .Select(p => new AppliedPromotion(p.PromotionId, p.PromotionName ?? "Promotion", CalculateDiscount(p, booking.RoomSubtotal)))
             .Where(p => p.DiscountAmount > 0)
             .OrderByDescending(p => p.DiscountAmount)
             .ThenBy(p => p.PromotionId)
+            .ToList();
+    }
+
+    /// <summary>เช็คสิทธิ์ทุกโปรที่เปิดอยู่ พร้อมเหตุผลที่ใช้ไม่ได้ (ใช้ได้ขึ้นก่อน ลดมากขึ้นก่อน)</summary>
+    public IReadOnlyList<PromotionCheck> CheckAll(PromotionData data, PromotionContext booking)
+    {
+        var today = availability.HotelToday();
+        return data.Candidates
+            .Select(p => new PromotionCheck(p.PromotionId, p.PromotionName ?? "Promotion",
+                PromotionRules.DescribeDiscount(p), PromotionRules.DescribeCondition(p),
+                CalculateDiscount(p, booking.RoomSubtotal), IneligibleReason(p, booking, data.Customer, today)))
+            .OrderBy(c => c.Reason != null)
+            .ThenByDescending(c => c.Discount)
+            .ThenBy(c => c.PromotionId)
             .ToList();
     }
 
@@ -55,7 +71,7 @@ public sealed class PromotionService(RoomAvailabilityService availability, Paral
     public (AppliedPromotion? Chosen, IReadOnlyList<AppliedPromotion> Eligible) Resolve(
         PromotionData data, PromotionContext booking, int? selectedPromotionId)
     {
-        var eligible = FindEligible(data, booking);
+        var eligible = FindEligible(data, booking, availability.HotelToday());
         var chosen = (selectedPromotionId.HasValue
             ? eligible.FirstOrDefault(p => p.PromotionId == selectedPromotionId.Value)
             : null) ?? eligible.FirstOrDefault();
@@ -78,28 +94,39 @@ public sealed class PromotionService(RoomAvailabilityService availability, Paral
         return Math.Min(discount, roomSubtotal);
     }
 
-    private static bool IsEligible(Promotion promotion, PromotionContext booking, CustomerHistory customer, DateOnly today)
+    /// <summary>เหตุผลที่โปรนี้ใช้กับการจองไม่ได้ (null = ใช้ได้) เป็นกติกาเดียวที่ใช้ทั้งระบบ</summary>
+    public static string? IneligibleReason(Promotion promotion, PromotionContext booking, CustomerHistory customer, DateOnly today)
     {
         // เงื่อนไขส่วนกลาง: ช่วงวันที่เข้าพัก + ยอดขั้นต่ำ
-        if (promotion.StartDate.HasValue && booking.CheckIn < promotion.StartDate.Value) return false;
-        if (promotion.EndDate.HasValue && booking.CheckIn > promotion.EndDate.Value) return false;
-        if (promotion.MinSpend.HasValue && booking.RoomSubtotal < promotion.MinSpend.Value) return false;
+        if (promotion.StartDate.HasValue && booking.CheckIn < promotion.StartDate.Value)
+            return $"ใช้ได้เมื่อเข้าพักตั้งแต่ {ThaiText.Date(promotion.StartDate)}";
+        if (promotion.EndDate.HasValue && booking.CheckIn > promotion.EndDate.Value)
+            return $"หมดช่วงเข้าพักแล้ว ({ThaiText.Date(promotion.EndDate)})";
+        if (promotion.MinSpend.HasValue && booking.RoomSubtotal < promotion.MinSpend.Value)
+            return $"ค่าห้องต้องถึง ฿{promotion.MinSpend:N0} (ตอนนี้ ฿{booking.RoomSubtotal:N0})";
 
         var x = promotion.RuleValue ?? 0;
         var daysBeforeCheckIn = booking.CheckIn.DayNumber - today.DayNumber;
         var nights = booking.CheckOut.DayNumber - booking.CheckIn.DayNumber;
+        const string needCustomer = "กรอกชื่อ นามสกุล และเบอร์เพื่อเช็คสิทธิ์";
 
         return promotion.RuleType switch
         {
-            PromotionRules.EarlyBird => daysBeforeCheckIn >= x,
-            PromotionRules.LastMinute => daysBeforeCheckIn <= x,
-            PromotionRules.LongStay => nights >= x,
-            PromotionRules.Weekday => AllNightsAreWeekdays(booking.CheckIn, nights),
-            PromotionRules.BirthdayMonth => customer.BirthMonth == booking.CheckIn.Month,
-            PromotionRules.FirstStay => customer.IsKnown && customer.ActiveBookingCount == 0,
-            PromotionRules.LoyalGuest => customer.CompletedStayCount >= x,
-            PromotionRules.Seasonal => true,
-            _ => false
+            PromotionRules.EarlyBird => daysBeforeCheckIn >= x ? null
+                : $"ต้องจองล่วงหน้า {x} วัน (ตอนนี้ {daysBeforeCheckIn} วัน)",
+            PromotionRules.LastMinute => daysBeforeCheckIn <= x ? null
+                : $"ต้องจองก่อนเข้าพักไม่เกิน {x} วัน (ตอนนี้ {daysBeforeCheckIn} วัน)",
+            PromotionRules.LongStay => nights >= x ? null : $"ต้องพัก {x} คืนขึ้นไป (ตอนนี้ {nights} คืน)",
+            PromotionRules.Weekday => AllNightsAreWeekdays(booking.CheckIn, nights) ? null : "มีคืนวันศุกร์หรือเสาร์",
+            PromotionRules.BirthdayMonth => customer.BirthMonth == booking.CheckIn.Month ? null
+                : !customer.IsKnown ? needCustomer
+                : customer.BirthMonth == null ? "ไม่มีวันเกิดของลูกค้าในระบบ" : "ไม่ใช่เดือนเกิดของลูกค้า",
+            PromotionRules.FirstStay => !customer.IsKnown ? needCustomer
+                : customer.ActiveBookingCount == 0 ? null : "ลูกค้าเคยจองแล้ว",
+            PromotionRules.LoyalGuest => customer.CompletedStayCount >= x ? null
+                : !customer.IsKnown ? needCustomer : $"เข้าพักจบแล้ว {customer.CompletedStayCount} จาก {x} ครั้ง",
+            PromotionRules.Seasonal => null,
+            _ => "ยังไม่ได้ตั้งเงื่อนไข"
         };
     }
 

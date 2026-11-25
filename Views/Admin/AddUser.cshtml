@@ -51,7 +51,7 @@
             <div class="col-md-6">
                 <div class="mb-3">
                     <label asp-for="BirthDate" class="form-label">วันเกิด</label>
-                    <input asp-for="BirthDate" type="date" class="form-control" />
+                    <input asp-for="BirthDate" type="date" class="form-control" min="1900-01-01" max="@(GoodHotel.Services.RoomAvailabilityService.HotelDate(DateTime.UtcNow).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))" />
                     <span asp-validation-for="BirthDate" class="text-danger"></span>
                 </div>
             </div>

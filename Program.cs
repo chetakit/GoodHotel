@@ -92,6 +92,13 @@ builder.Services.AddHostedService<PaymentDeadlineSweeper>();
 
 var app = builder.Build();
 
+// ตั้งข้อมูลตัวอย่างสำหรับสาธิต แล้วจบการทำงาน (ไม่เปิดเว็บ)
+if (args.Contains("seed-demo"))
+{
+    Environment.ExitCode = await DemoData.RunAsync(app.Services, args);
+    return;
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");

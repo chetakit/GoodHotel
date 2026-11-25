@@ -28,23 +28,40 @@ public static class PaymentDeadline
 
     public static DateTime? DueAtUtc(DateTime? createdAtUtc) => createdAtUtc + Window;
 
-    /// <summary>ยกเลิกการจองที่หมดเวลาชำระทั้งหมดด้วยคำสั่งเดียว คืนจำนวนที่ยกเลิก</summary>
-    public static Task<int> ExpireOverdueAsync(GoodHotelDbContext db, DateTime nowUtc, CancellationToken ct)
+    /// <summary>
+    /// ยกเลิกการจองที่หมดเวลาชำระ คืนจำนวนที่ยกเลิก
+    /// หารายการแบบไม่ล็อกก่อน แล้วล็อกทีละการจองและตรวจซ้ำ
+    /// (เดิมใช้ UPDATE เดียวทั้งตาราง ล็อกกว้างจนชนกับคนที่กำลังจ่ายเงิน เกิด deadlock ฝั่งที่แพ้จ่ายไม่สำเร็จ)
+    /// </summary>
+    public static async Task<int> ExpireOverdueAsync(GoodHotelDbContext db, DateTime nowUtc, CancellationToken ct)
+    {
+        var overdue = await Overdue(db, nowUtc).Select(b => b.BookingId).ToListAsync(ct);
+        var expired = 0;
+        foreach (var id in overdue)
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+            // ถ้าลูกค้ากำลังจ่ายอยู่ (ล็อกการจองไว้) จะรอ แล้วเห็นการชำระนั้น จึงไม่ยกเลิกการจองที่เพิ่งจ่าย
+            if (!await PaymentService.LockBookingAsync(db, id, ct)) continue;
+            expired += await Overdue(db, nowUtc).Where(b => b.BookingId == id)
+                .ExecuteUpdateAsync(b => b
+                    .SetProperty(x => x.Status, BookingStatuses.Cancelled)
+                    .SetProperty(x => x.CancelledAtUtc, nowUtc)
+                    .SetProperty(x => x.CancelReason, CancelReasons.PaymentTimeout), ct);
+            await tx.CommitAsync(ct);
+        }
+        return expired;
+    }
+
+    private static IQueryable<Booking> Overdue(GoodHotelDbContext db, DateTime nowUtc)
     {
         var cutoff = nowUtc - Window;
-        // เงื่อนไขทั้งหมดอยู่ใน WHERE ของ UPDATE เดียว ถ้าลูกค้ากำลังจ่ายอยู่ (ล็อกแถวการจองไว้)
-        // คำสั่งนี้จะรอ แล้วเห็นการชำระนั้น จึงไม่ยกเลิกการจองที่เพิ่งจ่าย
         return db.Bookings
             .Where(b => b.Status == BookingStatuses.Booked &&
                         b.CreatedAtUtc != null && b.CreatedAtUtc < cutoff &&
                         !db.BookingStays.Any(s => s.BookingId == b.BookingId) &&
                         !db.Payments.Any(p => p.BookingId == b.BookingId &&
                             (p.VerifiedAtUtc != null ||
-                             (p.SubmittedAtUtc != null && (p.PaymentStatus == "Pending" || p.PaymentStatus == "Submitted")))))
-            .ExecuteUpdateAsync(b => b
-                .SetProperty(x => x.Status, BookingStatuses.Cancelled)
-                .SetProperty(x => x.CancelledAtUtc, nowUtc)
-                .SetProperty(x => x.CancelReason, CancelReasons.PaymentTimeout), ct);
+                             (p.SubmittedAtUtc != null && (p.PaymentStatus == "Pending" || p.PaymentStatus == "Submitted")))));
     }
 }
 

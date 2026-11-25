@@ -21,6 +21,9 @@ public class ProfileViewModel
     public DateOnly? BirthDate { get; set; }
 
     /// <summary>"089 111 2233" → "0891112233" (ไม่ใช่เบอร์มือถือไทย = null)</summary>
+    /// <summary>วันเกิดต้องเป็น ค.ศ. ไม่อยู่ในอนาคต และไม่เกิน 120 ปี (กันกรอกปี พ.ศ. ซึ่งทำให้วันเกิดเพี้ยน)</summary>
+    public static bool IsValidBirthDate(DateOnly date, DateOnly today) => date <= today && date > today.AddYears(-120);
+
     public static string? NormalizePhone(string? phone)
     {
         var digits = phone?.Replace(" ", "");
