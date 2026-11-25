@@ -80,7 +80,7 @@
                         <li>
                             @ThaiText.Time(entry.OccurredAtUtc) —
                             @(entry.FromStatus == null ? "สร้างรายการ" : ThaiText.Status(entry.FromStatus)) → @ThaiText.Status(entry.ToStatus)
-                            (@(await Users.NameAsync(entry.ActorUserId)))
+                            · โดย @(await Users.NameAsync(entry.ActorUserId))
                             @if (!string.IsNullOrWhiteSpace(entry.Note))
                             {
                                 <span> — @entry.Note</span>

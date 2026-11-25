@@ -102,7 +102,7 @@ public class PaymentController(
         var namesTask = reader.Run(c => c.Users.AsNoTracking()
             .Where(u => c.PaymentEvents.Any(e => e.ActorUserId == u.UserId && e.Payment.BookingId == id) ||
                         c.PaymentRefunds.Any(r => r.RequestedByUserId == u.UserId && r.Payment.BookingId == id))
-            .Select(u => new { u.UserId, u.FirstName, u.LastName }).ToListAsync(ct));
+            .Select(u => new { u.UserId, u.FirstName, u.LastName, u.Role }).ToListAsync(ct));
         await Task.WhenAll(bookingTask, listTask, historyTask, refundsTask, namesTask);
 
         var booking = bookingTask.Result;
@@ -111,7 +111,7 @@ public class PaymentController(
         var list = listTask.Result;
         var history = historyTask.Result;
         var refunds = refundsTask.Result;
-        foreach (var person in namesTask.Result) users.Remember(person.UserId, person.FirstName, person.LastName);
+        foreach (var person in namesTask.Result) users.Remember(person.UserId, person.FirstName, person.LastName, person.Role);
         var confirmedPayment = list.Where(p => p.IsVerified).OrderBy(p => p.PaymentId).FirstOrDefault();
         var confirmed = confirmedPayment?.Amount ?? 0m;
         var refunded = refunds.Where(r => r.Status == "Approved" && r.PaymentId == confirmedPayment?.PaymentId)

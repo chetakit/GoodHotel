@@ -38,7 +38,7 @@ public class MaintenanceController : Controller
                 report.BlockUntil,
                 report.Description,
                 report.ReportedAtUtc,
-                (report.ReportedByUser.FirstName ?? "") + " " + (report.ReportedByUser.LastName ?? "")))
+                UserDirectory.Label(report.ReportedByUser.FirstName, report.ReportedByUser.LastName, report.ReportedByUser.Role)))
             .ToListAsync(cancellationToken);
 
         return View(reports);
