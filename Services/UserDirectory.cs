@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using GoodHotel.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,17 @@ public sealed class UserDirectory(GoodHotelDbContext db)
         if (string.IsNullOrWhiteSpace(role)) return name;
         return $"{name} ({ThaiText.Status(role)})".Trim();
     }
+
+    /// <summary>ชื่อของคนที่ล็อกอินอยู่ (ไม่มีก็ใช้อีเมล)</summary>
+    public static string DisplayName(ClaimsPrincipal user)
+    {
+        var name = user.FindFirst(ClaimTypes.GivenName)?.Value;
+        return string.IsNullOrWhiteSpace(name) ? user.Identity?.Name ?? "" : name;
+    }
+
+    /// <summary>ตัวอักษรแรกของชื่อ ข้ามสระหน้าของไทย (เ แ โ ใ ไ)</summary>
+    public static string Initial(string name) =>
+        name.TrimStart('เ', 'แ', 'โ', 'ใ', 'ไ', ' ') is { Length: > 0 } rest ? rest[..1].ToUpperInvariant() : "?";
 
     public async Task<string> NameAsync(int? userId)
     {

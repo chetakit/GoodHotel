@@ -15,12 +15,6 @@
     var maxPromo = Model.PromotionUsage.Select(p => p.BookingCount).DefaultIfEmpty(0).Max();
 }
 
-@section Actions {
-    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportBookings" asp-route-from="@from" asp-route-to="@to">การจอง CSV</a>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportMaintenanceReports" asp-route-from="@from" asp-route-to="@to">งานซ่อม CSV</a>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="ExportHousekeepingTasks" asp-route-from="@from" asp-route-to="@to">งานทำความสะอาด CSV</a>
-}
-
 <form method="get" asp-action="Reports" class="toolbar">
     <div>
         <label class="form-label" for="from">ตั้งแต่</label>

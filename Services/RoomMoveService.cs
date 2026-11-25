@@ -15,7 +15,8 @@ public sealed record RoomMoveInfo(int BookingId, string? GuestName, int RoomId, 
 /// - มีคำขอคืนเงินค้างอยู่ย้ายไม่ได้ ต้องรอฝ่ายบัญชีก่อน
 /// - บันทึกใน payment_events (RoomMoved) เห็นในประวัติการชำระเงินและหน้า Audit พร้อมชื่อพนักงาน
 /// </summary>
-public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityService availability, TimeProvider time)
+public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityService availability, TimeProvider time,
+    ParallelReader reader)
 {
     public static bool CanMove(string? status, DateOnly? checkOut, bool hasStay, bool isPaid, bool refundPending,
         DateOnly today) =>
@@ -37,17 +38,21 @@ public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityServi
     /// <summary>คืน null เมื่อการจองนี้ย้ายห้องไม่ได้</summary>
     public async Task<RoomMoveInfo?> InfoAsync(int bookingId, CancellationToken ct)
     {
-        var b = await db.Bookings.AsNoTracking().Where(x => x.BookingId == bookingId && x.RoomId != null)
+        // อ่านพร้อมกันได้: ตอนย้ายจริงห้องและการจองถูกล็อกไว้แล้ว ผลจึงไม่เปลี่ยนระหว่างนี้
+        var paidTask = reader.Run(c => PaymentService.IsPaidAsync(c, bookingId, ct));
+        var bookingTask = reader.Run(c => c.Bookings.AsNoTracking().Where(x => x.BookingId == bookingId && x.RoomId != null)
             .Select(x => new
             {
                 x.Status, x.CheckIn, x.CheckOut, x.Guests, x.ExtraBed, RoomId = x.RoomId!.Value,
                 RoomNumber = x.Room!.Room1, RoomType = x.Room.Type, x.Room.Rate,
                 GuestName = x.User == null ? null : x.User.FirstName + " " + x.User.LastName,
-                HasStay = db.BookingStays.Any(s => s.BookingId == x.BookingId),
+                HasStay = c.BookingStays.Any(s => s.BookingId == x.BookingId),
                 RefundPending = x.Payments.Any(p => p.Refunds.Any(r => r.Status == PaymentService.RefundRequested))
-            }).SingleOrDefaultAsync(ct);
+            }).SingleOrDefaultAsync(ct));
+        await Task.WhenAll(paidTask, bookingTask);
+        var b = bookingTask.Result;
         if (b?.CheckIn == null || b.CheckOut == null || b.Guests == null ||
-            !CanMove(b.Status, b.CheckOut, b.HasStay, await PaymentService.IsPaidAsync(db, bookingId, ct),
+            !CanMove(b.Status, b.CheckOut, b.HasStay, paidTask.Result,
                 b.RefundPending, availability.HotelToday()))
             return null;
         return new RoomMoveInfo(bookingId, b.GuestName, b.RoomId, b.RoomNumber, b.RoomType, b.Rate,
@@ -63,14 +68,14 @@ public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityServi
 
     public async Task<IReadOnlyList<RoomMoveOption>> OptionsAsync(RoomMoveInfo info, CancellationToken ct)
     {
-        var rooms = await db.Rooms.AsNoTracking()
+        var roomsTask = reader.Run(c => c.Rooms.AsNoTracking()
             .Where(r => r.RoomId != info.RoomId && r.Status == "Available")
             .OrderBy(r => r.Rate).ThenBy(r => r.Room1)
-            .Select(r => new RoomMoveOption(r.RoomId, r.Room1, r.Type, r.Capacity, r.Rate)).ToListAsync(ct);
-        rooms = rooms.Where(r => IsSuitable(info.Rate, r.Rate, r.Capacity, info.Guests, info.ExtraBed)).ToList();
-        if (rooms.Count == 0) return rooms;
-        var blocked = (await availability.GetBlockedPeriodsAsync(
-            rooms.Select(r => r.RoomId).ToArray(), From(info), info.CheckOut, ct)).Select(p => p.RoomId).ToHashSet();
+            .Select(r => new RoomMoveOption(r.RoomId, r.Room1, r.Type, r.Capacity, r.Rate)).ToListAsync(ct));
+        var blockedTask = availability.GetBlockedPeriodsAsync(null, From(info), info.CheckOut, ct);
+        await Task.WhenAll(roomsTask, blockedTask);
+        var rooms = roomsTask.Result.Where(r => IsSuitable(info.Rate, r.Rate, r.Capacity, info.Guests, info.ExtraBed)).ToList();
+        var blocked = blockedTask.Result.Select(p => p.RoomId).ToHashSet();
         return rooms.Where(r => !blocked.Contains(r.RoomId)).ToList();
     }
 

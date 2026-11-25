@@ -452,20 +452,24 @@ namespace GoodHotel.Controllers
 
             // ความจุ + เตียงเสริม 1 เตียง ต้องรับจำนวนคนได้
             var boardTask = _roomStatus.GetRoomBoardAsync(ct);
-            var blockedTask = form.CheckOut > form.Today
-                ? _availability.GetBlockedPeriodsAsync(null, form.Today, form.CheckOut.Value, ct)
-                : null;
+            // ดูล่วงหน้า 1 ปี เพื่อบอกได้ว่าแต่ละห้องพักได้ถึงวันไหน
+            var horizon = form.Today.AddYears(1);
+            if (form.CheckOut > horizon) horizon = form.CheckOut.Value;
+            var blockedTask = _availability.GetBlockedPeriodsAsync(null, form.Today, horizon, ct);
             var freeNow = (await boardTask)
                 .Where(r => r.Status == RoomLiveStatus.Available && (r.Capacity ?? 0) + 1 >= guests)
                 .ToList();
 
-            if (blockedTask != null)
-            {
-                var blockedIds = (await blockedTask).Select(b => b.RoomId).ToHashSet();
-                freeNow = freeNow.Where(r => !blockedIds.Contains(r.RoomId)).ToList();
-            }
+            // วันที่ห้องเริ่มไม่ว่าง = วันออกช้าสุดที่พักได้ (ไม่มีในรายการ = ยังไม่มีคนจองต่อ)
+            form.FreeUntil = (await blockedTask).GroupBy(b => b.RoomId)
+                .ToDictionary(g => g.Key, g => g.Min(b => b.Start ?? form.Today));
+            var wanted = form.CheckOut > form.Today ? form.CheckOut.Value : form.Today.AddDays(1);
+            bool FreeFor(RoomStatusItem r, DateOnly checkOut) =>
+                !form.FreeUntil.TryGetValue(r.RoomId, out var until) || until >= checkOut;
 
-            form.AvailableRooms = freeNow;
+            form.AvailableRooms = freeNow.Where(r => FreeFor(r, wanted)).ToList();
+            form.ShorterStayRooms = freeNow.Where(r => !FreeFor(r, wanted) && FreeFor(r, form.Today.AddDays(1)))
+                .OrderByDescending(r => form.FreeUntil[r.RoomId]).ToList();
             return form;
         }
 

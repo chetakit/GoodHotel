@@ -53,4 +53,11 @@ public class WalkInViewModel
     public DateOnly Today { get; set; }
 
     public IReadOnlyList<RoomStatusItem> AvailableRooms { get; set; } = [];
+
+    // ว่างวันนี้ แต่มีคนจองต่อก่อนวันออกที่เลือก
+    public IReadOnlyList<RoomStatusItem> ShorterStayRooms { get; set; } = [];
+
+    // รหัสห้อง → วันออกช้าสุดที่พักได้ (ไม่มี = ยังไม่มีคนจองต่อ)
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public Dictionary<int, DateOnly> FreeUntil { get; set; } = [];
 }

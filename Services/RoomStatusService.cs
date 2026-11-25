@@ -44,6 +44,17 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
         _ => "ไม่พร้อมขาย"
     };
 
+    /// <summary>สีของสถานะ (class tone-... ใน site.css) ใช้สีเดียวกันทั้งหน้า Staff และ Admin</summary>
+    public static string Tone(RoomLiveStatus status) => status switch
+    {
+        RoomLiveStatus.Available => "ok",
+        RoomLiveStatus.ArrivingToday => "arrive",
+        RoomLiveStatus.Occupied => "info",
+        RoomLiveStatus.Cleaning or RoomLiveStatus.Inspection => "warn",
+        RoomLiveStatus.Maintenance => "bad",
+        _ => "none"
+    };
+
     public async Task<IReadOnlyList<RoomStatusItem>> GetRoomBoardAsync(CancellationToken ct)
     {
         var today = availability.HotelToday();

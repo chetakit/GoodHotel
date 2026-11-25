@@ -48,6 +48,7 @@
         },
         _ => Array.Empty<(string, string, string, bool)>()
     };
+    var fullName = UserDirectory.DisplayName(User);
     var home = menu.Length > 0 ? menu[0] : ("", "Home", "Index", false);
 }
 <!DOCTYPE html>
@@ -82,11 +83,17 @@
                 </nav>
 
                 <div class="bo-user">
-                    <div class="bo-user-name">@User.Identity?.Name</div>
+                    <div class="bo-user-card">
+                        <span class="bo-avatar" aria-hidden="true">@UserDirectory.Initial(fullName)</span>
+                        <div class="bo-user-text">
+                            <div class="bo-user-name" title="@fullName">@fullName</div>
+                            <div class="bo-user-role">@ThaiText.Status(role)</div>
+                        </div>
+                    </div>
                     <div class="bo-user-links">
-                        <a asp-controller="Account" asp-action="Password">เปลี่ยนรหัสผ่าน</a>
                         <a asp-controller="Home" asp-action="Index">หน้าเว็บลูกค้า</a>
-                        <form asp-controller="Home" asp-action="Logout" method="post" class="d-inline">
+                        <a asp-controller="Account" asp-action="Password">เปลี่ยนรหัสผ่าน</a>
+                        <form asp-controller="Home" asp-action="Logout" method="post">
                             <button type="submit">ออกจากระบบ</button>
                         </form>
                     </div>

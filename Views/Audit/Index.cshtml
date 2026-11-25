@@ -16,11 +16,6 @@
     };
 }
 
-@section Actions {
-    <a class="btn btn-outline-secondary btn-sm" asp-action="Export" asp-route-from="@fromText" asp-route-to="@toText"
-       asp-route-type="@Model.Type" asp-route-bookingId="@Model.BookingId" asp-route-actor="@Model.Actor">ดาวน์โหลด CSV</a>
-}
-
 <form method="get" asp-action="Index" class="toolbar">
     <div>
         <label class="form-label" for="from">ตั้งแต่</label>

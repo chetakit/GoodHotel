@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using GoodHotel.Models;
 using GoodHotel.Models.ViewModels;
+using GoodHotel.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +11,7 @@ namespace GoodHotel.Controllers;
 
 /// <summary>บัญชีของตัวเอง: เปลี่ยนรหัสผ่าน (ทุกบทบาท) และข้อมูลส่วนตัว (ลูกค้า)</summary>
 [Authorize]
-public class AccountController(GoodHotelDbContext db, IPasswordHasher<User> hasher) : Controller
+public class AccountController(GoodHotelDbContext db, IPasswordHasher<User> hasher, UserAccessCache userAccess) : Controller
 {
     /// <summary>ลูกค้าแก้ชื่อและเบอร์ของตัวเอง</summary>
     [HttpGet]
@@ -51,6 +52,7 @@ public class AccountController(GoodHotelDbContext db, IPasswordHasher<User> hash
         user.LastName = form.LastName!.Trim();
         user.Phone = phone;
         await db.SaveChangesAsync(ct);
+        userAccess.Forget(user.UserId);
         TempData["ProfileSuccess"] = "บันทึกข้อมูลแล้ว";
         return RedirectToAction(nameof(Profile));
     }

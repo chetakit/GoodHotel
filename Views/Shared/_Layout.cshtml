@@ -13,14 +13,14 @@
     var action = ViewContext.RouteData.Values["Action"]?.ToString() ?? "";
     string Active(string name) => action.Equals(name, StringComparison.OrdinalIgnoreCase) ? "active" : "";
 
-    // พนักงานที่เปิดหน้าเว็บลูกค้า: ปุ่มกลับไปหน้าทำงานของ role ตัวเอง
+    // พนักงานที่เปิดหน้าเว็บลูกค้า: ลิงก์กลับไปหน้าทำงานของ role ตัวเอง (อยู่ในเมนูบัญชี)
     var workplace = role switch
     {
-        "Admin" => ("Admin", "Dashboard"),
-        "Staff" => ("Staff", "Index"),
-        "Housekeeper" => ("Housekeeper", "Index"),
-        "Accountant" => ("Accountant", "Index"),
-        _ => ((string, string)?)null
+        "Admin" => ("Admin", "Dashboard", "Admin Management"),
+        "Staff" => ("Staff", "Index", "Staff Management"),
+        "Housekeeper" => ("Housekeeper", "Index", "Housekeeping Management"),
+        "Accountant" => ("Accountant", "Index", "Accounting Management"),
+        _ => ((string, string, string)?)null
     };
 }
 <!DOCTYPE html>
@@ -66,18 +66,28 @@
                     <div class="d-flex align-items-center gap-3 mt-3 mt-lg-0">
                         @if (signedIn)
                         {
-                            <div class="user-chip">
-                                <div>@User.Identity!.Name</div>
-                                <small>@ThaiText.Status(role)</small>
+                            var fullName = UserDirectory.DisplayName(User);
+                            <div class="dropdown account-menu">
+                                <button class="account-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="bo-avatar" aria-hidden="true">@UserDirectory.Initial(fullName)</span>
+                                    <span class="account-text">
+                                        <span class="account-name">@fullName</span>
+                                        <span class="account-role">@ThaiText.Status(role)</span>
+                                    </span>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <div class="account-email">@User.Identity!.Name</div>
+                                    <div class="dropdown-divider"></div>
+                                    @if (workplace is { } place)
+                                    {
+                                        <a class="dropdown-item account-work" asp-controller="@place.Item1" asp-action="@place.Item2">@place.Item3</a>
+                                    }
+                                    <a class="dropdown-item" asp-controller="Account" asp-action="@(role == "Customer" ? "Profile" : "Password")">@(role == "Customer" ? "บัญชีของฉัน" : "เปลี่ยนรหัสผ่าน")</a>
+                                    <form asp-controller="Home" asp-action="Logout" method="post" class="m-0">
+                                        <button type="submit" class="dropdown-item account-logout">ออกจากระบบ</button>
+                                    </form>
+                                </div>
                             </div>
-                            @if (workplace is { } place)
-                            {
-                                <a class="btn btn-sm btn-primary" asp-controller="@place.Item1" asp-action="@place.Item2">ไปหน้าทำงาน</a>
-                            }
-                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Account" asp-action="@(role == "Customer" ? "Profile" : "Password")">@(role == "Customer" ? "บัญชีของฉัน" : "เปลี่ยนรหัสผ่าน")</a>
-                            <form asp-controller="Home" asp-action="Logout" method="post" class="m-0">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary">ออกจากระบบ</button>
-                            </form>
                         }
                         else
                         {

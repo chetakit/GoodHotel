@@ -109,22 +109,4 @@ public class AuditController(ParallelReader reader, RoomAvailabilityService avai
         var (entries, truncated) = await AuditEntriesAsync(start, end, type, bookingId, actor, ct);
         return View(new AuditViewModel(start, end, type, bookingId, actor, entries, AuditTypes(), truncated));
     }
-
-    [HttpGet]
-    public async Task<IActionResult> Export(DateOnly? from, DateOnly? to, string? type, int? bookingId, string? actor,
-        CancellationToken ct)
-    {
-        var (start, end) = FinanceLedger.Range(from, to, availability.HotelToday());
-        if (!string.IsNullOrEmpty(type) && AuditTypes().All(t => t.Key != type)) type = null;
-        var (entries, _) = await AuditEntriesAsync(start, end, type, bookingId, actor, ct);
-        var content = CsvExport.Build(
-            ["วันเวลา (ไทย)", "เหตุการณ์", "เลขที่การจอง", "เลขที่ชำระเงิน", "ผู้ทำรายการ", "บทบาท", "ช่องทาง", "จำนวนเงิน", "หมายเหตุ"],
-            entries.Select(e => new[]
-            {
-                ThaiText.Time(e.OccurredAtUtc), e.TypeLabel, CsvExport.Format(e.BookingId), CsvExport.Format(e.PaymentId),
-                e.Actor, e.ActorRole, e.Method == null ? null : ThaiText.PaymentMethod(e.Method), CsvExport.Format(e.Amount), e.Detail
-            }));
-        return File(content, "text/csv; charset=utf-8",
-            $"audit-{start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}-to-{end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.csv");
-    }
 }

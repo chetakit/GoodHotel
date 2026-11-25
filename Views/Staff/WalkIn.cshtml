@@ -42,7 +42,23 @@
             <span asp-validation-for="RoomId" class="text-danger d-block mb-2"></span>
             @if (Model.AvailableRooms.Count == 0)
             {
-                <div class="alert alert-light border">ไม่มีห้องว่างตามเงื่อนไขนี้ ลองเปลี่ยนวันที่ออกหรือจำนวนคน</div>
+                <div class="alert alert-light border">@(Model.ShorterStayRooms.Count > 0
+                    ? "ไม่มีห้องที่ว่างติดกันถึงวันออกที่เลือก เลือกห้องด้านล่างเพื่อเปลี่ยนวันออก"
+                    : "วันนี้ไม่มีห้องว่างสำหรับจำนวนคนนี้")</div>
+            }
+            @if (Model.ShorterStayRooms.Count > 0)
+            {
+                <div class="mb-3">
+                    <div class="text-muted small mb-2">ว่างวันนี้ แต่มีคนจองต่อ จึงพักได้สั้นกว่า</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var room in Model.ShorterStayRooms)
+                        {
+                            var until = Model.FreeUntil[room.RoomId];
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="WalkIn"
+                               asp-route-checkOut="@until.ToString("yyyy-MM-dd", iso)" asp-route-guests="@Model.Guests">ห้อง @room.RoomNumber · ออกได้ถึง @ThaiText.Date(until)</a>
+                        }
+                    </div>
+                </div>
             }
             <div class="row g-3 mb-4">
                 @foreach (var room in Model.AvailableRooms)
@@ -55,6 +71,7 @@
                                 <strong>ห้อง @room.RoomNumber</strong>
                             </div>
                             <small class="text-muted">@room.RoomType · รับได้ @room.Capacity คน</small>
+                            <small class="text-muted">@(Model.FreeUntil.TryGetValue(room.RoomId, out var freeUntil) ? $"ออกได้ถึง {ThaiText.Date(freeUntil)}" : "ยังไม่มีคนจองต่อ")</small>
                             <strong class="mt-1">@(room.Rate.HasValue ? $"฿{room.Rate.Value:N0}" : "-") <span class="text-muted small fw-normal">/คืน</span></strong>
                         </label>
                     </div>

@@ -70,8 +70,8 @@
                             <td>
                                 @if (live.TryGetValue(room.RoomId, out var now))
                                 {
-                                    <strong>@RoomStatusService.Label(now.Status)</strong>
-                                    @if (!string.IsNullOrEmpty(now.Detail)) { <br /><small class="text-muted">@now.Detail</small> }
+                                    <span class="badge live-status tone-@RoomStatusService.Tone(now.Status)">@RoomStatusService.Label(now.Status)</span>
+                                    @if (!string.IsNullOrEmpty(now.Detail)) { <div class="text-muted small mt-1">@now.Detail</div> }
                                 }
                             </td>
                             <td>

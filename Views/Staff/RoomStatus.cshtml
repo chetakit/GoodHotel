@@ -7,15 +7,7 @@
 
     string Label(RoomLiveStatus status) => RoomStatusService.Label(status);
 
-    string Tone(RoomLiveStatus status) => status switch
-    {
-        RoomLiveStatus.Available => "ok",
-        RoomLiveStatus.ArrivingToday => "accent",
-        RoomLiveStatus.Occupied => "info",
-        RoomLiveStatus.Cleaning or RoomLiveStatus.Inspection => "warn",
-        RoomLiveStatus.Maintenance => "bad",
-        _ => "none"
-    };
+    string Tone(RoomLiveStatus status) => RoomStatusService.Tone(status);
 }
 
 <p class="text-muted mb-3">ข้อมูล ณ @ThaiText.Date(today) (เวลาไทย) · คิดจากการเข้าพัก งานทำความสะอาด และงานซ่อมจริง</p>

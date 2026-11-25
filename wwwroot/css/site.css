@@ -325,8 +325,6 @@ dd { margin-bottom: .6rem; }
 .brand-mark { display: none; }
 .hotel-navbar .nav-link { color: var(--ink-2); font-weight: 500; padding: .4rem .2rem !important; margin: 0 .55rem; border-bottom: 2px solid transparent; }
 .hotel-navbar .nav-link:hover, .hotel-navbar .nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
-.user-chip { text-align: right; line-height: 1.25; font-size: .875rem; }
-.user-chip small { color: var(--muted); }
 
 .content-section { padding: 2.75rem 0; }
 .content-section.bg-light { background: var(--tint) !important; }
@@ -434,6 +432,7 @@ dd { margin-bottom: .6rem; }
 .bo-side-head { padding: 1.1rem 1.1rem .9rem; display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .5rem; }
 .bo-brand { font-family: var(--serif); font-size: 1.2rem; color: var(--ink); text-decoration: none; }
 .bo-role { font-size: .8rem; color: var(--muted); }
+@media (min-width: 992px) { .bo-role { display: none; } } /* จอใหญ่: ตำแหน่งอยู่ในการ์ดผู้ใช้แล้ว */
 .bo-menu-toggle { display: none; margin-left: auto; border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--radius); padding: .2rem .65rem; font-size: .85rem; }
 .bo-side-body { display: flex !important; flex-direction: column; flex: 1; min-height: 0; }
 .bo-nav { display: flex; flex-direction: column; padding: .25rem .6rem; gap: 1px; overflow-y: auto; }
@@ -447,11 +446,38 @@ dd { margin-bottom: .6rem; }
 }
 .bo-nav a:hover { background: var(--paper); color: var(--ink); }
 .bo-nav a.active { background: var(--accent); color: #fff; font-weight: 600; }
-.bo-user { margin-top: auto; padding: .9rem 1.1rem 1.1rem; border-top: 1px solid var(--line-strong); font-size: .85rem; }
-.bo-user-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bo-user-links { display: flex; gap: .9rem; margin-top: .3rem; }
-.bo-user-links a, .bo-user-links button { color: var(--muted); background: none; border: 0; padding: 0; font-size: .85rem; text-decoration: none; }
-.bo-user-links a:hover, .bo-user-links button:hover { color: var(--ink); text-decoration: underline; }
+.bo-user { margin-top: auto; padding: .8rem .6rem .8rem; border-top: 1px solid var(--line-strong); }
+.bo-user-card { display: flex; align-items: center; gap: .65rem; padding: 0 .6rem .6rem; }
+.bo-avatar {
+    flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+.bo-user-text { min-width: 0; line-height: 1.35; }
+.bo-user-name { font-size: .9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bo-user-role { font-size: .78rem; color: var(--muted); }
+.bo-user-links form { margin: 0; }
+.bo-user-links a, .bo-user-links button {
+    display: block;
+    width: 100%;
+    padding: .3rem .6rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--ink-2);
+    font-size: .85rem;
+    text-align: left;
+    text-decoration: none;
+}
+.bo-user-links a:hover, .bo-user-links button:hover { background: var(--paper); color: var(--ink); }
+.bo-user-links button { color: var(--bad); }
+.bo-user-links button:hover { background: var(--bad-soft); color: var(--bad); }
 
 .bo-main { flex: 1; min-width: 0; }
 .bo-top {
@@ -846,11 +872,12 @@ body.calendar-modal-open {
 .room-tile-number { font-size: 1.1rem; }
 .room-tile-status { font-size: .8rem; font-weight: 600; color: var(--ink-2); }
 .tone-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .4rem; background: var(--line-strong); }
-.tone-ok { --tone: var(--ok); }
-.tone-accent { --tone: var(--accent); }
-.tone-info { --tone: var(--info); }
-.tone-warn { --tone: var(--warn); }
-.tone-bad { --tone: var(--bad); }
+.tone-ok { --tone: var(--ok); --tone-soft: var(--ok-soft); }
+.tone-arrive { --tone: #6b3f8f; --tone-soft: #eee3f5; }
+.tone-info { --tone: var(--info); --tone-soft: var(--info-soft); }
+.tone-warn { --tone: var(--warn); --tone-soft: var(--warn-soft); }
+.tone-bad { --tone: var(--bad); --tone-soft: var(--bad-soft); }
+.live-status { background: var(--tone-soft, #e1e8e4); color: var(--tone, var(--ink-2)); }
 .room-tile[class*="tone-"] { border-left-color: var(--tone, var(--line-strong)); }
 .room-tile[class*="tone-"] .room-tile-status { color: var(--tone, var(--ink-2)); }
 .tone-dot[class*="tone-"] { background: var(--tone, var(--line-strong)); }
@@ -861,7 +888,7 @@ label.card:hover { border-color: var(--line-strong); }
 label.card:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 
 /* กล่องที่เป็น .row ด้วย (เช่นฟอร์ม Walk-in) ไม่ให้ล้นขอบ */
-.booking-panel.row { margin-left: 0; margin-right: 0; padding: .4rem .5rem 1.1rem; }
+.booking-panel.row { margin-top: 0; margin-left: 0; margin-right: 0; padding: .4rem .5rem 1.1rem; }
 
 /* หน้ารายละเอียดการชำระเงิน: แถวละรายการ ฟอร์มที่ต้องทำอยู่ใต้รายการนั้นเลย */
 .pay-row { padding: .85rem 1.1rem; border-bottom: 1px solid var(--line); }
@@ -986,3 +1013,18 @@ label.card:has(input:checked) { border-color: var(--accent); background: var(--a
 /* แถบยกเลิกการจองในหน้าชำระเงิน */
 .cancel-strip { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; padding: .6rem .9rem; margin-bottom: 1rem; border: 1px dashed var(--line-strong); border-radius: 6px; }
 .cancel-strip form, form.cancel-strip { margin-bottom: 1rem; }
+
+/* ---------- เมนูบัญชีบนแถบเมนูหน้าลูกค้า ---------- */
+.account-toggle { display: flex; align-items: center; gap: .6rem; padding: .25rem .6rem .25rem .3rem; border: 0; border-radius: 999px; background: none; color: var(--ink); text-align: left; }
+.account-toggle:hover, .account-toggle.show { background: var(--tint); }
+.account-toggle::after { color: var(--muted); }
+.account-text { display: block; line-height: 1.3; }
+.account-name { display: block; max-width: 14rem; font-size: .9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-role { display: block; font-size: .78rem; color: var(--muted); }
+.account-menu .dropdown-menu { background: var(--surface); min-width: 13rem; margin-top: .4rem; padding: .4rem; border-color: var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(20, 45, 40, .12); }
+.account-email { padding: .35rem .6rem; font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.account-menu .dropdown-item { padding: .45rem .6rem; border-radius: var(--radius); font-size: .9rem; color: var(--ink-2); }
+.account-menu .dropdown-item:hover, .account-menu .dropdown-item:focus { background: var(--paper); color: var(--ink); }
+.account-menu .account-logout { color: var(--bad); }
+.account-menu .account-logout:hover, .account-menu .account-logout:focus { background: var(--bad-soft); color: var(--bad); }
+.account-menu .account-work { color: var(--accent); font-weight: 600; }

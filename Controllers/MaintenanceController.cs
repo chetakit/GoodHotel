@@ -16,9 +16,13 @@ public class MaintenanceController : Controller
 {
     private readonly GoodHotelDbContext _db;
     private readonly TimeProvider _timeProvider;
+    private readonly ParallelReader _reader;
+    private readonly UserDirectory _users;
 
-    public MaintenanceController(GoodHotelDbContext db, TimeProvider timeProvider)
+    public MaintenanceController(GoodHotelDbContext db, TimeProvider timeProvider, ParallelReader reader, UserDirectory users)
     {
+        _reader = reader;
+        _users = users;
         _db = db;
         _timeProvider = timeProvider;
     }
@@ -239,7 +243,8 @@ public class MaintenanceController : Controller
 
     private async Task<MaintenanceDetailsViewModel?> GetDetailsAsync(int id, CancellationToken cancellationToken)
     {
-        var report = await _db.MaintenanceReports.AsNoTracking()
+        // งานซ่อม ประวัติ และชื่อคนที่เกี่ยวข้อง ไม่ขึ้นต่อกัน อ่านพร้อมกัน
+        var reportTask = _reader.Run(db => db.MaintenanceReports.AsNoTracking()
             .Where(item => item.ReportId == id)
             .Select(item => new
             {
@@ -255,14 +260,25 @@ public class MaintenanceController : Controller
                 item.ResolutionNote,
                 item.ResolvedAtUtc
             })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (report == null) return null;
-        var events = await _db.MaintenanceReportEvents.AsNoTracking()
+            .SingleOrDefaultAsync(cancellationToken));
+        var namesTask = _reader.Run(db => db.Users.AsNoTracking()
+            .Where(u => db.MaintenanceReports.Any(r => r.ReportId == id &&
+                            (r.ReportedByUserId == u.UserId || r.ResolvedByUserId == u.UserId)) ||
+                        db.MaintenanceReportEvents.Any(e => e.ReportId == id && e.ActorUserId == u.UserId))
+            .Select(u => new { u.UserId, u.FirstName, u.LastName, u.Role }).ToListAsync(cancellationToken));
+        var eventsTask = _reader.Run(db => db.MaintenanceReportEvents.AsNoTracking()
             .Where(item => item.ReportId == id)
             .OrderBy(item => item.EventId)
             .Select(item => new MaintenanceEventItem(item.ActorUserId, item.FromStatus,
                 item.ToStatus, item.OccurredAtUtc, item.Note))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken));
+        await Task.WhenAll(reportTask, namesTask, eventsTask);
+
+        var report = reportTask.Result;
+        if (report == null) return null;
+        foreach (var person in namesTask.Result)
+            _users.Remember(person.UserId, person.FirstName, person.LastName, person.Role);
+        var events = eventsTask.Result;
         return new MaintenanceDetailsViewModel(report.ReportId, report.RoomNumber, report.Description,
             report.Status, report.BlocksRoom, report.BlockFrom, report.BlockUntil, report.ReportedByUserId,
             report.ResolvedByUserId, report.ResolutionNote, report.ResolvedAtUtc, events);

@@ -80,6 +80,14 @@ builder.Services.AddAuthentication(
         {
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return;
+        }
+
+        // ชื่อที่แสดงบนเมนู ใช้ค่าปัจจุบันจากฐานข้อมูล (แก้ชื่อแล้วเปลี่ยนทันที ไม่ต้องล็อกอินใหม่)
+        if (context.Principal!.Identity is ClaimsIdentity identity)
+        {
+            foreach (var old in identity.FindAll(ClaimTypes.GivenName).ToList()) identity.RemoveClaim(old);
+            identity.AddClaim(new Claim(ClaimTypes.GivenName, $"{currentUser.FirstName} {currentUser.LastName}".Trim()));
         }
     };
 });

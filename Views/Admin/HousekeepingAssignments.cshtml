@@ -20,7 +20,6 @@
         <div class="col-md-3"><label for="assigneeId" class="form-label">Assignee user ID</label><input id="assigneeId" name="assigneeId" type="number" min="1" value="@Context.Request.Query["assigneeId"]" class="form-control" /></div>
         <div class="col-md-3 align-self-end"><button class="btn btn-primary" type="submit">Filter</button> <a asp-action="HousekeepingAssignments" class="btn btn-outline-secondary">Clear</a></div>
     </form>
-    <a asp-action="ExportHousekeepingTasks" asp-route-status="@Context.Request.Query["status"]" asp-route-roomId="@Context.Request.Query["roomId"]" asp-route-assigneeId="@Context.Request.Query["assigneeId"]" class="btn btn-outline-primary mb-3">Export filtered CSV</a>
     @if (Model.Count == 0) { <p>No tasks found.</p> }
     else
     {
