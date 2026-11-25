@@ -1119,7 +1119,6 @@ public class HomeController : Controller
 
         if (!ModelState.IsValid)
         {
-            ViewBag.ConfirmPassword = ConfirmPassword;
             ViewBag.AgreeToTerms = AgreeToTerms;
             return View(data);
         }
@@ -1133,7 +1132,6 @@ public class HomeController : Controller
             ViewBag.Status =
                 "อีเมลนี้ได้ลงทะเบียนไว้แล้ว กรุณาใช้อีเมลอื่นหรือเข้าสู่ระบบ";
 
-            ViewBag.ConfirmPassword = ConfirmPassword;
             ViewBag.AgreeToTerms = AgreeToTerms;
             return View(data);
         }
@@ -1184,7 +1182,6 @@ public class HomeController : Controller
             {
                 ViewBag.Status =
                     "อีเมลนี้ได้ลงทะเบียนไว้แล้ว กรุณาใช้อีเมลอื่นหรือเข้าสู่ระบบ";
-                ViewBag.ConfirmPassword = ConfirmPassword;
                 ViewBag.AgreeToTerms = AgreeToTerms;
                 return View(data);
             }
@@ -1199,7 +1196,6 @@ public class HomeController : Controller
             ViewBag.Status =
                 "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองอีกครั้ง";
 
-            ViewBag.ConfirmPassword = ConfirmPassword;
             ViewBag.AgreeToTerms = AgreeToTerms;
             return View(data);
         }

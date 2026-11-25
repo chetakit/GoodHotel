@@ -94,7 +94,6 @@ namespace GoodHotel.Controllers
             var today = _availability.HotelToday();
             var countsTask = reader.Run(db => db.Users.Where(u => u.UserId == userId).Select(_ => new
             {
-                Bookings = db.Bookings.Count(b => b.Status != BookingStatuses.Cancelled),
                 Staying = db.BookingStays.Count(s => s.Status == "CheckedIn"),
                 CheckedInToday = db.BookingStays.Count(s => s.CheckedInAtUtc >= start && s.CheckedInAtUtc < end),
                 CheckedOutToday = db.BookingStays.Count(s => s.CheckedOutAtUtc >= start && s.CheckedOutAtUtc < end),
@@ -144,7 +143,7 @@ namespace GoodHotel.Controllers
             await Task.WhenAll(countsTask, departuresTask);
             var counts = countsTask.Result;
             var departures = departuresTask.Result;
-            var model = new StaffDashboardViewModel(counts.Bookings, counts.Staying, counts.CheckedInToday,
+            var model = new StaffDashboardViewModel(counts.Staying, counts.CheckedInToday,
                 counts.CheckedOutToday, counts.ToVerify, counts.OpenMaintenance);
 
             ViewBag.Today = today;
@@ -166,11 +165,15 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> Bookings(
             string? q,
             string? when,
+            DateOnly? from,
+            DateOnly? to,
+            string? sort,
             int? page,
             [FromServices] ParallelReader reader,
             CancellationToken cancellationToken)
         {
             const int pageSize = 20;
+            if (from > to) (from, to) = (to, from);
             // สร้าง query จาก context ที่ส่งมา เพื่อนับจำนวนกับดึงรายการพร้อมกันได้
             var today = _availability.HotelToday();
             IQueryable<Booking> Filter(GoodHotelDbContext db)
@@ -195,6 +198,10 @@ namespace GoodHotel.Controllers
                             (b.User.FirstName + " " + b.User.LastName).Contains(keyword) ||
                             (b.User.Phone != null && b.User.Phone.Contains(keyword)))));
                 }
+
+                // ช่วงวันเข้าพัก (ใส่ด้านเดียวก็ได้)
+                if (from.HasValue) query = query.Where(b => b.CheckIn >= from);
+                if (to.HasValue) query = query.Where(b => b.CheckIn <= to);
 
                 // ตัวกรองช่วงเวลา: today = เข้าหรือออกวันนี้, upcoming = ยังไม่ถึงวันเข้าพัก, staying = พักอยู่ตอนนี้
                 query = when switch
@@ -235,9 +242,19 @@ namespace GoodHotel.Controllers
 
             ViewBag.Today = today;
 
-            Task<List<BookingListItem>> LoadPageAsync(int number) => Filter(_db)
-                .OrderByDescending(booking => booking.CheckIn)
-                .ThenByDescending(booking => booking.BookingId)
+            ViewBag.From = from;
+            ViewBag.To = to;
+
+            // ค่าเริ่มต้น: การจองล่าสุดก่อน (เลขที่มาก → น้อย)
+            static IQueryable<Booking> Ordered(IQueryable<Booking> query, string? sort) => sort switch
+            {
+                "oldest" => query.OrderBy(b => b.BookingId),
+                "checkin" => query.OrderBy(b => b.CheckIn).ThenBy(b => b.BookingId),
+                "checkin-desc" => query.OrderByDescending(b => b.CheckIn).ThenByDescending(b => b.BookingId),
+                _ => query.OrderByDescending(b => b.BookingId)
+            };
+
+            Task<List<BookingListItem>> LoadPageAsync(int number) => Ordered(Filter(_db), sort)
                 .Skip((number - 1) * pageSize)
                 .Take(pageSize)
                 .Select(booking => new BookingListItem(
@@ -336,7 +353,7 @@ namespace GoodHotel.Controllers
             bool closeRefund, CancellationToken ct)
         {
             if (!ModelState.IsValid || bookingId <= 0) return BadRequest();
-            var actorId = await GetActorIdAsync(ct);
+            var actorId = await GetActorIdAsync();
             if (!actorId.HasValue) return Forbid();
             var error = await _stays.CheckInAsync(bookingId, actorId.Value, note, closeRefund, ct);
             TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "เช็คอินเรียบร้อย";
@@ -358,7 +375,7 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> CheckOut(int bookingId, bool fromDashboard, CancellationToken ct)
         {
             if (!ModelState.IsValid || bookingId <= 0) return BadRequest();
-            var actorId = await GetActorIdAsync(ct);
+            var actorId = await GetActorIdAsync();
             if (!actorId.HasValue) return Forbid();
             var error = await _stays.CheckOutAsync(bookingId, actorId.Value, ct);
             TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "เช็คเอาท์เรียบร้อย ส่งงานทำความสะอาดให้แม่บ้านแล้ว";
@@ -413,7 +430,7 @@ namespace GoodHotel.Controllers
                 ModelState.AddModelError(nameof(form.CheckOut), "วันที่ออกต้องอยู่หลังวันนี้");
             }
 
-            var actorId = await GetActorIdAsync(ct);
+            var actorId = await GetActorIdAsync();
             if (!actorId.HasValue) return Forbid();
 
             if (ModelState.IsValid)
@@ -493,7 +510,7 @@ namespace GoodHotel.Controllers
             [FromServices] RoomMoveService moves, CancellationToken ct)
         {
             if (bookingId <= 0 || newRoomId <= 0) return BadRequest();
-            var actorId = await GetActorIdAsync(ct);
+            var actorId = await GetActorIdAsync();
             if (!actorId.HasValue) return Forbid();
             var error = await moves.MoveAsync(bookingId, newRoomId, actorId.Value, reason, ct);
             TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "ย้ายห้องเรียบร้อย ลูกค้าจ่ายเท่าเดิม";
@@ -507,7 +524,7 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> ReworkTask(int id, string? reason, CancellationToken ct)
         {
             if (id <= 0) return BadRequest();
-            var actorId = await GetActorIdAsync(ct);
+            var actorId = await GetActorIdAsync();
             if (!actorId.HasValue) return Forbid();
             var error = await _housekeeping.ReworkAsync(id, actorId.Value, reason, ct);
             TempData[error == null ? "StaffSuccess" : "StaffError"] = error ?? "ส่งงานกลับให้แม่บ้านทำใหม่แล้ว ห้องยังเช็คอินไม่ได้จนกว่าจะตรวจผ่าน";
@@ -531,7 +548,7 @@ namespace GoodHotel.Controllers
         public async Task<IActionResult> VerifyTask(int id, CancellationToken ct)
         {
             if (!ModelState.IsValid || id <= 0) return BadRequest();
-            var actorId = await GetActorIdAsync(ct);
+            var actorId = await GetActorIdAsync();
             if (!actorId.HasValue) return Forbid();
             var verified = await _housekeeping.VerifyAsync(id, actorId.Value, ct);
             // ตรวจผ่านแล้วแต่ห้องอาจยังปิดอยู่ (งานซ่อมค้าง หรือ Admin ปิดไว้) อย่าบอกว่าพร้อมเข้าพัก
@@ -544,14 +561,8 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(VerificationTasks));
         }
 
-        [HttpGet]
-        public IActionResult MaintenanceReports()
-        {
-            return RedirectToAction("Index", "Maintenance");
-        }
-
         // คุกกี้ถูกตรวจกับตารางผู้ใช้ทุกคำขอแล้ว (UserAccessCache) ไม่ต้องถามซ้ำ
-        private Task<int?> GetActorIdAsync(CancellationToken ct) => Task.FromResult<int?>(
+        private Task<int?> GetActorIdAsync() => Task.FromResult<int?>(
             int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0 ? id : null);
     }
 }

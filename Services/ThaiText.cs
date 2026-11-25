@@ -80,6 +80,18 @@ public static class ThaiText
     public static string Status(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : Statuses.GetValueOrDefault(value, value);
 
+    /// <summary>สีป้ายของสถานะงานแม่บ้าน งานซ่อม และการจอง (ใช้สีเดียวกันทุกหน้า)</summary>
+    public static string Badge(string? status) => status switch
+    {
+        "Verified" or "Resolved" or "CheckedIn" => "text-bg-success",
+        "Pending" or "Open" => "text-bg-warning",
+        "Accepted" or "InProgress" or "In Progress" => "text-bg-info",
+        "Completed" => "live-status tone-arrive", // ทำเสร็จแล้ว รอพนักงานต้อนรับตรวจ
+        "Booked" => "text-bg-primary",
+        "CheckedOut" => "text-bg-dark",
+        _ => "text-bg-secondary"
+    };
+
     /// <summary>วิธีชำระเงิน (ค่าที่เก็บในฐานข้อมูล) → ชื่อที่แสดง</summary>
     public static string PaymentMethod(string? method) => method switch
     {

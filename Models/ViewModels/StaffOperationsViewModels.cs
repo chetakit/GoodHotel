@@ -1,7 +1,7 @@
 namespace GoodHotel.Models.ViewModels;
 
 public record StaffDashboardViewModel(
-    int TotalBookings, int CheckedInStays, int TodayCheckIns, int TodayCheckOuts,
+    int CheckedInStays, int TodayCheckIns, int TodayCheckOuts,
     int AwaitingVerification, int OpenMaintenanceReports)
 {
     /// <summary>แขกที่จะเข้าพักวันนี้ (ยังไม่เช็คอิน)</summary>

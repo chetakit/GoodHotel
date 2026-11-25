@@ -1,4 +1,3 @@
-using System.Globalization;
 using GoodHotel.Models;
 using GoodHotel.Models.ViewModels;
 using GoodHotel.Services;

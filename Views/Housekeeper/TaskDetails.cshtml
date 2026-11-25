@@ -9,7 +9,7 @@
             <dt>ห้อง</dt><dd>@ThaiText.OrDash(task.RoomNumber)</dd>
             <dt>ประเภทห้อง</dt><dd>@ThaiText.OrDash(task.RoomType)</dd>
             <dt>ประเภทงาน</dt><dd>@ThaiText.Status(task.TaskType)</dd>
-            <dt>สถานะ</dt><dd>@ThaiText.Status(task.Status)</dd>
+            <dt>สถานะ</dt><dd><span class="badge @ThaiText.Badge(task.Status)">@ThaiText.Status(task.Status)</span></dd>
             <dt>สร้างงานเมื่อ</dt><dd>@ThaiText.Time(task.CreatedAtUtc)</dd>
             <dt>รับงานเมื่อ</dt><dd>@ThaiText.Time(task.AcceptedAtUtc)</dd>
             <dt>เริ่มทำเมื่อ</dt><dd>@ThaiText.Time(task.StartedAtUtc)</dd>

@@ -3,13 +3,6 @@
 @{
     ViewData["Title"] = "รายงาน";
 
-    string Badge(string? status) => status switch
-    {
-        "Resolved" or "Verified" => "text-bg-success",
-        "Open" or "Pending" => "text-bg-warning",
-        "In Progress" or "Accepted" or "InProgress" or "Completed" => "text-bg-info",
-        _ => "text-bg-secondary"
-    };
     var from = Model.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
     var to = Model.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
     var maxPromo = Model.PromotionUsage.Select(p => p.BookingCount).DefaultIfEmpty(0).Max();
@@ -63,7 +56,7 @@
                     <tbody>
                         @foreach (var item in Model.HousekeepingByStatus)
                         {
-                            <tr><td><span class="badge @Badge(item.Status)">@ThaiText.Status(item.Status)</span></td><td class="text-end num">@item.Count</td></tr>
+                            <tr><td><span class="badge @ThaiText.Badge(item.Status)">@ThaiText.Status(item.Status)</span></td><td class="text-end num">@item.Count</td></tr>
                         }
                     </tbody>
                 </table>
@@ -83,7 +76,7 @@
                     <tbody>
                         @foreach (var item in Model.MaintenanceByStatus)
                         {
-                            <tr><td><span class="badge @Badge(item.Status)">@ThaiText.Status(item.Status)</span></td><td class="text-end num">@item.Count</td></tr>
+                            <tr><td><span class="badge @ThaiText.Badge(item.Status)">@ThaiText.Status(item.Status)</span></td><td class="text-end num">@item.Count</td></tr>
                         }
                     </tbody>
                 </table>

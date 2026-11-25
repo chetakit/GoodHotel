@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace GoodHotel.Models;
+﻿namespace GoodHotel.Models;
 
 public partial class Employee
 {

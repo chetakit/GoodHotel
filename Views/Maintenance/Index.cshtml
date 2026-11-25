@@ -3,14 +3,6 @@
 @{
     ViewData["Title"] = "แจ้งซ่อม";
     var canReport = User.IsInRole("Staff") || User.IsInRole("Housekeeper");
-
-    string Badge(string? status) => status switch
-    {
-        "Resolved" => "text-bg-success",
-        "In Progress" => "text-bg-info",
-        "Open" => "text-bg-warning",
-        _ => "text-bg-secondary"
-    };
 }
 
 @section Actions {
@@ -49,7 +41,7 @@
                             <td>@ThaiText.OrDash(report.RoomNumber)</td>
                             <td class="text-break">@(report.Description.Length > 80 ? report.Description[..80] + "…" : report.Description)</td>
                             <td class="num">@ThaiText.Time(report.ReportedAtUtc)<div class="text-muted small">@ThaiText.OrDash(report.ReportedBy)</div></td>
-                            <td><span class="badge @Badge(report.Status)">@ThaiText.Status(report.Status)</span></td>
+                            <td><span class="badge @ThaiText.Badge(report.Status)">@ThaiText.Status(report.Status)</span></td>
                             <td class="text-end"><a asp-action="Details" asp-route-id="@report.ReportId" class="btn btn-sm btn-outline-primary">ดูรายละเอียด</a></td>
                         </tr>
                     }

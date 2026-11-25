@@ -1,5 +1,4 @@
 using GoodHotel.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace GoodHotel.Services;
 

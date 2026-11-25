@@ -8,7 +8,7 @@
             <dt>ห้อง</dt><dd>@ThaiText.OrDash(Model.RoomNumber)</dd>
             <dt>ประเภทห้อง</dt><dd>@ThaiText.OrDash(Model.RoomType)</dd>
             <dt>ประเภทงาน</dt><dd>@ThaiText.Status(Model.TaskType)</dd>
-            <dt>สถานะ</dt><dd>@ThaiText.Status(Model.Status)</dd>
+            <dt>สถานะ</dt><dd><span class="badge @ThaiText.Badge(Model.Status)">@ThaiText.Status(Model.Status)</span></dd>
             <dt>ทำโดย</dt><dd>@(await Users.NameAsync(Model.CompletedByUserId))</dd>
             <dt>ทำเสร็จเมื่อ</dt><dd>@ThaiText.Time(Model.CompletedAtUtc)</dd>
         </dl>

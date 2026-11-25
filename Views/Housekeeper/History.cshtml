@@ -23,7 +23,7 @@
                         <tr>
                             <td><a asp-action="TaskDetails" asp-route-id="@task.TaskId">#@task.TaskId</a></td>
                             <td>@ThaiText.OrDash(task.RoomNumber)</td>
-                            <td><span class="badge @(task.Status == "Verified" ? "text-bg-success" : "text-bg-info")">@ThaiText.Status(task.Status)</span></td>
+                            <td><span class="badge @ThaiText.Badge(task.Status)">@ThaiText.Status(task.Status)</span></td>
                             <td class="num">@ThaiText.Time(task.CompletedAtUtc)</td>
                         </tr>
                     }
@@ -52,7 +52,7 @@
                             <td>#@item.TaskId</td>
                             <td>@ThaiText.OrDash(item.RoomNumber)</td>
                             <td>@ThaiText.Status(item.EventType)</td>
-                            <td class="small">@ThaiText.Status(item.PreviousStatus) → @ThaiText.Status(item.NewStatus)</td>
+                            <td class="small"><span class="text-muted">@ThaiText.Status(item.PreviousStatus) →</span> <span class="badge @ThaiText.Badge(item.NewStatus)">@ThaiText.Status(item.NewStatus)</span></td>
                             <td class="small">@ThaiText.OrDash(item.Reason)</td>
                         </tr>
                     }

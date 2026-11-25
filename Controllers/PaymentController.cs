@@ -15,7 +15,6 @@ public class PaymentController(
     GoodHotel.Models.GoodHotelDbContext db,
     PaymentService payments,
     PaymentEvidenceStorage evidence,
-    IConfiguration configuration,
     ILogger<PaymentController> logger,
     ParallelReader reader,
     UserDirectory users,
@@ -23,10 +22,6 @@ public class PaymentController(
 {
     private bool TryActor(out int id) => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),
         NumberStyles.None, CultureInfo.InvariantCulture, out id) && id > 0;
-
-    private string? QrPath => configuration["Payments:PromptPayQrImagePath"];
-    private bool QrAvailable => !string.IsNullOrWhiteSpace(QrPath) && Path.IsPathFullyQualified(QrPath) &&
-        Path.GetExtension(QrPath).Equals(".png", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(QrPath);
 
     private async Task<IActionResult> FinishAsync(int bookingId, Func<Task<PaymentResult>> operation)
     {
@@ -276,15 +271,5 @@ public class PaymentController(
         Response.Headers.CacheControl = "private, no-store";
         var type = Path.GetExtension(path) switch { ".png" => "image/png", ".webp" => "image/webp", _ => "image/jpeg" };
         return PhysicalFile(path, type);
-    }
-
-    [HttpGet]
-    [Authorize(Roles = "Customer")]
-    public IActionResult PromptPayQr()
-    {
-        if (!QrAvailable) return NotFound();
-        Response.Headers["X-Content-Type-Options"] = "nosniff";
-        Response.Headers.CacheControl = "private, no-store";
-        return PhysicalFile(QrPath!, "image/png");
     }
 }

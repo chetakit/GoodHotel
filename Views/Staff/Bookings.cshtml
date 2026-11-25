@@ -3,6 +3,11 @@
 @{
     ViewData["Title"] = "รายการจอง";
     var when = Context.Request.Query["when"].ToString();
+    var sort = Context.Request.Query["sort"].ToString();
+    // <input type="date"> ต้องการปี ค.ศ. เสมอ
+    var iso = System.Globalization.CultureInfo.InvariantCulture;
+    var from = ((DateOnly?)ViewBag.From)?.ToString("yyyy-MM-dd", iso);
+    var to = ((DateOnly?)ViewBag.To)?.ToString("yyyy-MM-dd", iso);
 }
 
 <section class="content-section">
@@ -13,7 +18,7 @@
 
         <div class="booking-panel mb-4">
             <form asp-controller="Staff" asp-action="Bookings" method="get" class="row g-3 align-items-end">
-                <div class="col-sm-6 col-lg-5">
+                <div class="col-sm-6 col-lg-6">
                     <label for="q" class="form-label">ค้นหา</label>
                     <input id="q" name="q" type="search" class="form-control"
                            placeholder="ชื่อลูกค้า, เบอร์โทร หรือ #เลขที่การจอง"
@@ -21,7 +26,6 @@
                 </div>
                 <div class="col-sm-6 col-lg-3">
                     <label for="when" class="form-label">แสดง</label>
-                    
                     <select id="when" name="when" class="form-select" onchange="this.form.submit()">
                         <option value="" selected="@(when == "")">ไม่รวมที่ยกเลิก</option>
                         <option value="today" selected="@(when == "today")">เข้า/ออกวันนี้</option>
@@ -31,6 +35,23 @@
                         <option value="cancelled" selected="@(when == "cancelled")">ยกเลิกแล้ว</option>
                         <option value="all" selected="@(when == "all")">ทั้งหมด</option>
                     </select>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label for="sort" class="form-label">เรียงตาม</label>
+                    <select id="sort" name="sort" class="form-select" onchange="this.form.submit()">
+                        <option value="" selected="@(sort == "")">เลขที่ ใหม่ → เก่า</option>
+                        <option value="oldest" selected="@(sort == "oldest")">เลขที่ เก่า → ใหม่</option>
+                        <option value="checkin" selected="@(sort == "checkin")">วันเข้าพัก ก่อน → หลัง</option>
+                        <option value="checkin-desc" selected="@(sort == "checkin-desc")">วันเข้าพัก หลัง → ก่อน</option>
+                    </select>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label for="from" class="form-label">วันเข้าพัก ตั้งแต่</label>
+                    <input id="from" name="from" type="date" class="form-control" value="@from" />
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label for="to" class="form-label">ถึง</label>
+                    <input id="to" name="to" type="date" class="form-control" value="@to" />
                 </div>
                 <div class="col-auto">
                     <button type="submit" class="btn btn-primary">ค้นหา</button>
@@ -117,11 +138,11 @@
                         <div class="d-flex gap-2">
                             @if ((int)ViewBag.Page > 1)
                             {
-                                <a class="btn btn-sm btn-outline-secondary" asp-action="Bookings" asp-route-q="@search" asp-route-when="@when" asp-route-page="@((int)ViewBag.Page - 1)">ก่อนหน้า</a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Bookings" asp-route-q="@search" asp-route-when="@when" asp-route-from="@from" asp-route-to="@to" asp-route-sort="@sort" asp-route-page="@((int)ViewBag.Page - 1)">ก่อนหน้า</a>
                             }
                             @if ((int)ViewBag.Page < (int)ViewBag.TotalPages)
                             {
-                                <a class="btn btn-sm btn-outline-secondary" asp-action="Bookings" asp-route-q="@search" asp-route-when="@when" asp-route-page="@((int)ViewBag.Page + 1)">ถัดไป</a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Bookings" asp-route-q="@search" asp-route-when="@when" asp-route-from="@from" asp-route-to="@to" asp-route-sort="@sort" asp-route-page="@((int)ViewBag.Page + 1)">ถัดไป</a>
                             }
                         </div>
                     }

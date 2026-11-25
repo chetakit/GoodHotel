@@ -1,5 +1,4 @@
 using System.Data;
-using System.Data.Common;
 using GoodHotel.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -170,22 +169,10 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
     public const string PaidLabel = "จ่ายแล้ว";
     public const string RefundedLabel = "คืนเงินแล้ว";
 
-    /// <summary>สถานะการจ่ายเงินแบบสั้นๆ สำหรับหน้า Staff</summary>
-    public static async Task<string> PaymentLabelAsync(GoodHotelDbContext db, int bookingId, CancellationToken ct)
-    {
-        if (await IsPaidAsync(db, bookingId, ct)) return PaidLabel;
-        if (await db.PaymentRefunds.AnyAsync(r => r.Payment.BookingId == bookingId && r.Status == RefundApproved, ct))
-            return RefundedLabel;
-
-        var hasPending = await db.Payments.AnyAsync(p => p.BookingId == bookingId && p.SubmittedAtUtc != null &&
-            p.VerifiedAtUtc == null && (p.PaymentStatus == "Pending" || p.PaymentStatus == "Submitted"), ct);
-        return hasPending ? "รอตรวจสอบการชำระเงิน" : "ยังไม่จ่าย";
-    }
-
     /// <summary>
     /// สถานะการจ่ายเงินของหลายการจองในครั้งเดียว (query เดียว)
-    /// ใช้ในหน้ารายการ แทนการเรียก PaymentLabelAsync ทีละแถว ซึ่งช้ามากเพราะฐานข้อมูลอยู่ไกล
-    /// กติกาเหมือน IsPaidAsync/PaymentLabelAsync ทุกอย่าง
+    /// ใช้ในหน้ารายการ แทนการถามทีละแถว ซึ่งช้ามากเพราะฐานข้อมูลอยู่ไกล
+    /// กติกาเหมือน IsPaidAsync ทุกอย่าง
     /// </summary>
     public static async Task<Dictionary<int, string>> PaymentLabelsAsync(GoodHotelDbContext db,
         IReadOnlyCollection<int> bookingIds, CancellationToken ct)

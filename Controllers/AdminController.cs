@@ -8,7 +8,6 @@ using GoodHotel.Models.ViewModels;
 using GoodHotel.Services;
 using System.Globalization;
 using System.Security.Claims;
-using System.Text;
 using System.Data;
 
 namespace GoodHotel.Controllers
@@ -1221,15 +1220,6 @@ namespace GoodHotel.Controllers
         }
 
         [HttpGet]
-        public IActionResult HousekeepingReassignments(int? taskId = null)
-        {
-            if (!ModelState.IsValid || taskId is <= 0) return BadRequest();
-            return taskId.HasValue
-                ? RedirectToAction(nameof(HousekeepingDetails), new { id = taskId.Value })
-                : RedirectToAction(nameof(HousekeepingAssignments));
-        }
-
-        [HttpGet]
         public async Task<IActionResult> HousekeepingDetails(int id, CancellationToken ct)
         {
             if (!ModelState.IsValid || id <= 0) return BadRequest();
@@ -1263,25 +1253,6 @@ namespace GoodHotel.Controllers
         private bool ValidTaskFilters(string? status, int? roomId, int? assigneeId) =>
             ModelState.IsValid && roomId is not <= 0 && assigneeId is not <= 0 &&
             (string.IsNullOrEmpty(status) || status is "Pending" or "Accepted" or "InProgress" or "Completed" or "Verified");
-
-        [HttpGet]
-        public IActionResult MaintenanceReports()
-        {
-            return RedirectToAction("Index", "Maintenance");
-        }
-
-        [HttpGet]
-        public IActionResult MaintenanceResolution(int? reportId = null)
-        {
-            if (reportId is <= 0)
-            {
-                return BadRequest();
-            }
-
-            return reportId.HasValue
-                ? RedirectToAction("Details", "Maintenance", new { id = reportId.Value })
-                : RedirectToAction("Index", "Maintenance");
-        }
 
         /// <summary>รายงานงานโรงแรม (ตัวเลขเงินย้ายไปอยู่ที่ฝ่ายบัญชีแล้ว)</summary>
         public async Task<IActionResult> Reports(DateOnly? from, DateOnly? to, CancellationToken ct)

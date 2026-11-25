@@ -23,7 +23,7 @@
                 <a class="task-room" asp-action="TaskDetails" asp-route-id="@task.TaskId">ห้อง @ThaiText.OrDash(task.RoomNumber)</a>
                 <div class="task-meta">
                     @ThaiText.Status(task.TaskType) · งาน #@task.TaskId
-                    <span class="badge @(task.Status == "InProgress" ? "text-bg-info" : "text-bg-secondary") ms-1">@ThaiText.Status(task.Status)</span>
+                    <span class="badge @ThaiText.Badge(task.Status) ms-1">@ThaiText.Status(task.Status)</span>
                     @if (task.ReworkReason != null) { <div class="text-danger">ตรวจไม่ผ่าน ต้องแก้: @task.ReworkReason</div> }
                 </div>
                 <div class="task-action">

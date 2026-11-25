@@ -1,9 +1,7 @@
 using System.Security.Claims;
-using GoodHotel.Models;
 using GoodHotel.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace GoodHotel.Controllers;
 
@@ -68,12 +66,6 @@ public class HousekeeperController(HousekeepingService housekeeping) : Controlle
     [HttpPost]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> Complete(int id, CancellationToken ct) => Transition(id, "Complete", ct);
-
-    [HttpGet]
-    public IActionResult MaintenanceReports() => RedirectToAction("Index", "Maintenance");
-
-    [HttpGet]
-    public IActionResult MaintenanceHistory() => RedirectToAction("Index", "Maintenance");
 
     private async Task<IActionResult> Transition(int id, string action, CancellationToken ct)
     {

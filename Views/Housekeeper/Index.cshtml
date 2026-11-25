@@ -47,7 +47,7 @@
                     <tr>
                         <td>#@task.TaskId</td>
                         <td>@ThaiText.OrDash(task.RoomNumber)</td>
-                        <td>@ThaiText.Status(task.Status)</td>
+                        <td><span class="badge @ThaiText.Badge(task.Status)">@ThaiText.Status(task.Status)</span></td>
                         <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="TaskDetails" asp-route-id="@task.TaskId">เปิด</a></td>
                     </tr>
                 }

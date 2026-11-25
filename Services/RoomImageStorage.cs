@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace GoodHotel.Services;
 
 public static class RoomImageStorage

@@ -22,7 +22,7 @@
                 <dt class="col-sm-5 col-lg-4">รายละเอียดปัญหา</dt>
                 <dd class="col-sm-7 col-lg-8">@Model.Description</dd>
                 <dt class="col-sm-5 col-lg-4">สถานะ</dt>
-                <dd class="col-sm-7 col-lg-8">@ThaiText.Status(Model.Status)</dd>
+                <dd class="col-sm-7 col-lg-8"><span class="badge @ThaiText.Badge(Model.Status)">@ThaiText.Status(Model.Status)</span></dd>
                 <dt class="col-sm-5 col-lg-4">แจ้งโดย</dt>
                 <dd class="col-sm-7 col-lg-8">@(await Users.NameAsync(Model.ReportedByUserId))</dd>
                 <dt class="col-sm-5 col-lg-4">ปิดห้องระหว่างซ่อม</dt>
