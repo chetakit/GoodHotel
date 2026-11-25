@@ -13,6 +13,7 @@ public sealed record WalkInQuote(bool Succeeded, string? Message, int? Nights = 
     string? PromotionName = null, decimal? Discount = null, decimal? ExtraBed = null, decimal? Total = null, bool IsFinal = false,
     int? PromotionId = null, IReadOnlyList<PromotionCheck>? Promotions = null, string? CustomerNote = null);
 
+// ลูกค้าเดิมที่หาเจอ
 public sealed record WalkInCustomer(int UserId, string? FirstName, string? LastName, bool CanLogin);
 
 /// <summary>
@@ -26,6 +27,7 @@ public sealed class WalkInService(
 {
     public const string PromotionRefused = "โปรที่เลือกใช้กับการเข้าพักนี้ไม่ได้ กรุณาเลือกโปรใหม่";
 
+    // จอง + รับเงินสด + เช็คอินในครั้งเดียว
     public async Task<WalkInResult> CreateAsync(WalkInViewModel form, int staffId, CancellationToken ct)
     {
         var phone = form.Phone!.Trim();
@@ -104,6 +106,7 @@ public sealed class WalkInService(
             : new WalkInQuote(false, quote.StatusMessage ?? "คำนวณยอดไม่ได้");
     }
 
+    // คิดราคาให้พนักงานดูก่อน
     private Task<BookingConfirmationViewModel> PriceAsync(WalkInViewModel form, int? customerId, bool isNewCustomer,
         CancellationToken ct) =>
         bookings.PrepareConfirmationAsync(new CreateBookingViewModel
@@ -130,9 +133,11 @@ public sealed class WalkInService(
         return sameName.Count == 1 ? (sameName[0].UserId, false) : (null, true);
     }
 
+    // ชื่อตรงกันไหม
     private static bool SameName(string? a, string? b) =>
         string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 
+    // สร้างลูกค้าใหม่ (ไม่มีรหัสผ่าน ล็อกอินไม่ได้จนกว่าจะสมัคร)
     private async Task<int> CreateCustomerAsync(WalkInViewModel form, CancellationToken ct)
     {
         var phone = form.Phone!.Trim();

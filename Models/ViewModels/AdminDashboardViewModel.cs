@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// ข้อมูลหน้าภาพรวมของ Admin
 public class AdminDashboardViewModel
 {
     public int RoomCount { get; set; }
@@ -31,6 +32,7 @@ public record ChartPoint(string Label, int Value, string Tip, bool IsToday = fal
 /// <summary>ข้อมูลให้ partial _ColumnChart วาดกราฟแท่ง (AxisMax null = ปัดจากค่าสูงสุดให้เอง)</summary>
 public record ColumnChartModel(string Id, IReadOnlyList<ChartPoint> Points, string ValueHeader, int? AxisMax = null);
 
+// การจองหนึ่งรายการบนหน้าภาพรวม
 public class DashboardBookingViewModel
 {
     public int BookingId { get; set; }
@@ -44,6 +46,7 @@ public class DashboardBookingViewModel
     public decimal? Amount { get; set; }
 }
 
+// จำนวนห้องของแต่ละสถานะ
 public class RoomStatusCountViewModel
 {
     public string? Status { get; set; }

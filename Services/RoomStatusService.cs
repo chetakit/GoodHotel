@@ -16,6 +16,7 @@ public enum RoomLiveStatus
     Closed          // Admin ตั้งไว้ว่าไม่พร้อมขาย (เช่น Reserved)
 }
 
+// สถานะของห้องหนึ่งห้อง
 public sealed record RoomStatusItem(
     int RoomId,
     string? RoomNumber,
@@ -55,6 +56,7 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
         _ => "none"
     };
 
+    // คำนวณสถานะจริงของทุกห้อง ณ ตอนนี้
     public async Task<IReadOnlyList<RoomStatusItem>> GetRoomBoardAsync(CancellationToken ct)
     {
         var today = availability.HotelToday();
@@ -159,6 +161,7 @@ public sealed class RoomStatusService(RoomAvailabilityService availability, Para
         }).ToList();
     }
 
+    // สร้างข้อมูลสถานะหนึ่งห้อง
     private static RoomStatusItem Item(Room room, RoomLiveStatus status, string? detail, int? bookingId = null) =>
         new(room.RoomId, room.Room1, room.Type, room.Capacity, status, detail, bookingId, room.Rate);
 }

@@ -1,3 +1,4 @@
+@* โครงหน้าฝั่งพนักงาน: เมนูซ้าย + เนื้อหา (RenderBody) *@
 @{
     // เมนูของแต่ละ role ในหน้าพนักงาน (Staff / แม่บ้าน / บัญชี / Admin ใช้ layout เดียวกัน)
     var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";

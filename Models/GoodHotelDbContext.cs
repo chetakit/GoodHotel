@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GoodHotel.Models
 {
+    // ตัวกลางระหว่าง C# กับ MySQL (Entity Framework Core): เขียน LINQ แล้วแปลงเป็น SQL ให้
     public class GoodHotelDbContext : DbContext
     {
+        // รับที่อยู่ฐานข้อมูลที่ตั้งไว้ใน Program.cs
         public GoodHotelDbContext(DbContextOptions<GoodHotelDbContext> options)
             : base(options)
         {
@@ -13,6 +15,7 @@ namespace GoodHotel.Models
         }
 
         // Database Tables
+        // DbSet 1 ตัว = 1 ตาราง เช่น _db.Rooms คือตาราง rooms
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<BookingStay> BookingStays { get; set; }
         public DbSet<Employee> Employees { get; set; }
@@ -27,6 +30,7 @@ namespace GoodHotel.Models
         public DbSet<Room> Rooms { get; set; }
         public DbSet<User> Users { get; set; }
 
+        // กำหนดว่า class ไหนคือตารางไหน: ToTable = ชื่อตาราง, HasKey = primary key, HasForeignKey = ความสัมพันธ์
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.UseCollation("utf8mb4_unicode_ci")
@@ -51,6 +55,7 @@ namespace GoodHotel.Models
                 entity.Property(e => e.CancelReason).HasMaxLength(20);
                 entity.HasIndex(e => new { e.Status, e.CreatedAtUtc });
 
+                // การจองมีโปร ห้อง และผู้ใช้อย่างละ 1 / ส่วนแต่ละอันมีได้หลายการจอง (one-to-many)
                 entity.HasOne(e => e.Promotion)
                       .WithMany(e => e.Bookings)
                       .HasForeignKey(e => e.PromotionId);
@@ -64,6 +69,7 @@ namespace GoodHotel.Models
                       .HasForeignKey(e => e.UserId);
             });
 
+            // การเข้าพักจริง
             modelBuilder.Entity<BookingStay>(entity =>
             {
                 entity.ToTable("booking_stays");
@@ -113,6 +119,7 @@ namespace GoodHotel.Models
                       .HasCharSet("utf8mb3");
             });
 
+            // งานทำความสะอาด
             modelBuilder.Entity<HousekeepingTask>(entity =>
             {
                 entity.ToTable("housekeeping_tasks");
@@ -129,6 +136,7 @@ namespace GoodHotel.Models
                 entity.HasOne(e => e.VerifiedByUser).WithMany().HasForeignKey(e => e.VerifiedByUserId).OnDelete(DeleteBehavior.Restrict);
             });
 
+            // ประวัติงานทำความสะอาด
             modelBuilder.Entity<HousekeepingTaskEvent>(entity =>
             {
                 entity.ToTable("housekeeping_task_events");
@@ -166,6 +174,7 @@ namespace GoodHotel.Models
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // ประวัติงานซ่อม
             modelBuilder.Entity<MaintenanceReportEvent>(entity =>
             {
                 entity.ToTable("maintenance_report_events");
@@ -216,6 +225,7 @@ namespace GoodHotel.Models
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // ประวัติการเงิน
             modelBuilder.Entity<PaymentEvent>(entity =>
             {
                 entity.ToTable("payment_events");
@@ -234,6 +244,7 @@ namespace GoodHotel.Models
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // คำขอคืนเงิน
             modelBuilder.Entity<PaymentRefund>(entity =>
             {
                 entity.ToTable("payment_refunds");

@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GoodHotel.Models.ViewModels;
 
+// ฟอร์มเปลี่ยนรหัสผ่าน
 public class ChangePasswordViewModel
 {
     [Required(ErrorMessage = "กรุณากรอกรหัสผ่านปัจจุบัน")]

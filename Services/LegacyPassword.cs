@@ -6,6 +6,7 @@ namespace GoodHotel.Services;
 /// </summary>
 public static class LegacyPassword
 {
+    // เทียบรหัสผ่านเก่าที่ยังไม่ถูก hash
     public static bool Matches(string stored, string entered) =>
         !IsHash(stored) && string.Equals(stored, entered, StringComparison.Ordinal);
 

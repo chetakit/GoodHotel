@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GoodHotel.Models.ViewModels;
 
+// ฟอร์มแก้บัญชี
 public class EditUserViewModel
 {
     public int UserId { get; set; }

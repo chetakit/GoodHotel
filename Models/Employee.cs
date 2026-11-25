@@ -1,5 +1,6 @@
 ﻿namespace GoodHotel.Models;
 
+// ตาราง employees เดิม ไม่ได้ใช้แล้ว (พนักงานอยู่ในตาราง users)
 public partial class Employee
 {
     public int EmployeeId { get; set; }

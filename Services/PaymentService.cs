@@ -5,12 +5,16 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace GoodHotel.Services;
 
+// ผลการทำรายการเงิน
 public sealed record PaymentResult(bool Succeeded, string Message, int? PaymentId = null);
 
+// กติกาเรื่องเงินทั้งหมด: จ่าย ยืนยัน และคืนเงิน ล็อกแถวการจองก่อนทุกครั้ง
 public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, ParallelReader? reader = null)
 {
+    // ชื่อล็อกที่กันเลขชำระเงินชนกัน
     internal const string IdLock = "GoodHotel.PaymentId";
 
+    // ล็อกแถวการจองของ DbContext นี้
     private Task<bool> LockBookingAsync(int bookingId, CancellationToken ct) => LockBookingAsync(db, bookingId, ct);
 
     /// <summary>ล็อกแถวการจอง ใช้ร่วมกันทุกที่ที่เปลี่ยนการจ่ายหรือยกเลิก (ต้องอยู่ใน transaction)</summary>
@@ -40,6 +44,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return (await (track ? query : query.AsNoTracking()).ToListAsync(ct)).SingleOrDefault();
     }
 
+    // ผลตรวจที่อ่านมาในครั้งเดียว
     private sealed record BookingChecks(bool KeyUsed, bool HasLegacy, bool HasConfirmed, bool HasPending, bool HasStay, bool HasRefund);
 
     /// <summary>
@@ -65,13 +70,18 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return (actor is { IsActive: true } && roles.Contains(actor.Role, StringComparer.Ordinal), checksTask.Result);
     }
 
+    // ตรวจรหัสกันกดซ้ำ
     private static string? KeyError(string key, bool used) =>
         !ValidKey(key) ? "คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่" : used ? "คำขอนี้ถูกดำเนินการไปแล้ว" : null;
 
+    // รหัสกันกดซ้ำต้องเป็น GUID
     private static bool ValidKey(string key) => Guid.TryParseExact(key, "N", out _);
+    // สร้างผลไม่สำเร็จ
     private static PaymentResult Error(string message) => new(false, message);
+    // สร้างผลสำเร็จ
     private static PaymentResult Success(int id, string message) => new(true, message, id);
 
+    // คนทำมี role ที่อนุญาตไหม
     private async Task<bool> ActorHasRoleAsync(int actorId, string[] roles, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().Where(u => u.UserId == actorId)
@@ -79,6 +89,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return user != null && user.IsActive && roles.Contains(user.Role, StringComparer.Ordinal);
     }
 
+    // รหัสนี้เคยใช้แล้วหรือยัง
     private async Task<string?> ValidateKeyAsync(string key, CancellationToken ct)
     {
         if (!ValidKey(key)) return "คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่";
@@ -86,6 +97,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
             ? "คำขอนี้ถูกดำเนินการไปแล้ว" : null;
     }
 
+    // บันทึกประวัติว่าใครทำอะไร
     private void AddEvent(Payment payment, int actorId, string eventType, string key,
         decimal? amount, string? reason = null)
     {
@@ -96,16 +108,20 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         });
     }
 
+    // มีข้อมูลเก่าที่ยังไม่ตรวจไหม
     private async Task<bool> HasUnreconciledLegacyAsync(int bookingId, CancellationToken ct) =>
         await db.Payments.AnyAsync(p => p.BookingId == bookingId && p.SubmittedAtUtc == null &&
             p.VerifiedAtUtc == null && p.LegacyDisposition == null, ct);
 
+    // จ่ายแล้วหรือยัง
     private async Task<bool> HasConfirmedAsync(int bookingId, CancellationToken ct) =>
         await db.Payments.AnyAsync(p => p.BookingId == bookingId && p.VerifiedAtUtc != null, ct);
 
+    // ยอดเงินถูกต้องไหม
     private static bool ValidAmount(decimal? amount) =>
         amount.HasValue && amount > 0 && amount <= 99999999.99m && decimal.Round(amount.Value, 2) == amount;
 
+    // จ่ายครบเต็มจำนวนไหม
     private static bool IsFullPayment(decimal? bookingAmount, decimal? recordedAmount, decimal? received) =>
         ValidAmount(bookingAmount) && recordedAmount == bookingAmount && received == bookingAmount;
 
@@ -134,6 +150,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return lastId;
     }
 
+    // ปลดล็อกเลขชำระเงิน
     private async Task ReleasePaymentIdAsync()
     {
         await using var command = db.Database.GetDbConnection().CreateCommand();
@@ -215,15 +232,18 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         };
     }
 
+    // เป็นวิธีจ่ายแบบจำลองไหม (โปรเจคนี้ไม่มีการโอนเงินจริง)
     public static bool IsMockMethod(string? method) =>
         method is "Bank Transfer (Mock)" or "PromptPay (Mock)" or "PayPal (Mock)";
 
+    // รายการที่นับเป็นรายได้ (การจองละ 1 รายการ)
     public static IQueryable<Payment> ConfirmedForRevenue(IQueryable<Payment> payments) =>
         payments.Where(payment => payment.VerifiedAtUtc != null &&
             (payment.BookingId == null || !payments.Any(other =>
                 other.BookingId == payment.BookingId && other.VerifiedAtUtc != null &&
                 other.PaymentId < payment.PaymentId)));
 
+    // สร้างแถวชำระเงินใหม่
     private Payment CreateSubmission(int paymentId, int bookingId, int actorId, string method, decimal? amount, string key)
     {
         var now = time.GetUtcNow().UtcDateTime;
@@ -242,6 +262,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return payment;
     }
 
+    // ลูกค้าชำระเงิน: ล็อกการจอง → ตรวจเงื่อนไข → บันทึก
     public async Task<PaymentResult> SubmitAsync(int bookingId, int actorId, string method, string key,
         CancellationToken ct)
     {
@@ -328,6 +349,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return payment;
     }
 
+    // ยืนยันหรือปฏิเสธการชำระที่รอตรวจ
     public async Task<PaymentResult> ReviewAsync(int paymentId, int actorId, bool confirm, decimal? received,
         string? reason, string key, CancellationToken ct)
     {
@@ -377,6 +399,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return Success(paymentId, confirm ? "ยืนยันการชำระเงินแล้ว" : "ปฏิเสธการชำระเงินแล้ว");
     }
 
+    // บัญชีตรวจข้อมูลเก่า
     public async Task<PaymentResult> ReconcileAsync(int paymentId, int actorId, bool confirmed,
         string? reason, string key, CancellationToken ct)
     {
@@ -437,6 +460,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         bookingStatus == BookingStatuses.Booked && !hasStay && isPaid && !hasAnyRefundRecord &&
         checkOut.HasValue && checkOut.Value > today;
 
+    // ลูกค้าขอคืนเงิน
     public async Task<PaymentResult> RequestRefundAsync(int bookingId, int actorId, string? reason,
         string key, CancellationToken ct)
     {
@@ -472,6 +496,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
         return Success(payment.PaymentId, "ส่งคำขอคืนเงินแล้ว รอฝ่ายบัญชีพิจารณา ระหว่างนี้การจองยังอยู่ตามเดิม");
     }
 
+    // บัญชีอนุมัติ: คืนเงิน + ยกเลิกการจองพร้อมกัน
     public async Task<PaymentResult> ApproveRefundAsync(int refundId, int actorId, string key, CancellationToken ct)
     {
         if (refundId <= 0 || actorId <= 0) return Error("ไม่พบคำขอคืนเงิน");
@@ -510,6 +535,7 @@ public sealed class PaymentService(GoodHotelDbContext db, TimeProvider time, Par
             $" การจอง #{bookingId} ถูกยกเลิกและห้องว่างให้จองแล้ว");
     }
 
+    // บัญชีปฏิเสธ พร้อมเหตุผล
     public async Task<PaymentResult> RejectRefundAsync(int refundId, int actorId, string? reason,
         string key, CancellationToken ct)
     {

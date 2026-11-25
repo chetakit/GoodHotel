@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// บัญชีผู้ใช้หนึ่งแถว
 public class MemberListViewModel
 {
     public int UserId { get; set; }

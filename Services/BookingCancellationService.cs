@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GoodHotel.Services;
 
+// ผลการยกเลิก
 public sealed record CancelBookingResult(bool Succeeded, string Message);
 
 /// <summary>
@@ -17,6 +18,7 @@ public sealed class BookingCancellationService(
     TimeProvider time,
     ParallelReader reader)
 {
+    // เงื่อนไขว่าลูกค้ายกเลิกได้ไหม (ใช้แสดงปุ่ม)
     public static bool CanCancel(string status, DateOnly? checkOut, bool hasStay, bool refundPending, DateOnly today) =>
         status == BookingStatuses.Booked &&
         !hasStay &&
@@ -24,6 +26,7 @@ public sealed class BookingCancellationService(
         checkOut.HasValue &&
         checkOut.Value > today;
 
+    // ยกเลิกการจองของลูกค้า
     public async Task<CancelBookingResult> CancelAsync(int bookingId, int customerId, CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
@@ -106,6 +109,7 @@ public sealed class BookingCancellationService(
             : new CancelBookingResult(false, "ยกเลิกไม่ได้: การจองนี้ถูกยกเลิกแล้วหรือเช็คอินไปแล้ว");
     }
 
+    // ยกเลิกไม่ได้: หาเหตุผลมาบอก
     private async Task<string> ExplainWhyNotCancelledAsync(
         int bookingId, int customerId, DateOnly today, CancellationToken ct)
     {

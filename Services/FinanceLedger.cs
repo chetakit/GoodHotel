@@ -57,6 +57,7 @@ public sealed class FinanceLedger(ParallelReader reader)
         return new MoneyTotal(receivedTask.Result, refundedTask.Result);
     }
 
+    // รวมเงินรับและเงินคืน
     public static MoneyTotal Total(IEnumerable<LedgerEntry> entries)
     {
         var list = entries as IReadOnlyCollection<LedgerEntry> ?? entries.ToList();
@@ -101,5 +102,6 @@ public sealed class FinanceLedger(ParallelReader reader)
         return (start, end);
     }
 
+    // แปลงเวลา UTC เป็นวันที่ไทย
     public static DateOnly HotelDate(DateTime utc) => RoomAvailabilityService.HotelDate(utc);
 }

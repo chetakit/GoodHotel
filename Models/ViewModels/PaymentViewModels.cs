@@ -2,6 +2,7 @@ using GoodHotel.Services;
 
 namespace GoodHotel.Models.ViewModels;
 
+// การชำระเงินหนึ่งรายการ
 public record PaymentListItem(int PaymentId, int? BookingId, string? Method, string? Status,
     decimal? Amount, bool IsLegacy, bool IsExcludedLegacy, bool IsNew, bool IsVerified, bool HasEvidence,
     decimal ApprovedRefundAmount)
@@ -12,12 +13,15 @@ public record PaymentListItem(int PaymentId, int? BookingId, string? Method, str
         Status ?? "Unknown";
 }
 
+// ประวัติเงินหนึ่งรายการ
 public record PaymentHistoryItem(int EventId, int PaymentId, int ActorUserId, string EventType, DateTime OccurredAtUtc,
     decimal? Amount, string? Method, string? Reason);
 
+// คำขอคืนเงินหนึ่งรายการ
 public record PaymentRefundItem(int RefundId, int PaymentId, int? BookingId, decimal Amount, string Status, string Reason,
     int RequestedByUserId, DateTime RequestedAtUtc, int? ApprovedByUserId, DateTime? ApprovedAtUtc);
 
+// ข้อมูลหน้าชำระเงิน
 public record PaymentDetailsViewModel(int BookingId, decimal? BookingAmount, decimal ConfirmedAmount,
     decimal RefundedAmount, bool RequiresReconciliation, IReadOnlyList<PaymentListItem> Payments,
     IReadOnlyList<PaymentHistoryItem> Events, IReadOnlyList<PaymentRefundItem> Refunds,
@@ -43,9 +47,11 @@ public record PaymentDetailsViewModel(int BookingId, decimal? BookingAmount, dec
         : Math.Max(0m, BookingAmount.Value - ConfirmedAmount);
 }
 
+// รายการชำระเงิน + ชื่อลูกค้า
 public record PaymentManagementItem(PaymentListItem Payment, string? Customer, DateTime? TransactionAtUtc,
     DateOnly? PaymentDate);
 
+// ข้อมูลหน้ารายการชำระเงิน
 public record PaymentQueueViewModel(IReadOnlyList<PaymentManagementItem> Payments,
     IReadOnlyList<PaymentRefundItem> Refunds, string? Search, string? Status, string? Method);
 

@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GoodHotel.Services;
 
+// ห้องที่ย้ายไปได้
 public sealed record RoomMoveOption(int RoomId, string? RoomNumber, string? Type, int? Capacity, decimal? Rate);
 
+// ข้อมูลการจองที่จะย้าย
 public sealed record RoomMoveInfo(int BookingId, string? GuestName, int RoomId, string? RoomNumber, string? RoomType,
     decimal? Rate, DateOnly CheckIn, DateOnly CheckOut, int Guests, int ExtraBed);
 
@@ -18,6 +20,7 @@ public sealed record RoomMoveInfo(int BookingId, string? GuestName, int RoomId, 
 public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityService availability, TimeProvider time,
     ParallelReader reader)
 {
+    // การจองนี้ย้ายได้ไหม
     public static bool CanMove(string? status, DateOnly? checkOut, bool hasStay, bool isPaid, bool refundPending,
         DateOnly today) =>
         BlockReason(status, checkOut, hasStay, isPaid, refundPending, today) == null;
@@ -32,6 +35,7 @@ public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityServi
         : !isPaid ? "ลูกค้ายังไม่ได้ชำระเงิน"
         : null;
 
+    // ห้องใหม่เหมาะไหม (ราคาและความจุ)
     public static bool IsSuitable(decimal? oldRate, decimal? newRate, int? capacity, int guests, int extraBed) =>
         oldRate.HasValue && newRate >= oldRate && capacity.HasValue && guests <= capacity + extraBed;
 
@@ -66,6 +70,7 @@ public sealed class RoomMoveService(GoodHotelDbContext db, RoomAvailabilityServi
         return info.CheckIn > today ? info.CheckIn : today;
     }
 
+    // รายการห้องที่ย้ายไปได้
     public async Task<IReadOnlyList<RoomMoveOption>> OptionsAsync(RoomMoveInfo info, CancellationToken ct)
     {
         var roomsTask = reader.Run(c => c.Rooms.AsNoTracking()

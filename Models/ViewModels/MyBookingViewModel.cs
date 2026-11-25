@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// การจองหนึ่งรายการในหน้า "การจองของฉัน"
 public class MyBookingViewModel
 {
     public int BookingId { get; set; }

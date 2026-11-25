@@ -5,9 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GoodHotel.Controllers;
 
+// หน้าของแม่บ้าน: กติกาทั้งหมดอยู่ใน HousekeepingService
 [Authorize(Roles = "Housekeeper")]
 public class HousekeeperController(HousekeepingService housekeeping) : Controller
 {
+    // หน้าหลัก: จำนวนงานและงานล่าสุด
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -15,6 +17,7 @@ public class HousekeeperController(HousekeepingService housekeeping) : Controlle
         return View(await housekeeping.DashboardAsync(userId, ct));
     }
 
+    // งานว่างที่รับได้ และงานที่ตัวเองรับไว้
     [HttpGet]
     public async Task<IActionResult> Tasks(CancellationToken ct)
     {
@@ -22,6 +25,7 @@ public class HousekeeperController(HousekeepingService housekeeping) : Controlle
         return View(await housekeeping.TasksAsync(userId, ct));
     }
 
+    // รายละเอียดงาน
     [HttpGet]
     public async Task<IActionResult> TaskDetails(int id, CancellationToken ct)
     {
@@ -31,6 +35,7 @@ public class HousekeeperController(HousekeepingService housekeeping) : Controlle
         return task == null ? NotFound() : View(task);
     }
 
+    // ประวัติงานของตัวเอง
     [HttpGet]
     public async Task<IActionResult> History(CancellationToken ct)
     {
@@ -38,10 +43,12 @@ public class HousekeeperController(HousekeepingService housekeeping) : Controlle
         return View(await housekeeping.HistoryAsync(userId, ct));
     }
 
+    // [POST] รับงาน
     [HttpPost]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> Claim(int id, CancellationToken ct) => Transition(id, "Claim", ct);
 
+    // [POST] เริ่มทำ
     [HttpPost]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> Start(int id, CancellationToken ct) => Transition(id, "Start", ct);
@@ -63,10 +70,12 @@ public class HousekeeperController(HousekeepingService housekeeping) : Controlle
         return RedirectToAction(nameof(Tasks));
     }
 
+    // [POST] ทำเสร็จ ส่งให้พนักงานต้อนรับตรวจ
     [HttpPost]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> Complete(int id, CancellationToken ct) => Transition(id, "Complete", ct);
 
+    // ใช้ร่วมกันทุกปุ่ม: เปลี่ยนสถานะงาน แล้วกลับพร้อมข้อความ
     private async Task<IActionResult> Transition(int id, string action, CancellationToken ct)
     {
         if (!ModelState.IsValid || id <= 0) return BadRequest();
@@ -81,6 +90,7 @@ public class HousekeeperController(HousekeepingService housekeeping) : Controlle
         return RedirectToAction(nameof(Tasks));
     }
 
+    // รหัสแม่บ้านที่ล็อกอินอยู่
     private bool TryGetUserId(out int userId) =>
         int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId) && userId > 0;
 }

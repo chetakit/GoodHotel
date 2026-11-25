@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace GoodHotel.Services;
 
+// งานทำความสะอาด: Pending (รอรับ) → Accepted (รับแล้ว) → InProgress (กำลังทำ) → Completed (รอตรวจ) → Verified (ตรวจผ่าน)
 public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvider, ParallelReader reader)
 {
     // Lock users before updating tasks; multiple user locks must be taken in ID order.
@@ -30,6 +31,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         (await db.Users.FromSqlInterpolated($"SELECT * FROM `users` WHERE `UserId` = {userId} FOR UPDATE")
             .AsNoTracking().ToListAsync(ct)).SingleOrDefault();
 
+    // รายการงานทั้งหมดของ Admin
     public IQueryable<AdminHousekeepingTaskItem> AdminTasks(string? status, int? roomId, int? assigneeId)
     {
         var tasks = db.HousekeepingTasks.AsNoTracking();
@@ -42,6 +44,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
             t.AssignedToUser == null ? null : t.AssignedToUser.LastName, t.CreatedAtUtc));
     }
 
+    // รายละเอียดงานของ Admin
     public async Task<AdminHousekeepingDetailsViewModel?> AdminDetailsAsync(int id, CancellationToken ct)
     {
         var task = await AdminTasks(null, null, null).Where(t => t.TaskId == id).SingleOrDefaultAsync(ct);
@@ -62,6 +65,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
             events.Count == 0 ? 0 : events.Max(e => e.EventId));
     }
 
+    // ตรวจว่ามอบหมายได้ไหม
     private static string? ValidateAssignment(string status, int? previousAssignee, int newAssignee, string? reason)
     {
         if (reason?.Length > 2000) return "เหตุผลต้องไม่เกิน 2000 ตัวอักษร";
@@ -75,6 +79,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return "มอบหมายงานนี้ไม่ได้ในสถานะปัจจุบัน";
     }
 
+    // มอบหมายงานให้แม่บ้าน
     public async Task<string?> AssignAsync(int taskId, int newAssignee, int actorId,
         string expectedStatus, int? expectedAssignee, int expectedEventId, string? reason, CancellationToken ct)
     {
@@ -138,6 +143,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return null;
     }
 
+    // เช็คเอาท์แล้ว: สร้างงานทำความสะอาดอัตโนมัติ
     public async Task CreateCheckoutCleaningAsync(int roomId, int bookingId, int actorId, DateTime now, CancellationToken ct)
     {
         if (db.Database.CurrentTransaction == null)
@@ -156,6 +162,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         await db.SaveChangesAsync(ct);
     }
 
+    // ห้องที่ทำเสร็จแล้ว รอพนักงานตรวจ
     public async Task<List<StaffTaskViewModel>> AwaitingVerificationAsync(CancellationToken ct) =>
         await db.HousekeepingTasks.AsNoTracking().Where(t => t.Status == "Completed")
             .OrderBy(t => t.CompletedAtUtc)
@@ -163,12 +170,14 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
                 t.Status, t.AssignedToUserId, t.CompletedByUserId, t.CompletedAtUtc))
             .ToListAsync(ct);
 
+    // รายละเอียดงานสำหรับพนักงานตรวจ
     public async Task<StaffTaskViewModel?> StaffDetailsAsync(int id, CancellationToken ct) =>
         await db.HousekeepingTasks.AsNoTracking().Where(t => t.TaskId == id)
             .Select(t => new StaffTaskViewModel(t.TaskId, t.Room.Room1, t.Room.Type, t.TaskType,
                 t.Status, t.AssignedToUserId, t.CompletedByUserId, t.CompletedAtUtc))
             .SingleOrDefaultAsync(ct);
 
+    // ตรวจห้องผ่าน (คนตรวจต้องไม่ใช่คนทำ)
     public async Task<bool> VerifyAsync(int taskId, int actorId, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -181,6 +190,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.Status, "Verified")
                 .SetProperty(t => t.VerifiedAtUtc, now)
                 .SetProperty(t => t.VerifiedByUserId, actorId), ct);
+        // ไม่มีแถวถูกแก้ = มีคนอื่นทำไปก่อนแล้ว
         if (changed != 1) return false;
         db.HousekeepingTaskEvents.Add(new HousekeepingTaskEvent
         {
@@ -228,6 +238,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return null;
     }
 
+    // เลือกช่องที่หน้าแม่บ้านใช้
     private IQueryable<HousekeepingTaskItem> TaskItems(IQueryable<HousekeepingTask> tasks) =>
         tasks.Select(t => new HousekeepingTaskItem(
             t.TaskId, t.Room.Room1, t.Room.Type, t.TaskType, t.Status, t.AssignedToUserId,
@@ -236,6 +247,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
                 : t.Events.Where(e => e.EventType == "Rework").OrderByDescending(e => e.EventId)
                     .Select(e => e.Reason).FirstOrDefault()));
 
+    // ตัวเลขหน้าหลักของแม่บ้าน
     public async Task<HousekeepingDashboardViewModel> DashboardAsync(int userId, CancellationToken ct)
     {
         // "วันนี้" ตามเวลาไทย (เดิมตัดวันตาม UTC ช่วงเที่ยงคืนถึง 7 โมงเช้านับงานเมื่อวานด้วย)
@@ -259,6 +271,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
             counts?.InProgress ?? 0, counts?.Completed ?? 0, recentTask.Result);
     }
 
+    // งานว่าง + งานของฉัน
     public async Task<HousekeepingTasksViewModel> TasksAsync(int userId, CancellationToken ct)
     {
         var availableTask = reader.Run(c => TaskItems(c.HousekeepingTasks.AsNoTracking()
@@ -271,6 +284,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return new HousekeepingTasksViewModel(availableTask.Result, assignedTask.Result);
     }
 
+    // รายละเอียดงาน (เห็นเฉพาะงานว่างหรืองานตัวเอง)
     public async Task<HousekeepingDetailsViewModel?> DetailsAsync(int id, int userId, CancellationToken ct)
     {
         var item = await TaskItems(db.HousekeepingTasks.AsNoTracking().Where(t => t.TaskId == id &&
@@ -281,6 +295,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return item == null ? null : new HousekeepingDetailsViewModel(item, item.AssignedToUserId == userId);
     }
 
+    // ประวัติงานของแม่บ้าน
     public async Task<HousekeepingHistoryViewModel> HistoryAsync(int userId, CancellationToken ct)
     {
         var completedTask = reader.Run(c => TaskItems(c.HousekeepingTasks.AsNoTracking()
@@ -296,6 +311,7 @@ public class HousekeepingService(GoodHotelDbContext db, TimeProvider timeProvide
         return new HousekeepingHistoryViewModel(completedTask.Result, eventsTask.Result);
     }
 
+    // เปลี่ยนสถานะงาน: มีเงื่อนไขสถานะเดิมใน WHERE สองคนกดรับพร้อมกันจะได้คนเดียว
     public async Task<bool> TransitionAsync(int taskId, int userId, string action, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;

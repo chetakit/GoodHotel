@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GoodHotel.Controllers;
 
+// แจ้งซ่อมและติดตามงานซ่อม
 [Authorize(Roles = "Admin,Staff,Housekeeper")]
 public class MaintenanceController : Controller
 {
@@ -19,6 +20,7 @@ public class MaintenanceController : Controller
     private readonly ParallelReader _reader;
     private readonly UserDirectory _users;
 
+    // รับ Service ที่ต้องใช้จากระบบ DI
     public MaintenanceController(GoodHotelDbContext db, TimeProvider timeProvider, ParallelReader reader, UserDirectory users)
     {
         _reader = reader;
@@ -27,6 +29,7 @@ public class MaintenanceController : Controller
         _timeProvider = timeProvider;
     }
 
+    // รายการงานซ่อม
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
@@ -48,6 +51,7 @@ public class MaintenanceController : Controller
         return View(reports);
     }
 
+    // [GET] ฟอร์มแจ้งซ่อม
     [HttpGet]
     [Authorize(Roles = "Staff,Housekeeper")]
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
@@ -57,6 +61,7 @@ public class MaintenanceController : Controller
         return View(model);
     }
 
+    // [POST] บันทึกแจ้งซ่อม และปิดขายห้อง
     [HttpPost]
     [Authorize(Roles = "Staff,Housekeeper")]
     [ValidateAntiForgeryToken]
@@ -111,6 +116,7 @@ public class MaintenanceController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // รายละเอียดและประวัติงานซ่อม
     [HttpGet]
     public async Task<IActionResult> Details(int id, CancellationToken cancellationToken)
     {
@@ -123,18 +129,21 @@ public class MaintenanceController : Controller
         return report == null ? NotFound() : View(report);
     }
 
+    // [POST] เริ่มซ่อม
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> StartProgress(int id, CancellationToken cancellationToken)
         => TransitionAsync(id, MaintenanceReport.InProgress, null, cancellationToken);
 
+    // [POST] ซ่อมเสร็จ เปิดขายห้องกลับถ้าไม่มีงานซ่อมอื่น
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
     public Task<IActionResult> Resolve(int id, string? resolutionNote, CancellationToken cancellationToken)
         => TransitionAsync(id, MaintenanceReport.Resolved, resolutionNote, cancellationToken);
 
+    // เปลี่ยนสถานะงานซ่อม: Open → In Progress → Resolved (ข้ามขั้นไม่ได้)
     private async Task<IActionResult> TransitionAsync(
         int id, string nextStatus, string? resolutionNote, CancellationToken cancellationToken)
     {
@@ -232,6 +241,7 @@ public class MaintenanceController : Controller
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    // รหัสผู้ใช้ที่ล็อกอินอยู่
     private bool TryGetUserId(out int userId)
     {
         return int.TryParse(
@@ -241,6 +251,7 @@ public class MaintenanceController : Controller
                    out userId) && userId > 0;
     }
 
+    // อ่านข้อมูลงานซ่อมหนึ่งงาน
     private async Task<MaintenanceDetailsViewModel?> GetDetailsAsync(int id, CancellationToken cancellationToken)
     {
         // งานซ่อม ประวัติ และชื่อคนที่เกี่ยวข้อง ไม่ขึ้นต่อกัน อ่านพร้อมกัน
@@ -284,6 +295,7 @@ public class MaintenanceController : Controller
             report.ResolvedByUserId, report.ResolutionNote, report.ResolvedAtUtc, events);
     }
 
+    // ใส่รายการห้องใน dropdown
     private async Task PopulateRoomsAsync(MaintenanceCreateViewModel model, CancellationToken cancellationToken)
     {
         model.Rooms = await _db.Rooms

@@ -32,6 +32,7 @@ public static class PromotionRules
             [Seasonal] = ("Seasonal – ช่วงเทศกาล (ใช้ช่วงวันที่อย่างเดียว)", null)
         };
 
+    // เงื่อนไขแบบนี้ต้องกรอกตัวเลขไหม
     public static bool NeedsValue(string? ruleType) =>
         ruleType != null && All.TryGetValue(ruleType, out var rule) && rule.ValueLabel != null;
 
@@ -74,6 +75,7 @@ public static class PromotionRules
             ? $"ลด {promotion.DiscountValue:0.##}%" + (promotion.MaxDiscount > 0 ? $" (สูงสุด ฿{promotion.MaxDiscount:N0})" : "")
             : $"ลด ฿{promotion.DiscountValue:N0}";
 
+    // แสดงวันที่
     private static string? FormatDate(DateOnly? date) =>
         date?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 }

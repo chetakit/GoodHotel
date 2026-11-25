@@ -12,6 +12,7 @@ public sealed class UserDirectory(GoodHotelDbContext db)
 {
     private readonly Dictionary<int, string> _cache = new();
 
+    // จำชื่อที่อ่านมาแล้ว ไม่ต้องถามซ้ำ
     public void Remember(int userId, string? firstName, string? lastName, string? role) =>
         _cache[userId] = Label(firstName, lastName, role);
 
@@ -34,6 +35,7 @@ public sealed class UserDirectory(GoodHotelDbContext db)
     public static string Initial(string name) =>
         name.TrimStart('เ', 'แ', 'โ', 'ใ', 'ไ', ' ') is { Length: > 0 } rest ? rest[..1].ToUpperInvariant() : "?";
 
+    // ชื่อพร้อมตำแหน่งของผู้ใช้
     public async Task<string> NameAsync(int? userId)
     {
         if (userId is not int id) return "-";

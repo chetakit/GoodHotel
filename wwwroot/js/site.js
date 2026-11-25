@@ -2,6 +2,7 @@
 // ฐานข้อมูลอยู่ไกล แต่ละหน้าใช้เวลาเสี้ยววินาที: แสดงแถบโหลดด้านบนทันทีที่กด
 // และเมื่อส่งฟอร์มแล้ว ปุ่มจะหมุนรอ กดซ้ำไม่ได้ (กันจองซ้ำ/เช็คอินซ้ำ)
 (() => {
+    // แถบโหลดด้านบน
     const bar = document.createElement("div");
     bar.className = "page-loading";
     document.body.appendChild(bar);
@@ -13,6 +14,7 @@
         document.querySelectorAll("form[data-submitting]").forEach(form => delete form.dataset.submitting);
     };
 
+    // กดลิงก์: แสดงแถบโหลด (ข้ามลิงก์ที่เปิดแท็บใหม่หรือดาวน์โหลด)
     document.addEventListener("click", event => {
         const link = event.target.closest("a[href]");
         if (!link || event.defaultPrevented || event.button !== 0 ||
@@ -24,6 +26,7 @@
         start();
     });
 
+    // ส่งฟอร์ม: กันกดซ้ำ
     document.addEventListener("submit", event => {
         const form = event.target;
         if (event.defaultPrevented) return;
@@ -47,6 +50,7 @@
     const boxes = document.querySelectorAll("[data-deadline]");
     if (boxes.length === 0) return;
 
+    // ทำทุก 1 วินาที: เหลือเวลาเท่าไร
     const tick = () => {
         let anyExpired = false;
         boxes.forEach(box => {
@@ -69,6 +73,7 @@
 
 // ---------- ปฏิทินเลือกวันเข้าพัก ----------
 (() => {
+    // ทำงานเฉพาะหน้าที่มีปฏิทิน
     const modal = document.getElementById("room-calendar-modal");
     if (!modal) {
         return;
@@ -95,6 +100,7 @@
         currency: "THB",
         maximumFractionDigits: 2
     });
+    // ค่าที่จำไว้ระหว่างเลือกวัน (months = เดือนที่โหลดมาแล้ว ไม่ต้องขอซ้ำ)
     const state = {
         roomId: null,
         roomNumber: "",
@@ -112,11 +118,13 @@
         renderVersion: 0
     };
 
+    // แปลงข้อความ yyyy-MM-dd เป็นวันที่
     const parseIsoDate = value => {
         const [year, month, day] = value.split("-").map(Number);
         return new Date(Date.UTC(year, month - 1, day));
     };
 
+    // แปลงวันที่เป็นข้อความ yyyy-MM-dd
     const formatIsoDate = date => [
         date.getUTCFullYear().toString().padStart(4, "0"),
         (date.getUTCMonth() + 1).toString().padStart(2, "0"),
@@ -125,6 +133,7 @@
 
     const monthKey = (year, month) => `${year}-${month}`;
 
+    // แสดงข้อความผิดพลาด
     const setError = message => {
         errorBox.textContent = message;
         errorBox.hidden = !message;
@@ -137,11 +146,14 @@
     const getCachedPeriods = () => [...state.months.values()]
         .flatMap(month => month.blockedPeriods);
 
+    // ช่วงที่เลือกชนกับวันที่ไม่ว่างไหม
     const rangeHasConflict = (checkIn, checkOut) =>
         getCachedPeriods().some(period =>
             period.checkIn < checkOut &&
             period.checkOut > checkIn);
 
+    // *** จุดเชื่อมหน้าบ้านกับหลังบ้าน ***
+    // ขอวันว่างจาก HomeController.RoomAvailability แล้วได้ JSON กลับมา โดยไม่โหลดหน้าใหม่
     const loadMonth = async (year, month) => {
         const key = monthKey(year, month);
         if (state.months.has(key)) {
@@ -153,9 +165,11 @@
         url.searchParams.set("year", year);
         url.searchParams.set("month", month);
 
+        // fetch = ส่งคำขอ HTTP แบบ GET, await = รอคำตอบ
         const response = await fetch(url, {
             headers: { Accept: "application/json" }
         });
+        // แปลงข้อความ JSON เป็น object
         const result = await response.json();
         if (!response.ok) {
             throw new Error(result.message || "ไม่สามารถโหลดข้อมูลวันว่างได้");
@@ -197,6 +211,7 @@
         return data;
     };
 
+    // โหลดทุกเดือนที่อยู่ในช่วงที่เลือก
     const ensureMonthsInRange = async (fromIso, toIso) => {
         const from = parseIsoDate(fromIso);
         const to = parseIsoDate(toIso);
@@ -218,6 +233,7 @@
         await Promise.all(pending);
     };
 
+    // วาดปฏิทิน: สร้างปุ่มทีละวัน (DOM)
     const renderCalendar = data => {
         const year = state.monthYear;
         const month = state.monthNumber;
@@ -260,6 +276,7 @@
                 button.classList.add("in-range");
             }
 
+            // วันไหนกดได้บ้าง
             const canStart = day.canCheckIn && state.roomCanBeBooked;
             const canRestartCheckIn = state.checkIn &&
                 day.date <= state.checkIn &&
@@ -288,6 +305,7 @@
         updateSelectionSummary();
     };
 
+    // เปลี่ยนเดือนที่แสดง
     const displayMonth = async (year, month) => {
         state.monthYear = year;
         state.monthNumber = month;
@@ -310,6 +328,7 @@
         }
     };
 
+    // กดเลือกวัน: ครั้งแรก = วันเข้า ครั้งที่สอง = วันออก
     const selectDate = async day => {
         setError("");
         if (!state.checkIn || day.date <= state.checkIn) {
@@ -363,6 +382,7 @@
         renderCalendar(month);
     };
 
+    // คิดจำนวนคืนและราคาให้ดู (ราคาจริง server คิดอีกที)
     const updateSelectionSummary = () => {
         if (!state.checkIn) {
             nightCount.textContent = "-";
@@ -399,6 +419,7 @@
             rangeHasConflict(state.checkIn, state.checkOut);
     };
 
+    // เปิดปฏิทินของห้องที่กด
     const openModal = async button => {
         state.roomId = button.dataset.roomId;
         state.roomNumber = button.dataset.roomNumber || "";
@@ -432,6 +453,7 @@
         }
     };
 
+    // ปิดปฏิทิน
     const closeModal = () => {
         state.renderVersion += 1;
         modal.hidden = true;
@@ -440,6 +462,7 @@
         state.lastFocusedElement?.focus();
     };
 
+    // ผูกปุ่มต่างๆ กับฟังก์ชันข้างบน
     document.querySelectorAll(".js-open-room-calendar")
         .forEach(button => button.addEventListener("click", () => openModal(button)));
     closeButtons.forEach(button => button.addEventListener("click", closeModal));
@@ -473,6 +496,7 @@
         displayMonth(year, month);
     });
     guestsInput.addEventListener("input", updateSelectionSummary);
+    // ไปหน้าจอง พร้อมส่งห้อง วัน และจำนวนคนไปใน URL
     continueButton.addEventListener("click", () => {
         if (continueButton.disabled) {
             return;
@@ -489,6 +513,7 @@
 // หน้ายืนยันการจอง: เปลี่ยนจำนวนเตียงเสริมแล้วขอราคาใหม่จาก server
 // (server เป็นคนเลือกโปรที่ดีที่สุดให้อัตโนมัติ หน้าเว็บแค่แสดงผล)
 (() => {
+    // ทำงานเฉพาะหน้ายืนยันการจอง
     const form = document.getElementById("promotion-preview-form");
     if (!form) {
         return;
@@ -505,6 +530,7 @@
     const currency = form.dataset.currency || "";
     let latestRequest = 0;
 
+    // แสดงตัวเลขเป็นเงิน
     const formatMoney = value =>
         `${currency}${Number(value).toLocaleString("th-TH", {
             minimumFractionDigits: 2,
@@ -517,6 +543,7 @@
         feedback.classList.toggle("promotion-feedback-error", !isSuccess);
     };
 
+    // เอาผลจาก server มาแสดง
     const render = result => {
         roomSubtotal.textContent = formatMoney(result.roomSubtotal);
         discount.textContent = `-${formatMoney(result.discountAmount)}`;
@@ -531,7 +558,10 @@
         showMessage(result.message, true);
     };
 
+    // *** จุดเชื่อมหน้าบ้านกับหลังบ้าน ***
+    // ส่งฟอร์มแบบ POST ไป HomeController.ApplyPromotion แล้วได้ราคาใหม่เป็น JSON (แนบ token กัน CSRF)
     const requestQuote = async () => {
+        // กดเร็วๆ หลายครั้ง ใช้เฉพาะคำตอบล่าสุด
         const requestId = ++latestRequest;
         const formData = new FormData(form);
         try {

@@ -1,4 +1,5 @@
-﻿@inject GoodHotel.Services.CustomerNotices Notices
+﻿@* โครงหน้าฝั่งลูกค้า: แถบเมนู + เนื้อหา (RenderBody) + ส่วนท้าย *@
+@inject GoodHotel.Services.CustomerNotices Notices
 @inject GoodHotel.Models.GoodHotelDbContext LayoutDb
 @{
     var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;

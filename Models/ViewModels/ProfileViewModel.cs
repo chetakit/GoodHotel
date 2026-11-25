@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GoodHotel.Models.ViewModels;
 
+// ฟอร์มโปรไฟล์ลูกค้า
 public class ProfileViewModel
 {
     [Required(ErrorMessage = "กรุณากรอกชื่อ")]
@@ -24,6 +25,7 @@ public class ProfileViewModel
     /// <summary>วันเกิดต้องเป็น ค.ศ. ไม่อยู่ในอนาคต และไม่เกิน 120 ปี (กันกรอกปี พ.ศ. ซึ่งทำให้วันเกิดเพี้ยน)</summary>
     public static bool IsValidBirthDate(DateOnly date, DateOnly today) => date <= today && date > today.AddYears(-120);
 
+    // แปลงเบอร์ให้เหลือแต่ตัวเลข
     public static string? NormalizePhone(string? phone)
     {
         var digits = phone?.Replace(" ", "");

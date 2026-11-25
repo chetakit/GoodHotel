@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace GoodHotel.Models.ViewModels;
 
+// ฟอร์มเพิ่ม/แก้ห้อง
 public class RoomFormViewModel
 {
     public int? RoomId { get; set; }
@@ -32,6 +33,7 @@ public class RoomFormViewModel
 
     public int? OriginalMaintenanceEventId { get; set; }
 
+    // สถานะห้องเปลี่ยนไปหลังเปิดฟอร์มหรือไม่
     public bool HasStaleRoomStatus(string? status, string? preMaintenanceStatus, int latestEventId) =>
         !OriginalMaintenanceEventId.HasValue ||
         !string.Equals(OriginalStatus ?? "", status ?? "", StringComparison.Ordinal) ||

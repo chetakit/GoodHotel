@@ -6,6 +6,7 @@ namespace GoodHotel.Services;
 /// <summary>สร้างไฟล์ CSV (UTF-8 มี BOM ให้ Excel อ่านภาษาไทยได้) ใช้ร่วมกันระหว่าง Admin และฝ่ายบัญชี</summary>
 public static class CsvExport
 {
+    // สร้างไฟล์ CSV (ตารางที่เปิดใน Excel ได้)
     public static byte[] Build(string[] headers, IEnumerable<string?[]> rows)
     {
         var builder = new StringBuilder();
@@ -29,6 +30,7 @@ public static class CsvExport
         return "\"" + value.Replace("\"", "\"\"") + "\"";
     }
 
+    // เลขติดลบจริง ไม่ใช่สูตร Excel
     private static bool IsNegativeNumber(string value) => value.StartsWith('-') &&
         decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _);
 

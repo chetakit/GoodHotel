@@ -31,6 +31,7 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
     private const long StaleMilliseconds = 100_000;
     private long _lastAlive = Environment.TickCount64;
 
+    // การเชื่อมต่อที่ใช้กับคำขอที่ต้องล็อกชื่อ (จอง/จ่าย)
     public string Write { get; } = new MySqlConnectionStringBuilder(
         configuration.GetConnectionString("DefaultConnection") ?? "")
     {
@@ -39,6 +40,7 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
         Keepalive = 30
     }.ConnectionString;
 
+    // การเชื่อมต่อของคำขอทั่วไป
     public string Read { get; } = new MySqlConnectionStringBuilder(
         configuration.GetConnectionString("DefaultConnection") ?? "")
     {
@@ -50,11 +52,14 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
         Keepalive = 30
     }.ConnectionString;
 
+    // เลือกว่าคำขอนี้ใช้การเชื่อมต่อแบบไหน
     public string For(HttpContext? context) => context == null || UsesNamedLock(context.Request) ? Write : Read;
 
+    // คำขอนี้ต้องใช้ล็อกชื่อไหม
     public static bool UsesNamedLock(HttpRequest request) => HttpMethods.IsPost(request.Method) &&
         NamedLockPaths.Any(path => string.Equals(request.Path.Value?.TrimEnd('/'), path, StringComparison.OrdinalIgnoreCase));
 
+    // จดเวลาล่าสุดที่ฐานข้อมูลตอบ
     public void MarkAlive() => Interlocked.Exchange(ref _lastAlive, Environment.TickCount64);
 
     /// <summary>เพิ่งตื่นจาก sleep: ทิ้ง connection เก่าก่อน ไม่ให้หน้าแรกที่เปิดเจอ error</summary>
@@ -65,6 +70,7 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
         ClearRead();
     }
 
+    // ทิ้งการเชื่อมต่อเก่าทั้งหมด
     public void ClearRead()
     {
         foreach (var text in new[] { Read, Write })
@@ -79,6 +85,7 @@ public sealed class DatabaseConnections(IConfiguration configuration, ILoggerFac
 public sealed class ReadConnectionWarmer(DatabaseConnections connections, ILogger<ReadConnectionWarmer> logger)
     : BackgroundService
 {
+    // วนทำงานเบื้องหลังตลอดที่เว็บเปิด
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(45));

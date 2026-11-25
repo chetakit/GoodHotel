@@ -25,6 +25,7 @@ public class AuditController(ParallelReader reader, RoomAvailabilityService avai
         "RefundRequested", "RefundApproved", "RefundRejected", "RefundClosed", "RoomMoved", "LegacyConfirmed", "LegacyExcluded"
     ];
 
+    // ประเภทเหตุการณ์ในตัวกรอง
     private static IReadOnlyList<KeyValuePair<string, string>> AuditTypes() =>
         AuditEventTypes.Select(t => new KeyValuePair<string, string>(t, ThaiText.Status(t)))
             .Append(new KeyValuePair<string, string>(CancelType, "ยกเลิกการจอง"))
@@ -99,6 +100,7 @@ public class AuditController(ParallelReader reader, RoomAvailabilityService avai
         return (truncated ? entries.Take(AuditLimit).ToList() : entries, truncated);
     }
 
+    // หน้าตรวจสอบย้อนหลัง: ใคร ทำอะไร เมื่อไหร่ (กรองได้)
     [HttpGet]
     public async Task<IActionResult> Index(DateOnly? from, DateOnly? to, string? type, int? bookingId, string? actor,
         CancellationToken ct)

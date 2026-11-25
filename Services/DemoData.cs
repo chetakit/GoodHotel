@@ -35,16 +35,20 @@ public static class DemoData
         (105, "ชัยวัฒน์", "ศิริพงษ์", "0811110105"), (106, "อรทัย", "แสงจันทร์", "0811110106")
     ];
 
+    // ประเภทการจองตัวอย่าง
     private enum Kind { Finished, InHouse, Upcoming, NoShow, Timeout, SelfCancelUnpaid, SelfCancelPaid, StaffCancel, Refunded }
 
+    // แผนของการจองตัวอย่าง 1 รายการ
     private sealed record Spec(int Customer, string Room, DateOnly In, DateOnly Out, DateTime CreatedUtc, Kind Kind,
         bool WalkIn = false, int ExtraBed = 0, DateTime? CheckedOutUtc = null, DateTime? CancelledUtc = null, string? Tag = null)
     {
         // การจองที่กันห้องจริง (ใช้กันข้อมูลตัวอย่างซ้อนกัน)
         public bool HoldsRoom => Kind is Kind.Finished or Kind.InHouse or Kind.Upcoming or Kind.NoShow;
+        // วันชนกันไหม
         public bool Overlaps(DateOnly from, DateOnly to) => In < to && Out > from;
     }
 
+    // คำสั่ง dotnet run -- seed-demo: สำรอง → ล้าง → สร้างข้อมูล
     public static async Task<int> RunAsync(IServiceProvider services, string[] args)
     {
         if (!args.Contains("--yes"))
@@ -70,6 +74,7 @@ public static class DemoData
         return 0;
     }
 
+    // สำรองข้อมูลเดิมเป็นไฟล์ JSON
     private static async Task<string> BackupAsync(GoodHotelDbContext db, string folder)
     {
         var data = new
@@ -93,6 +98,7 @@ public static class DemoData
         return path;
     }
 
+    // ล้างข้อมูลเดิม
     private static async Task ClearAsync(GoodHotelDbContext db)
     {
         // ลูกก่อนแม่
@@ -116,6 +122,7 @@ public static class DemoData
             .ExecuteUpdateAsync(p => p.SetProperty(x => x.IsActive, false));
     }
 
+    // สร้างข้อมูลตัวอย่างใหม่
     private static async Task<string> SeedAsync(GoodHotelDbContext db)
     {
         var now = DateTime.UtcNow;

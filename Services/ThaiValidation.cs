@@ -10,6 +10,7 @@ namespace GoodHotel.Services;
 /// </summary>
 public sealed class ThaiValidation : IValidationMetadataProvider
 {
+    // แปลข้อความของทุกช่องในฟอร์ม
     public void CreateValidationMetadata(ValidationMetadataProviderContext context)
     {
         var validators = context.ValidationMetadata.ValidatorMetadata;
@@ -25,6 +26,7 @@ public sealed class ThaiValidation : IValidationMetadataProvider
             Translate(attribute);
     }
 
+    // แปลข้อความของกติกาหนึ่งข้อ
     public static void Translate(ValidationAttribute attribute)
     {
         if (attribute.ErrorMessage != null || attribute.ErrorMessageResourceName != null) return;
@@ -42,6 +44,7 @@ public sealed class ThaiValidation : IValidationMetadataProvider
         };
     }
 
+    // ติดตั้งข้อความไทยให้ MVC (เรียกจาก Program.cs)
     public static void Configure(MvcOptions options)
     {
         options.ModelMetadataDetailsProviders.Add(new ThaiValidation());

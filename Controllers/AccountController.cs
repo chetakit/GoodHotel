@@ -26,6 +26,7 @@ public class AccountController(GoodHotelDbContext db, IPasswordHasher<User> hash
         });
     }
 
+    // [POST] บันทึกโปรไฟล์ลูกค้า (Bind = รับเฉพาะ 3 ช่องนี้ กันคนส่งช่องอื่นมาแก้ เช่น Role)
     [HttpPost]
     [Authorize(Roles = "Customer")]
     [ValidateAntiForgeryToken]
@@ -57,14 +58,17 @@ public class AccountController(GoodHotelDbContext db, IPasswordHasher<User> hash
         return RedirectToAction(nameof(Profile));
     }
 
+    // หาข้อมูลลูกค้าที่ล็อกอินอยู่จากรหัสใน cookie
     private async Task<User?> CurrentCustomerAsync(CancellationToken ct) =>
         int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id)
             ? await db.Users.SingleOrDefaultAsync(u => u.UserId == id && u.IsActive && u.Role == "Customer", ct)
             : null;
 
+    // [GET] หน้าเปลี่ยนรหัสผ่าน (ทุก role)
     [HttpGet]
     public IActionResult Password() => View(new ChangePasswordViewModel());
 
+    // [POST] ตรวจรหัสเดิม แล้วบันทึกรหัสใหม่แบบ hash
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Password(ChangePasswordViewModel form, CancellationToken ct)

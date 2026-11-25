@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// ข้อมูลหน้ายืนยันการจอง
 public class BookingConfirmationViewModel : CreateBookingViewModel
 {
     public string? RoomNumber { get; set; }

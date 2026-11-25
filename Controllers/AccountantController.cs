@@ -16,6 +16,7 @@ namespace GoodHotel.Controllers;
 public class AccountantController(FinanceLedger ledger, ParallelReader reader, RoomAvailabilityService availability)
     : Controller
 {
+    // หน้าภาพรวมการเงิน
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -113,6 +114,7 @@ public class AccountantController(FinanceLedger ledger, ParallelReader reader, R
             $"ledger-{start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}-to-{end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.csv");
     }
 
+    // ดาวน์โหลดรายการชำระเงินทั้งหมดเป็น CSV
     [HttpGet]
     public async Task<IActionResult> ExportPayments(CancellationToken ct)
     {
@@ -132,6 +134,7 @@ public class AccountantController(FinanceLedger ledger, ParallelReader reader, R
         return File(content, "text/csv; charset=utf-8", "payments.csv");
     }
 
+    // จัดช่วงวันที่ให้ถูกต้อง (ไม่ใส่ = ใช้ค่าเริ่มต้น)
     private (DateOnly Start, DateOnly End) Range(DateOnly? from, DateOnly? to) =>
         FinanceLedger.Range(from, to, availability.HotelToday());
 }

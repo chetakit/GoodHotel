@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// พนักงานหนึ่งแถว
 public class EmployeeListViewModel
 {
     public int UserId { get; set; }

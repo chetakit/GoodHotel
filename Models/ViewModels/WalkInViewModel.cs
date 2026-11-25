@@ -3,6 +3,7 @@ using GoodHotel.Services;
 
 namespace GoodHotel.Models.ViewModels;
 
+// ฟอร์ม Walk-in
 public class WalkInViewModel
 {
     [Required(ErrorMessage = "กรุณากรอกชื่อ")]

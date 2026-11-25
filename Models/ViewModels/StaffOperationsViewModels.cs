@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// ข้อมูลหน้าหลักพนักงาน
 public record StaffDashboardViewModel(
     int CheckedInStays, int TodayCheckIns, int TodayCheckOuts,
     int AwaitingVerification, int OpenMaintenanceReports)
@@ -26,6 +27,7 @@ public record FrontDeskRow(
     public bool IsPaid { get; init; }
 }
 
+// ห้องที่รอตรวจ
 public record StaffTaskViewModel(
     int TaskId, string? RoomNumber, string? RoomType, string TaskType, string Status,
     int? AssignedToUserId, int? CompletedByUserId, DateTime? CompletedAtUtc);

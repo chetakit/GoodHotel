@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// เงื่อนไขและผลค้นหาห้อง
 public class AvailabilitySearchViewModel
 {
     public DateOnly? CheckIn { get; set; }

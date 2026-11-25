@@ -26,6 +26,7 @@ public sealed class ApplyPromotionRequestViewModel
     public int? PromotionId { get; set; }
 }
 
+// คำตอบราคาที่ส่งกลับให้ site.js เป็น JSON
 public sealed record ApplyPromotionResponseViewModel(
     bool IsValidRequest,
     string Message,

@@ -14,8 +14,11 @@ using GoodHotel.Services;
 
 namespace GoodHotel.Controllers;
 
+// ฝั่งลูกค้า: หน้าแรก ค้นหาห้อง จองห้อง การจองของฉัน สมัคร เข้าสู่ระบบ
+// Controller = ตัวกลาง รับคำขอจากหน้าเว็บ → เรียก Service/ฐานข้อมูล → ส่ง View หรือ JSON กลับ
 public class HomeController : Controller
 {
+    // ตัวเชื่อมฐานข้อมูลและ Service ที่ใช้ใน Controller นี้
     private readonly GoodHotelDbContext _db;
     private readonly ILogger<HomeController> _logger;
     private readonly IPasswordHasher<User> _passwordHasher;
@@ -24,6 +27,7 @@ public class HomeController : Controller
     private readonly RoomAvailabilityService _availability;
     private readonly BookingCancellationService _cancellation;
 
+    // Dependency Injection: ระบบส่งของที่ลงทะเบียนไว้ใน Program.cs มาให้เอง
     public HomeController(
         GoodHotelDbContext db,
         ILogger<HomeController> logger,
@@ -42,11 +46,14 @@ public class HomeController : Controller
         _availability = availability;
     }
 
+    // หน้าแรก: ห้องที่เปิดขาย + โปรที่เปิดอยู่
     public async Task<IActionResult> Index([FromServices] ParallelReader reader)
     {
         // โปรโมชันดึงพร้อมกันกับห้องพัก (คนละ connection)
         var promotionsTask = reader.Run(LoadOpenPromotionsAsync);
 
+        // LINQ แปลงเป็น SELECT ... WHERE Status = 'Available' แล้วเลือกเฉพาะช่องที่หน้าเว็บใช้
+        // AsNoTracking = อ่านอย่างเดียว เร็วกว่า
         var featuredRooms = await _db.Rooms
             .AsNoTracking()
             .Where(room => room.Status == "Available")
@@ -70,6 +77,7 @@ public class HomeController : Controller
                 room.ImagePath);
         }
 
+        // รวมข้อมูลใส่ ViewModel ส่งให้ Views/Home/Index.cshtml
         var model = new HomeViewModel
         {
             FeaturedRooms = featuredRooms,
@@ -82,6 +90,7 @@ public class HomeController : Controller
     /// <summary>โปรที่เปิดอยู่และยังไม่หมดเขต สำหรับแสดงให้ลูกค้าเห็น</summary>
     private Task<List<PromotionListViewModel>> LoadOpenPromotionsAsync() => LoadOpenPromotionsAsync(_db);
 
+    // อ่านโปรจากฐานข้อมูล (ใช้กับ connection ที่ส่งมาได้)
     private async Task<List<PromotionListViewModel>> LoadOpenPromotionsAsync(GoodHotelDbContext db)
     {
         var today = _availability.HotelToday();
@@ -92,6 +101,7 @@ public class HomeController : Controller
         return promotions.Select(PromotionListViewModel.From).ToList();
     }
 
+    // [GET] ค้นหาห้อง: รับวันเข้า วันออก จำนวนคนจาก URL แล้วแสดงเฉพาะห้องว่าง
     [HttpGet]
     public async Task<IActionResult> Rooms(AvailabilitySearchViewModel search)
     {
@@ -216,6 +226,7 @@ public class HomeController : Controller
         return View(room);
     }
 
+    // [GET] API ของปฏิทิน: site.js เรียกด้วย fetch แล้วตอบเป็น JSON (ไม่ใช่หน้าเว็บ)
     [HttpGet]
     public async Task<IActionResult> RoomAvailability(
         int? roomId,
@@ -224,6 +235,7 @@ public class HomeController : Controller
         [FromServices] ParallelReader reader,
         CancellationToken cancellationToken)
     {
+        // ตรวจค่าที่ส่งมา ผิดรูปแบบตอบ 400
         if (!roomId.HasValue || roomId.Value <= 0 ||
             !year.HasValue || !month.HasValue ||
             year.Value < 1 || year.Value > 9999 ||
@@ -263,6 +275,7 @@ public class HomeController : Controller
                 CheckOut = booking.CheckOut!.Value
             })
             .ToListAsync(cancellationToken));
+        // ข้อมูลห้อง (ราคา ความจุ สถานะ)
         var room = await _db.Rooms
             .AsNoTracking()
             .Where(item => item.RoomId == roomId.Value)
@@ -278,6 +291,7 @@ public class HomeController : Controller
             .SingleOrDefaultAsync(cancellationToken);
         await Task.WhenAll(blockedTask, bookingPeriodsTask);
 
+        // ไม่มีห้องนี้ตอบ 404
         if (room == null)
         {
             return NotFound(new { message = "ไม่พบห้องพักที่เลือก" });
@@ -294,6 +308,7 @@ public class HomeController : Controller
         var days = new List<object>(DateTime.DaysInMonth(
             monthStart.Year,
             monthStart.Month));
+        // ทำทีละวันทั้งเดือน: วันนั้นไม่ว่างไหม และเลือกเป็นวันเข้าพักได้ไหม
         for (var date = monthStart; date < monthEnd; date = date.AddDays(1))
         {
             var occupied = blockedPeriods.Any(period =>
@@ -309,6 +324,7 @@ public class HomeController : Controller
             });
         }
 
+        // แปลง object เป็น JSON ให้ JavaScript เอาไปวาดปฏิทิน
         return Json(new
         {
             room.RoomId,
@@ -338,13 +354,16 @@ public class HomeController : Controller
         });
     }
 
+    // หน้าเกี่ยวกับเรา
     public IActionResult About() => View();
 
+    // หน้าโปรโมชั่น
     public async Task<IActionResult> Promotion()
     {
         return View(await LoadOpenPromotionsAsync());
     }
 
+    // [GET] การจองของฉัน (เฉพาะลูกค้าที่ล็อกอิน เห็นเฉพาะของตัวเอง)
     [HttpGet]
     [Authorize(Roles = "Customer")]
     public async Task<IActionResult> MyBookings(
@@ -378,6 +397,7 @@ public class HomeController : Controller
             .Select(e => new { e.Payment.BookingId, e.Reason }).ToListAsync(cancellationToken));
         var noticesTask = reader.Run(db => notices.UnseenAsync(HttpContext, db, userId, cancellationToken, fresh: true));
 
+        // JOIN ตาราง bookings กับ rooms และกรองด้วย userId ที่มาจาก cookie (ลูกค้าแก้เองไม่ได้)
         var bookings = await (
             from booking in _db.Bookings.AsNoTracking()
             join room in _db.Rooms.AsNoTracking()
@@ -404,6 +424,7 @@ public class HomeController : Controller
             })
             .ToListAsync(cancellationToken);
 
+        // แยกว่าการจองไหนเป็นประวัติแล้ว
         var today = _availability.HotelToday();
         foreach (var booking in bookings)
         {
@@ -420,6 +441,7 @@ public class HomeController : Controller
         foreach (var booking in bookings)
         {
             var records = paymentRows.Where(p => p.BookingId == booking.BookingId).ToList();
+            // คำนวณสถานะการจ่าย และปุ่มที่กดได้ของแต่ละการจอง
             var needsReview = records.Any(p => p.SubmittedAtUtc == null && p.VerifiedAtUtc == null &&
                 p.LegacyDisposition == null);
             var confirmedPayment = records.Where(p => p.VerifiedAtUtc != null)
@@ -473,6 +495,7 @@ public class HomeController : Controller
     [Authorize(Roles = "Customer")]
     [ValidateAntiForgeryToken]
     /// <param name="findAnotherRoom">กดจากหน้าชำระเงิน "ยกเลิกแล้วเลือกห้องอื่น": ยกเลิกสำเร็จแล้วพาไปค้นห้องวันเดิม</param>
+    // [POST] ลูกค้ายกเลิกการจอง (กติกาอยู่ใน BookingCancellationService)
     public async Task<IActionResult> CancelBooking(int bookingId, bool findAnotherRoom, CancellationToken cancellationToken)
     {
         if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
@@ -503,6 +526,7 @@ public class HomeController : Controller
             : RedirectToAction("Details", "Payment", new { id = bookingId });
     }
 
+    // [GET] หน้ายืนยันการจอง: แสดงห้อง ราคา ส่วนลด (ยังไม่บันทึก)
     [HttpGet]
     public async Task<IActionResult> Booking(
         int? roomId,
@@ -532,6 +556,7 @@ public class HomeController : Controller
         return View(model);
     }
 
+    // [POST] API คิดราคาใหม่เมื่อเปลี่ยนโปรหรือเตียงเสริม: site.js เรียกด้วย fetch ตอบเป็น JSON
     [HttpPost]
     [Authorize(Roles = "Customer")]
     [ValidateAntiForgeryToken]
@@ -589,11 +614,14 @@ public class HomeController : Controller
             : $"ใช้โปร \"{quote.PromotionName}\" ลด ฿{chosenDiscount:N0} ซึ่งคุ้มที่สุดแล้ว";
     }
 
+    // รหัสลูกค้าที่ล็อกอินอยู่ (ไม่ใช่ลูกค้า = null)
     private int? CurrentCustomerId() =>
         User.IsInRole("Customer") && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0
             ? id
             : null;
 
+    // [POST] กดยืนยันจอง: ฟอร์มใน Booking.cshtml ส่งมาที่นี่
+    // ValidateAntiForgeryToken = กันเว็บอื่นแอบส่งฟอร์มแทนผู้ใช้ (CSRF)
     [HttpPost]
     [Authorize(Roles = "Customer")]
     [ValidateAntiForgeryToken]
@@ -607,6 +635,7 @@ public class HomeController : Controller
         [FromServices] ParallelReader reader,
         CancellationToken cancellationToken)
     {
+        // ขั้น 1 แปลงวันที่จากข้อความเป็นวันที่
         var parsedCheckIn = TryParseBookingDate(
             checkIn,
             out var checkInDate);
@@ -642,6 +671,7 @@ public class HomeController : Controller
                     : "รูปแบบวันที่ออกไม่ถูกต้อง");
         }
 
+        // ขั้น 2 ตรวจข้อมูลฝั่ง server
         TryValidateModel(request);
 
         LogBookingDateDiagnostics(
@@ -651,6 +681,7 @@ public class HomeController : Controller
             parsedCheckIn ? checkInDate : null,
             parsedCheckOut ? checkOutDate : null);
 
+        // ขั้น 3 รู้ว่าใครจอง จาก cookie ไม่ใช่จากฟอร์ม
         if (!int.TryParse(
                 User.FindFirstValue(ClaimTypes.NameIdentifier),
                 System.Globalization.NumberStyles.None,
@@ -670,11 +701,13 @@ public class HomeController : Controller
             return View(invalidModel);
         }
 
+        // ขั้น 4 ส่งให้ BookingService ตรวจและบันทึกลงฐานข้อมูล
         var result = await _bookingService.CreateAsync(
             userId,
             request,
             cancellationToken);
 
+        // ขั้น 5 จองสำเร็จ: เตรียมหน้าจองสำเร็จ พร้อมเวลาที่ต้องจ่าย
         if (result.Status is BookingSaveStatus.Created or
             BookingSaveStatus.AlreadyExists)
         {
@@ -726,6 +759,7 @@ public class HomeController : Controller
             });
         }
 
+        // จองไม่สำเร็จ: กลับหน้าเดิมพร้อมเหตุผล
         var model = await _bookingService.PrepareConfirmationAsync(
             request,
             userId,
@@ -734,6 +768,7 @@ public class HomeController : Controller
         return View(model);
     }
 
+    // แปลงข้อความ yyyy-MM-dd เป็นวันที่ (ผิดรูปแบบ = false)
     private bool TryParseBookingDate(
         string? rawValue,
         out DateOnly parsedDate)
@@ -752,6 +787,7 @@ public class HomeController : Controller
             out parsedDate);
     }
 
+    // เขียน log วันที่ที่ได้รับ ไว้หาสาเหตุเวลามีปัญหา
     private void LogBookingDateDiagnostics(
         string source,
         string rawCheckIn,
@@ -792,6 +828,7 @@ public class HomeController : Controller
                 : SanitizeDiagnosticValue(modelStateErrors));
     }
 
+    // ตัดอักขระควบคุมและความยาวก่อนเขียน log
     private static string SanitizeDiagnosticValue(string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -849,6 +886,7 @@ public class HomeController : Controller
         return View();
     }
 
+    // [POST] เข้าสู่ระบบ: ฟอร์มใน Login.cshtml ส่งมาที่นี่
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(User data, string? returnUrl)
@@ -863,8 +901,10 @@ public class HomeController : Controller
 
         var email = data.Email.Trim();
 
+        // หาผู้ใช้จากอีเมลในฐานข้อมูล
         var user = _db.Users.FirstOrDefault(u => u.Email == email);
 
+        // ไม่บอกว่าผิดที่อีเมลหรือรหัส กันคนเดาว่าอีเมลไหนมีอยู่
         if (user == null || !user.IsActive || string.IsNullOrEmpty(user.Password))
         {
             ViewBag.Status = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
@@ -916,6 +956,7 @@ public class HomeController : Controller
             _db.SaveChanges();
         }
 
+        // ต้องเป็น 1 ใน 5 role นี้
         var allowedRoles = new[]
         {
             "Customer",
@@ -932,6 +973,7 @@ public class HomeController : Controller
             return View(data);
         }
 
+        // ข้อมูลที่เก็บใน cookie: รหัสผู้ใช้ อีเมล role (ไม่มีรหัสผ่าน)
         var claims = new List<Claim>
         {
             new Claim(
@@ -955,11 +997,13 @@ public class HomeController : Controller
 
         var principal = new ClaimsPrincipal(identity);
 
+        // สร้าง cookie ล็อกอิน (เข้ารหัสไว้) ส่งให้เบราว์เซอร์
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             principal
         );
 
+        // พาไปหน้าแรกของแต่ละ role
         return user.Role switch
         {
             "Admin" => RedirectToAction("Dashboard", "Admin"),
@@ -972,6 +1016,7 @@ public class HomeController : Controller
         };
     }
 
+    // [POST] ออกจากระบบ: ลบ cookie
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
@@ -983,17 +1028,20 @@ public class HomeController : Controller
         return RedirectToAction("Index", "Home");
     }
 
+    // หน้าไม่มีสิทธิ์
     public IActionResult AccessDenied()
     {
         return View();
     }
 
+    // [GET] ฟอร์มสมัครสมาชิก
     public IActionResult Register(string? returnUrl)
     {
         ViewBag.ReturnUrl = CustomerReturnUrl(returnUrl);
         return View();
     }
 
+    // [POST] สมัครสมาชิก: ตรวจทุกช่อง → เช็คอีเมลซ้ำ → hash รหัสผ่าน → บันทึก
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Register(
@@ -1125,6 +1173,7 @@ public class HomeController : Controller
 
         var email = data.Email!.Trim();
 
+        // อีเมลซ้ำไม่ได้
         var userCheck = _db.Users.FirstOrDefault(u => u.Email == email);
 
         if (userCheck != null)
@@ -1214,6 +1263,7 @@ public class HomeController : Controller
         return View();
     }
 
+    // หน้าเกิดข้อผิดพลาด
     [ResponseCache(
         Duration = 0,
         Location = ResponseCacheLocation.None,

@@ -26,6 +26,8 @@ public class AdminReportsViewModel
     public List<AdminOperationStatusCount> MaintenanceByStatus { get; set; } = new();
 }
 
+// จำนวนงานของแต่ละสถานะ
 public record AdminOperationStatusCount(string? Status, int Count);
 
+// โปรนี้ถูกใช้กี่ครั้ง
 public record PromotionUsageViewModel(string PromotionName, int BookingCount, decimal BookingAmount);

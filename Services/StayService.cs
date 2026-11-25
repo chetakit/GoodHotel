@@ -4,13 +4,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GoodHotel.Services;
 
+// เช็คอินและเช็คเอาท์
 public sealed class StayService(GoodHotelDbContext db, HousekeepingService housekeeping, TimeProvider timeProvider, ParallelReader reader)
 {
     private static readonly TimeZoneInfo HotelTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Bangkok");
 
+    // วันนี้ตามเวลาไทย
     public DateOnly HotelToday() =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), HotelTimeZone).DateTime);
 
+    // เวลาเริ่มและจบของวันนี้ แปลงเป็น UTC
     public (DateTime StartUtc, DateTime EndUtc) HotelDayUtcBounds()
     {
         var start = HotelToday().ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
@@ -18,6 +21,7 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
             TimeZoneInfo.ConvertTimeToUtc(start.AddDays(1), HotelTimeZone));
     }
 
+    // เช็คอิน: คืน null = สำเร็จ, ข้อความ = เหตุผลที่ไม่ผ่าน
     public async Task<string?> CheckInAsync(int bookingId, int actorId, string? note, bool closeRefund,
         CancellationToken ct)
     {
@@ -65,6 +69,7 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
         if (!closeRefund && checks.RefundPending)
             return "การจองนี้มีคำขอคืนเงินรอฝ่ายบัญชีพิจารณา ถ้าเช็คอินคำขอจะถูกปิด กรุณาแจ้งลูกค้าแล้วกดเช็คอินอีกครั้งเพื่อยืนยัน";
 
+        // ผ่านทุกข้อ: บันทึกการเข้าพัก
         db.BookingStays.Add(new BookingStay
         {
             BookingId = bookingId, Status = "CheckedIn", CheckedInAtUtc = timeProvider.GetUtcNow().UtcDateTime,
@@ -78,6 +83,7 @@ public sealed class StayService(GoodHotelDbContext db, HousekeepingService house
         return null;
     }
 
+    // เช็คเอาท์ แล้วสร้างงานทำความสะอาดใน transaction เดียวกัน
     public async Task<string?> CheckOutAsync(int bookingId, int actorId, CancellationToken ct)
     {
         var roomId = await db.Bookings.AsNoTracking().Where(b => b.BookingId == bookingId)

@@ -11,12 +11,15 @@ namespace GoodHotel.Services;
 /// </summary>
 public sealed class UserAccessCache(IMemoryCache cache)
 {
+    // สิทธิ์และชื่อของผู้ใช้
     public sealed record Access(string? Role, bool IsActive, string? FirstName, string? LastName);
 
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(1);
 
+    // ชื่อที่ใช้เก็บใน cache
     private static string Key(int userId) => $"user-access:{userId}";
 
+    // อ่านจาก cache ไม่มีค่อยถามฐานข้อมูล
     public async Task<Access?> GetAsync(GoodHotelDbContext db, int userId, CancellationToken ct)
     {
         if (cache.TryGetValue(Key(userId), out Access? access)) return access;
@@ -27,5 +30,6 @@ public sealed class UserAccessCache(IMemoryCache cache)
         return access;
     }
 
+    // ลบออกจาก cache เมื่อข้อมูลเปลี่ยน
     public void Forget(int userId) => cache.Remove(Key(userId));
 }

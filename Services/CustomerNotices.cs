@@ -15,6 +15,7 @@ public sealed record NoticeCount(int Refunds, int Moves)
     public int Total => Refunds + Moves;
 }
 
+// แจ้งเตือนผลคำขอคืนเงินให้ลูกค้า
 public sealed class CustomerNotices(IMemoryCache cache)
 {
     // แยก cookie ตามผู้ใช้: เบราว์เซอร์เดียวกันอาจมีลูกค้าหลายคนสลับกันล็อกอิน
@@ -22,8 +23,10 @@ public sealed class CustomerNotices(IMemoryCache cache)
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan LookBack = TimeSpan.FromDays(14);
 
+    // ชื่อที่ใช้เก็บใน cache ของแต่ละคน
     private static string Key(int userId) => $"customer-notices:{userId}";
 
+    // เวลาล่าสุดที่ลูกค้าเปิดดู (เก็บใน cookie)
     private static DateTime SeenAtUtc(HttpContext context, int userId)
     {
         var floor = DateTime.UtcNow - LookBack;

@@ -9,13 +9,16 @@ public sealed record PromotionContext(
     DateOnly CheckOut,
     decimal RoomSubtotal);
 
+// ประวัติลูกค้าที่ใช้ตรวจสิทธิ์
 public sealed record CustomerHistory(bool IsKnown, int? BirthMonth, int ActiveBookingCount, int CompletedStayCount);
 
+// โปรทั้งหมด + ประวัติลูกค้า
 public sealed record PromotionData(IReadOnlyList<Promotion> Candidates, CustomerHistory Customer);
 
 /// <summary>ผลเช็คสิทธิ์ของโปรหนึ่งตัว Reason = เหตุผลที่ใช้ไม่ได้ (null = ใช้ได้)</summary>
 public sealed record PromotionCheck(int PromotionId, string Name, string DiscountText, string Condition, decimal Discount, string? Reason);
 
+// โปรที่ใช้ได้ และลดเท่าไร
 public sealed record AppliedPromotion(int PromotionId, string Name, decimal DiscountAmount);
 
 /// <summary>
@@ -78,6 +81,7 @@ public sealed class PromotionService(RoomAvailabilityService availability, Paral
         return (chosen, eligible);
     }
 
+    // คิดส่วนลดเป็นบาท (แบบ % หรือจำนวนเงิน)
     public static decimal CalculateDiscount(Promotion promotion, decimal roomSubtotal)
     {
         var value = promotion.DiscountValue ?? 0m;

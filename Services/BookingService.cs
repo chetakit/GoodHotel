@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace GoodHotel.Services;
 
+// ผลลัพธ์ที่เป็นไปได้ตอนบันทึกการจอง
 public enum BookingSaveStatus
 {
     Created,
@@ -20,6 +21,7 @@ public enum BookingSaveStatus
     LockTimeout
 }
 
+// ข้อมูลที่ส่งกลับไปให้ Controller
 public sealed record BookingSaveResult(
     BookingSaveStatus Status,
     int? BookingId = null,
@@ -32,6 +34,7 @@ public sealed record BookingSaveResult(
     decimal? DiscountAmount = null,
     decimal? ExtraBedAmount = null);
 
+// กติกาการจองห้องทั้งหมด: ตรวจข้อมูล คิดราคา กันจองซ้ำ และบันทึก
 public sealed class BookingService
 {
     private const string BookingIdLockName = "GoodHotel.BookingId";
@@ -45,6 +48,7 @@ public sealed class BookingService
     private readonly TimeProvider _time;
     private readonly ParallelReader _reader;
 
+    // รับของที่ต้องใช้จากระบบ DI
     public BookingService(
         GoodHotelDbContext db,
         ILogger<BookingService> logger,
@@ -62,12 +66,14 @@ public sealed class BookingService
     }
 
     /// <param name="customerId">ลูกค้าที่กำลังจอง (null = ยังไม่ login) ใช้ตรวจโปรที่ขึ้นกับประวัติลูกค้า</param>
+    // เตรียมหน้ายืนยัน: ตรวจห้องและคิดราคา (ยังไม่บันทึก)
     public async Task<BookingConfirmationViewModel> PrepareConfirmationAsync(
         CreateBookingViewModel request,
         int? customerId,
         CancellationToken cancellationToken = default,
         bool isNewCustomer = false)
     {
+        // ขั้น 1 ตรวจข้อมูลที่ส่งมา
         var model = CopyRequest(request);
         var validationMessage = ValidateRequest(request);
         if (validationMessage != null)
@@ -97,6 +103,7 @@ public sealed class BookingService
             return model;
         }
 
+        // ขั้น 2 ใส่ข้อมูลห้องและราคา = ราคาต่อคืน x จำนวนคืน แล้วตรวจว่าห้องจองได้
         SetRoomDetails(model, room, request);
 
         if (room.Status != "Available")
@@ -146,7 +153,9 @@ public sealed class BookingService
         model.PromotionId = promotion?.PromotionId;
         model.PromotionName = promotion?.Name;
         model.DiscountAmount = promotion?.DiscountAmount ?? 0m;
+        // เตียงเสริม 500 บาท x จำนวนเตียง x จำนวนคืน
         model.ExtraBedAmount = 500m * request.ExtraBedCount * nights;
+        // ยอดสุทธิ = ค่าห้อง - ส่วนลด + เตียงเสริม
         model.TotalAmount = subtotal - model.DiscountAmount + model.ExtraBedAmount;
 
         if (model.TotalAmount > 99999999.99m)
@@ -159,6 +168,7 @@ public sealed class BookingService
         return model;
     }
 
+    // บันทึกการจองจริง ทุกอย่างอยู่ใน transaction เดียว: สำเร็จทั้งหมดหรือไม่เกิดอะไรเลย
     public async Task<BookingSaveResult> CreateAsync(
         int userId,
         CreateBookingViewModel request,
@@ -182,6 +192,7 @@ public sealed class BookingService
                 Message: "ไม่พบบัญชีลูกค้าที่กำลังใช้งาน");
         }
 
+        // ขั้น 1 เปิดการเชื่อมต่อและเริ่ม transaction
         await _db.Database.OpenConnectionAsync(cancellationToken);
         var connection = _db.Database.GetDbConnection();
         IDbContextTransaction? transaction = null;
@@ -198,6 +209,7 @@ public sealed class BookingService
             transaction = activeTransaction;
             var dbTransaction = activeTransaction.GetDbTransaction();
 
+            // ไม่ผ่านเงื่อนไข: ยกเลิก transaction แล้วส่งเหตุผลกลับ
             async Task<BookingSaveResult> RollbackWithResultAsync(
                 BookingSaveResult result)
             {
@@ -208,6 +220,7 @@ public sealed class BookingService
 
             // ล็อกห้องก่อน แล้วยิงทุกการตรวจสอบพร้อมกัน (~200ms แทนที่จะต่อคิวเกือบ 2 วินาที)
             // ใครจะจอง เช็คอิน ย้ายห้อง หรือแจ้งซ่อมห้องนี้ต้องล็อกห้องก่อน ข้อมูลที่อ่านจึงไม่เปลี่ยนจนกว่าจะบันทึกเสร็จ
+            // ขั้น 2 ล็อกแถวห้อง (SELECT ... FOR UPDATE) คนอื่นที่จองห้องเดียวกันต้องรอ จึงจองซ้ำไม่ได้
             var room = await RoomAvailabilityService.LockAndLoadRoomAsync(_db, request.RoomId, cancellationToken);
             var userTask = _reader.Run(db => db.Users
                 .AsNoTracking()
@@ -248,6 +261,7 @@ public sealed class BookingService
             var userIsCustomer = userTask.Result;
             var existingRequest = existingTask.Result;
 
+            // ขั้น 3 ตรวจเงื่อนไขทีละข้อ ไม่ผ่านข้อไหนให้ rollback
             if (!staffTask.Result)
             {
                 return await RollbackWithResultAsync(new BookingSaveResult(
@@ -314,6 +328,7 @@ public sealed class BookingService
                     Message: "ห้องพักไม่พร้อมให้จองในช่วงวันที่เลือก"));
             }
 
+            // ขั้น 4 คิดราคาใหม่จากฐานข้อมูล ไม่เชื่อราคาที่ส่งมาจากหน้าเว็บ
             var nightCount =
                 request.CheckOut.Value.DayNumber -
                 request.CheckIn.Value.DayNumber;
@@ -374,6 +389,7 @@ public sealed class BookingService
                     Message: "ยอดรวมเกินขอบเขตที่ระบบรองรับ"));
             }
 
+            // ราคาไม่ตรงกับที่พนักงานเห็น (Walk-in): ให้ตรวจยอดอีกครั้ง
             if (expectedAmount.HasValue && expectedAmount != amount)
             {
                 return await RollbackWithResultAsync(new BookingSaveResult(
@@ -435,8 +451,10 @@ public sealed class BookingService
                 throw new InvalidOperationException("No more BookingId values are available.");
             }
 
+            // ขั้น 5 เลขการจองใหม่ = เลขมากสุด + 1 (ล็อกไว้แล้ว เลขจึงไม่ชน)
             var bookingId = maxId + 1;
 
+            // ขั้น 6 เพิ่มแถวลงตาราง bookings
             _db.Bookings.Add(new Booking
             {
                 BookingId = bookingId,
@@ -464,6 +482,7 @@ public sealed class BookingService
                 });
             }
 
+            // ขั้น 7 SaveChanges = ส่ง INSERT, Commit = ยืนยันให้ข้อมูลมีผลจริง
             await _db.SaveChangesAsync(cancellationToken);
             await activeTransaction.CommitAsync(cancellationToken);
             transactionCompleted = true;
@@ -480,6 +499,7 @@ public sealed class BookingService
                 discountAmount,
                 extraBedAmount);
         }
+        // เกิดข้อผิดพลาด: ย้อนกลับทั้งหมด ไม่ให้ข้อมูลค้างครึ่งทาง
         catch
         {
             if (transaction != null && !transactionCompleted)
@@ -499,6 +519,7 @@ public sealed class BookingService
 
             throw;
         }
+        // ไม่ว่าสำเร็จหรือไม่ ต้องปลดล็อกและปิดการเชื่อมต่อเสมอ
         finally
         {
             if (lockAcquired || paymentLockAcquired)
@@ -557,6 +578,7 @@ public sealed class BookingService
         }
     }
 
+    // ปลดล็อกเลขที่การจอง/เลขชำระเงิน
     private async Task ReleaseNamedLockAsync(
         DbConnection connection,
         DbTransaction? transaction,
@@ -589,6 +611,7 @@ public sealed class BookingService
         }
     }
 
+    // ใส่ค่าเป็น parameter ไม่ต่อข้อความ SQL เอง (กัน SQL Injection)
     private static void AddParameter(
         DbCommand command,
         string name,
@@ -600,6 +623,7 @@ public sealed class BookingService
         command.Parameters.Add(parameter);
     }
 
+    // ตรวจข้อมูลที่ส่งมา คืนข้อความเตือน (null = ผ่าน)
     private string? ValidateRequest(CreateBookingViewModel request)
     {
         if (request.RoomId <= 0)
@@ -635,6 +659,7 @@ public sealed class BookingService
         return null;
     }
 
+    // คัดลอกข้อมูลที่กรอกไปใส่หน้ายืนยัน
     private static BookingConfirmationViewModel CopyRequest(
         CreateBookingViewModel request)
     {
@@ -648,6 +673,7 @@ public sealed class BookingService
         };
     }
 
+    // ใส่ข้อมูลห้อง จำนวนคืน และราคา
     private static void SetRoomDetails(
         BookingConfirmationViewModel model,
         Room room,

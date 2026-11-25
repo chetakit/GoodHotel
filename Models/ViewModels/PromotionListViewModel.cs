@@ -22,6 +22,7 @@ public class PromotionListViewModel
     // โปรเก่าจากระบบ Promotion Code ที่ยังไม่ได้ตั้งเงื่อนไขใหม่
     public bool NeedsSetup { get; set; }
 
+    // แปลงจากตารางเป็นการ์ด
     public static PromotionListViewModel From(Promotion promotion) => new()
     {
         PromotionId = promotion.PromotionId,

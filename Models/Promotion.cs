@@ -1,10 +1,11 @@
 ﻿namespace GoodHotel.Models;
 
+// ตาราง promotions: โปรโมชั่น
 public partial class Promotion
 {
-    public int PromotionId { get; set; }
+    public int PromotionId { get; set; } // เลขโปร
 
-    public string? PromotionName { get; set; }
+    public string? PromotionName { get; set; } // ชื่อโปร
 
     public string? Description { get; set; }
 
@@ -24,7 +25,7 @@ public partial class Promotion
 
     public DateOnly? EndDate { get; set; }
 
-    public bool IsActive { get; set; } = true;
+    public bool IsActive { get; set; } = true; // เปิดใช้อยู่ไหม
 
     // ---------- ส่วนลด ----------
 

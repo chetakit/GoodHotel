@@ -10,6 +10,7 @@ using MySqlConnector;
 
 namespace GoodHotel.Controllers;
 
+// ชำระเงิน ใบเสร็จ และคืนเงิน: กติกาทั้งหมดอยู่ใน PaymentService
 [Authorize]
 public class PaymentController(
     GoodHotel.Models.GoodHotelDbContext db,
@@ -20,9 +21,11 @@ public class PaymentController(
     UserDirectory users,
     RoomAvailabilityService availability) : Controller
 {
+    // รหัสผู้ใช้ที่ล็อกอินอยู่
     private bool TryActor(out int id) => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),
         NumberStyles.None, CultureInfo.InvariantCulture, out id) && id > 0;
 
+    // ทำงานแล้วกลับหน้าชำระเงินพร้อมข้อความสำเร็จ/ไม่สำเร็จ
     private async Task<IActionResult> FinishAsync(int bookingId, Func<Task<PaymentResult>> operation)
     {
         try
@@ -38,6 +41,7 @@ public class PaymentController(
         return RedirectToAction(nameof(Details), new { id = bookingId });
     }
 
+    // เลือกช่องของรายการชำระเงิน
     private static IQueryable<PaymentListItem> PaymentItems(IQueryable<GoodHotel.Models.Payment> query) => query.Select(p =>
         new PaymentListItem(p.PaymentId, p.BookingId, p.PaymentMethod, p.PaymentStatus, p.Amount,
             p.SubmittedAtUtc == null && p.VerifiedAtUtc == null && p.LegacyDisposition == null,
@@ -45,6 +49,7 @@ public class PaymentController(
             p.VerifiedAtUtc != null, p.EvidenceFileName != null,
             p.Refunds.Where(r => r.Status == "Approved").Sum(r => (decimal?)r.Amount) ?? 0m));
 
+    // รายการชำระเงินสำหรับหน้าพนักงาน/บัญชี (มีชื่อลูกค้า)
     public static IQueryable<PaymentManagementItem> ManagementItems(IQueryable<Payment> query) =>
         query.Select(p => new PaymentManagementItem(
             new PaymentListItem(p.PaymentId, p.BookingId, p.PaymentMethod, p.PaymentStatus, p.Amount,
@@ -56,6 +61,7 @@ public class PaymentController(
                 (p.Booking.User.FirstName ?? "") + " " + (p.Booking.User.LastName ?? ""),
             p.SubmittedAtUtc ?? (p.PaymentDate == null ? p.VerifiedAtUtc : null), p.PaymentDate));
 
+    // กรองด้วยคำค้นและวิธีชำระ
     public static IQueryable<Payment> FilterHistory(IQueryable<Payment> query, string? search, string? method)
     {
         if (!string.IsNullOrEmpty(search))
@@ -72,6 +78,7 @@ public class PaymentController(
         return string.IsNullOrEmpty(method) ? query : query.Where(p => p.PaymentMethod == method);
     }
 
+    // หน้าชำระเงินของการจอง (ลูกค้าเปิดได้เฉพาะของตัวเอง)
     [HttpGet]
     [Authorize(Roles = "Customer,Staff,Accountant")]
     public async Task<IActionResult> Details(int id, CancellationToken ct)
@@ -163,6 +170,7 @@ public class PaymentController(
         return View(receipt.Model);
     }
 
+    // รายการชำระเงินและคำขอคืนเงิน (พนักงาน/บัญชี)
     [HttpGet]
     [Authorize(Roles = "Staff,Accountant")]
     public async Task<IActionResult> Queue(string? search, string? status, string? method, CancellationToken ct)
@@ -203,6 +211,7 @@ public class PaymentController(
         return await FinishAsync(bookingId, () => payments.RequestRefundAsync(bookingId, actor, reason, key, ct));
     }
 
+    // [POST] บัญชีอนุมัติคืนเงิน
     [HttpPost]
     [Authorize(Roles = "Accountant")]
     [ValidateAntiForgeryToken]
@@ -212,6 +221,7 @@ public class PaymentController(
         return await FinishAsync(bookingId, () => payments.ApproveRefundAsync(refundId, actor, key, ct));
     }
 
+    // [POST] บัญชีปฏิเสธคืนเงิน
     [HttpPost]
     [Authorize(Roles = "Accountant")]
     [ValidateAntiForgeryToken]
@@ -222,6 +232,7 @@ public class PaymentController(
         return await FinishAsync(bookingId, () => payments.RejectRefundAsync(refundId, actor, reason, key, ct));
     }
 
+    // [POST] ลูกค้าชำระเงิน (key = รหัสกันกดซ้ำ)
     [HttpPost]
     [Authorize(Roles = "Customer")]
     [ValidateAntiForgeryToken]
@@ -233,6 +244,7 @@ public class PaymentController(
         return await FinishAsync(bookingId, () => payments.SubmitAsync(bookingId, actorId, method, key, ct));
     }
 
+    // [POST] ยืนยัน/ปฏิเสธการชำระที่รอตรวจ
     [HttpPost]
     [Authorize(Roles = "Staff,Accountant")]
     [ValidateAntiForgeryToken]
@@ -244,6 +256,7 @@ public class PaymentController(
         return await FinishAsync(bookingId, () => payments.ReviewAsync(paymentId, actor, confirm.Value, received, reason, key, ct));
     }
 
+    // [POST] บัญชีตรวจข้อมูลชำระเงินเก่า
     [HttpPost]
     [Authorize(Roles = "Accountant")]
     [ValidateAntiForgeryToken]
@@ -255,6 +268,7 @@ public class PaymentController(
         return await FinishAsync(bookingId, () => payments.ReconcileAsync(paymentId, actor, confirmed.Value, reason, key, ct));
     }
 
+    // แสดงรูปหลักฐาน (เก็บนอก wwwroot เปิดตรงจาก URL ไม่ได้)
     [HttpGet]
     [Authorize(Roles = "Customer,Staff,Accountant")]
     public async Task<IActionResult> Evidence(int id, CancellationToken ct)

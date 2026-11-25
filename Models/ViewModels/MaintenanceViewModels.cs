@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace GoodHotel.Models.ViewModels;
 
+// ฟอร์มแจ้งซ่อม
 public class MaintenanceCreateViewModel
 {
     [Required(ErrorMessage = "กรุณาเลือกห้อง")]
@@ -18,6 +19,7 @@ public class MaintenanceCreateViewModel
     public List<SelectListItem> Rooms { get; set; } = new();
 }
 
+// งานซ่อมหนึ่งแถว
 public sealed record MaintenanceListItem(
     int ReportId,
     string? RoomNumber,
@@ -29,6 +31,7 @@ public sealed record MaintenanceListItem(
     DateTime ReportedAtUtc,
     string? ReportedBy);
 
+// รายละเอียดงานซ่อม
 public sealed record MaintenanceDetailsViewModel(
     int ReportId,
     string? RoomNumber,
@@ -43,6 +46,7 @@ public sealed record MaintenanceDetailsViewModel(
     DateTime? ResolvedAtUtc,
     IReadOnlyList<MaintenanceEventItem> Events);
 
+// ประวัติงานซ่อมหนึ่งรายการ
 public sealed record MaintenanceEventItem(
     int ActorUserId,
     string? FromStatus,

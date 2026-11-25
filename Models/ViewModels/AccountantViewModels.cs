@@ -28,6 +28,7 @@ public sealed record LedgerEntry(
     string? ActorName,
     string? GuestName);
 
+// ข้อมูลหน้าภาพรวมการเงิน
 public sealed record AccountantDashboardViewModel(
     MoneyTotal Today,
     MoneyTotal ThisMonth,
@@ -39,6 +40,7 @@ public sealed record AccountantDashboardViewModel(
     IReadOnlyList<MethodTotal> MonthByMethod,
     IReadOnlyList<LedgerEntry> TodayLedger);
 
+// ข้อมูลหน้าปิดยอดรายวัน
 public sealed record DailyCloseViewModel(
     DateOnly Date,
     MoneyTotal Total,
@@ -46,6 +48,7 @@ public sealed record DailyCloseViewModel(
     IReadOnlyList<CashierTotal> Cashiers,
     IReadOnlyList<LedgerEntry> Entries);
 
+// ข้อมูลหน้ารายงานการเงิน
 public sealed record FinanceReportViewModel(
     DateOnly From,
     DateOnly To,
@@ -69,6 +72,7 @@ public sealed record AuditEntry(
     string? Method,
     string? Detail);
 
+// ข้อมูลหน้าตรวจสอบย้อนหลัง
 public sealed record AuditViewModel(
     DateOnly From,
     DateOnly To,
@@ -79,6 +83,7 @@ public sealed record AuditViewModel(
     IReadOnlyList<KeyValuePair<string, string>> Types,
     bool Truncated);
 
+// ยอดของหนึ่งวัน
 public sealed record DailyRow(DateOnly Date, decimal Received, decimal Refunded)
 {
     public decimal Net => Received - Refunded;

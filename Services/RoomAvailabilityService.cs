@@ -5,18 +5,23 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace GoodHotel.Services;
 
+// ช่วงวันที่ห้องไม่ว่าง (null = ไม่มีขอบเขต)
 public sealed record RoomBlockedPeriod(int RoomId, DateOnly? Start, DateOnly? End)
 {
+    // สูตรวันชนกัน: เริ่มก่อนอีกช่วงจบ และ จบหลังอีกช่วงเริ่ม (ออกวันไหน คนใหม่เข้าวันนั้นได้)
     public bool Overlaps(DateOnly start, DateOnly end) =>
         (!Start.HasValue || Start < end) && (!End.HasValue || End > start);
 }
 
+// เช็คว่าห้องว่างไหม ดูจาก 5 อย่าง: สถานะห้อง การจอง แขกที่พักอยู่ งานซ่อม งานทำความสะอาด
 public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider timeProvider, ParallelReader reader)
 {
     private static readonly TimeZoneInfo HotelTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Bangkok");
 
+    // วันนี้ตามเวลาไทย
     public DateOnly HotelToday() => HotelDate(timeProvider.GetUtcNow().UtcDateTime);
 
+    // แปลงเวลา UTC เป็นวันที่ไทย
     public static DateOnly HotelDate(DateTime utc) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), HotelTimeZone));
 
@@ -64,6 +69,7 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
         {
             async c =>
             {
+                // 1) ห้องที่ปิดขาย
                 var rooms = await c.Rooms.AsNoTracking().Where(r => all || ids.Contains(r.RoomId))
                     .Select(r => new { r.RoomId, r.Status }).ToListAsync(ct);
                 var found = rooms.Select(r => r.RoomId).ToHashSet();
@@ -72,6 +78,7 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
                         .Select(r => new RoomBlockedPeriod(r.RoomId, null, null)))
                     .ToList();
             },
+            // 2) ช่วงที่มีการจอง (ไม่นับที่ยกเลิก)
             async c => (await c.Bookings.AsNoTracking()
                 .Where(b => b.Status != BookingStatuses.Cancelled &&
                     b.RoomId.HasValue && (all || ids.Contains(b.RoomId.Value)) &&
@@ -88,15 +95,18 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
                 })
                 .ToListAsync(ct))
                 .Select(b => new RoomBlockedPeriod(b.RoomId, b.CheckIn, EffectiveCheckOut(b.CheckOut, b.CheckedOutAtUtc))),
+            // 3) แขกที่พักอยู่
             async c => (await c.BookingStays.AsNoTracking()
                 .Where(s => s.Status == "CheckedIn" && s.Booking.RoomId.HasValue && (all || ids.Contains(s.Booking.RoomId.Value)))
                 .Select(s => new { RoomId = s.Booking.RoomId!.Value, s.CheckedInAtUtc, s.Booking.CheckOut })
                 .ToListAsync(ct))
                 .Select(s => ActiveStayPeriod(s.RoomId, s.CheckedInAtUtc, s.CheckOut, today)),
+            // 4) งานซ่อมที่ยังไม่เสร็จ
             async c => (await c.MaintenanceReports.AsNoTracking()
                 .Where(r => (all || ids.Contains(r.RoomId)) && r.Status != MaintenanceReport.Resolved)
                 .Select(r => r.RoomId).Distinct().ToListAsync(ct))
                 .Select(roomId => new RoomBlockedPeriod(roomId, null, null)),
+            // 5) ห้องที่รอทำความสะอาดหรือรอตรวจ
             async c => (await (from task in c.HousekeepingTasks.AsNoTracking()
                 join stay in c.BookingStays.AsNoTracking() on task.StayBookingId equals (int?)stay.BookingId into stays
                 from stay in stays.DefaultIfEmpty()
@@ -110,27 +120,33 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
                 .Select(t => CleaningPeriod(t.RoomId, t.CheckedOutAtUtc, today))
         };
 
+        // ถามพร้อมกันทั้ง 5 อย่าง แล้วเอาเฉพาะช่วงที่ชนกับวันที่ขอ
         var periods = new List<RoomBlockedPeriod>();
         foreach (var result in await Task.WhenAll(queries.Select(reader.Run))) periods.AddRange(result);
         return periods.Where(p => p.Overlaps(start, end)).ToList();
     }
 
+    // ว่าง = ไม่มีช่วงไหนชนเลย
     public async Task<bool> IsAvailableAsync(int roomId, DateOnly start, DateOnly end, CancellationToken ct) =>
         (await GetBlockedPeriodsAsync(new[] { roomId }, start, end, ct)).Count == 0;
 
+    // แขกที่พักอยู่ในห้องนี้
     public static IQueryable<BookingStay> CurrentStays(IQueryable<BookingStay> stays, int roomId) =>
         stays.Where(stay => stay.Status == "CheckedIn" && stay.Booking.RoomId == roomId);
 
+    // การจองที่ครอบคลุมวันนี้
     public static IQueryable<Booking> CurrentBookings(IQueryable<Booking> bookings, int roomId, DateOnly today) =>
         bookings.Where(booking => booking.Status != BookingStatuses.Cancelled &&
             booking.RoomId == roomId && booking.CheckIn.HasValue &&
             booking.CheckOut.HasValue && booking.CheckIn <= today && booking.CheckOut > today);
 
+    // งานทำความสะอาดที่ยังไม่ตรวจผ่าน
     public static IQueryable<HousekeepingTask> PendingCheckoutCleaning(
         IQueryable<HousekeepingTask> tasks, int roomId) =>
         tasks.Where(task => task.RoomId == roomId && task.TaskType == "CheckoutCleaning" &&
             task.Status != "Verified");
 
+    // มีแขกหรือรอทำความสะอาดอยู่ไหม
     public async Task<bool> HasCurrentRestrictionsAsync(int roomId, CancellationToken ct)
     {
         // แค่มีคนจองวันนี้ (ยังไม่เช็คอิน) ไม่กันการเปิดห้อง ไม่งั้นซ่อมเสร็จแล้วแขกเช็คอินไม่ได้ และ Admin ก็เปิดห้องไม่ได้
@@ -148,6 +164,7 @@ public sealed class RoomAvailabilityService(GoodHotelDbContext db, TimeProvider 
         return (await (track ? query : query.AsNoTracking()).ToListAsync(ct)).SingleOrDefault();
     }
 
+    // ล็อกแถวห้องด้วย FOR UPDATE คนอื่นต้องรอจนกว่าเราจะ commit
     public static async Task<bool> LockRoomAsync(GoodHotelDbContext db, IDbContextTransaction transaction,
         int roomId, CancellationToken ct)
     {

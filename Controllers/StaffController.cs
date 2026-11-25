@@ -9,6 +9,7 @@ using System.Security.Claims;
 
 namespace GoodHotel.Controllers
 {
+    // หน้าของพนักงานต้อนรับ: การจอง เช็คอิน/เอาท์ Walk-in ย้ายห้อง ตรวจห้อง
     [Authorize(Roles = "Staff")]
     public class StaffController : Controller
     {
@@ -20,6 +21,7 @@ namespace GoodHotel.Controllers
         private readonly WalkInService _walkIn;
         private readonly BookingCancellationService _cancellation;
 
+        // รับ Service ที่ต้องใช้จากระบบ DI
         public StaffController(
             GoodHotelDbContext db,
             StayService stays,
@@ -38,6 +40,7 @@ namespace GoodHotel.Controllers
             _walkIn = walkIn;
         }
 
+        // หนึ่งแถวในรายการจอง
         public sealed record BookingListItem(
             int BookingId,
             string? FirstName,
@@ -56,6 +59,7 @@ namespace GoodHotel.Controllers
             public string PaymentLabel { get; init; } = "";
         }
 
+        // ข้อมูลหน้ารายละเอียดการจอง
         public sealed record BookingDetailsModel(
             int BookingId,
             string? FirstName,
@@ -75,6 +79,7 @@ namespace GoodHotel.Controllers
             public bool RefundPending { get; init; }
         }
 
+        // ข้อมูลหน้าแขก
         public sealed record GuestDetailsModel(
             int BookingId,
             bool HasGuest,
@@ -84,6 +89,7 @@ namespace GoodHotel.Controllers
             string? Phone,
             DateOnly? BirthDate);
 
+        // หน้าหลัก: แขกเข้า/ออกวันนี้
         [HttpGet]
         public async Task<IActionResult> Index([FromServices] ParallelReader reader, CancellationToken cancellationToken)
         {
@@ -161,6 +167,7 @@ namespace GoodHotel.Controllers
             b.Payments.Any(p => p.Refunds.Any(r => r.Status == PaymentService.RefundRequested)),
             b.RoomId);
 
+        // รายการจอง: ค้นหา กรอง เรียง และแบ่งหน้า
         [HttpGet]
         public async Task<IActionResult> Bookings(
             string? q,
@@ -278,6 +285,7 @@ namespace GoodHotel.Controllers
             return View(bookings.Select(b => b with { PaymentLabel = label(b.BookingId) }).ToList());
         }
 
+        // รายละเอียดการจอง
         [HttpGet]
         public async Task<IActionResult> BookingDetails(int id, [FromServices] ParallelReader reader, CancellationToken cancellationToken)
         {
@@ -323,6 +331,7 @@ namespace GoodHotel.Controllers
             });
         }
 
+        // ข้อมูลติดต่อของแขก
         [HttpGet]
         public async Task<IActionResult> GuestDetails(int bookingId, CancellationToken cancellationToken)
         {
@@ -347,6 +356,7 @@ namespace GoodHotel.Controllers
             return guest == null ? NotFound() : View(guest);
         }
 
+        // [POST] เช็คอิน (เงื่อนไขอยู่ใน StayService) ข้อความที่ได้กลับมา = เหตุผลที่ไม่ผ่าน, null = สำเร็จ
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CheckIn(int bookingId, string? note, bool fromDashboard,
@@ -360,6 +370,7 @@ namespace GoodHotel.Controllers
             return BackToDeskOrBooking(fromDashboard, bookingId);
         }
 
+        // [POST] พนักงานยกเลิกการจอง
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelBooking(int bookingId, CancellationToken ct)
@@ -370,6 +381,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(BookingDetails), new { id = bookingId });
         }
 
+        // [POST] เช็คเอาท์ ระบบสร้างงานทำความสะอาดให้เอง
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CheckOut(int bookingId, bool fromDashboard, CancellationToken ct)
@@ -390,6 +402,7 @@ namespace GoodHotel.Controllers
 
         // ---------- สถานะห้องพัก ----------
 
+        // กระดานสถานะห้องทั้งหมด
         [HttpGet]
         public async Task<IActionResult> RoomStatus(CancellationToken ct)
         {
@@ -399,6 +412,7 @@ namespace GoodHotel.Controllers
 
         // ---------- ลูกค้า Walk-in ----------
 
+        // [GET] ฟอร์มรับลูกค้า Walk-in
         [HttpGet]
         public async Task<IActionResult> WalkIn(DateOnly? checkOut, int? guests, CancellationToken ct)
         {
@@ -411,6 +425,7 @@ namespace GoodHotel.Controllers
             return View(await FillWalkInRoomsAsync(form, ct));
         }
 
+        // [POST] จอง รับเงินสด และเช็คอินในครั้งเดียว
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> WalkIn(WalkInViewModel form, CancellationToken ct)
@@ -504,6 +519,7 @@ namespace GoodHotel.Controllers
             return View(info);
         }
 
+        // [POST] ย้ายห้อง
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MoveRoom(int bookingId, int newRoomId, string? reason,
@@ -519,6 +535,7 @@ namespace GoodHotel.Controllers
                 : RedirectToAction(nameof(MoveRoom), new { id = bookingId });
         }
 
+        // [POST] ตรวจห้องไม่ผ่าน ส่งให้แม่บ้านทำใหม่
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReworkTask(int id, string? reason, CancellationToken ct)
@@ -531,10 +548,12 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(VerificationTasks));
         }
 
+        // ห้องที่รอตรวจ
         [HttpGet]
         public async Task<IActionResult> VerificationTasks(CancellationToken ct) =>
             View(await _housekeeping.AwaitingVerificationAsync(ct));
 
+        // รายละเอียดห้องที่จะตรวจ
         [HttpGet]
         public async Task<IActionResult> VerificationDetails(int id, CancellationToken ct)
         {
@@ -543,6 +562,7 @@ namespace GoodHotel.Controllers
             return task == null ? NotFound() : View(task);
         }
 
+        // [POST] ตรวจห้องผ่าน ห้องพร้อมเข้าพัก
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> VerifyTask(int id, CancellationToken ct)

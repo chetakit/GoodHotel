@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GoodHotel.Models.ViewModels;
 
+// ข้อมูลที่ลูกค้ากรอกตอนจอง ([Required] ฯลฯ = กติกาตรวจข้อมูล)
 public class CreateBookingViewModel
 {
     [Range(1, int.MaxValue, ErrorMessage = "กรุณาเลือกห้องพัก")]

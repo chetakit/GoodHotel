@@ -10,6 +10,7 @@ namespace GoodHotel.Services;
 /// </summary>
 public sealed class ParallelReader(DatabaseConnections connections)
 {
+    // รันคำสั่งอ่านด้วย DbContext ของตัวเอง จึงอ่านหลายอย่างพร้อมกันได้
     public async Task<T> Run<T>(Func<GoodHotelDbContext, Task<T>> query)
     {
         await using var context = new GoodHotelDbContext(connections.ReadOptions);

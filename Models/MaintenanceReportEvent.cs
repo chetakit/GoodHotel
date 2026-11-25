@@ -1,5 +1,6 @@
 namespace GoodHotel.Models;
 
+// ตารางประวัติงานซ่อม
 public class MaintenanceReportEvent
 {
     public int EventId { get; set; }

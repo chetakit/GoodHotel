@@ -1,5 +1,6 @@
 namespace GoodHotel.Models.ViewModels;
 
+// ห้องหนึ่งห้องที่แสดงบนหน้าเว็บ
 public class RoomListViewModel
 {
     public int RoomId { get; set; }

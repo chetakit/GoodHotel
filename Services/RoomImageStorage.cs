@@ -1,5 +1,6 @@
 namespace GoodHotel.Services;
 
+// จัดการรูปห้องใน wwwroot/uploads/rooms
 public static class RoomImageStorage
 {
     public const string DefaultImagePath = "/images/default-room.svg";
@@ -7,6 +8,7 @@ public static class RoomImageStorage
     private const string UploadPathPrefix = "/uploads/rooms/";
     private const long MaximumFileSize = 5 * 1024 * 1024;
 
+    // ตรวจชนิดและขนาดไฟล์ (null = ผ่าน)
     public static string? GetUploadValidationError(IFormFile? file)
     {
         if (file == null)
@@ -40,6 +42,7 @@ public static class RoomImageStorage
         return null;
     }
 
+    // บันทึกรูปด้วยชื่อใหม่
     public static async Task<string> SaveAsync(
         IFormFile file,
         string webRootPath,
@@ -104,6 +107,7 @@ public static class RoomImageStorage
         return $"{UploadPathPrefix}{fileName}";
     }
 
+    // ที่อยู่รูปที่จะแสดง (ไม่มีรูปใช้รูปสำรอง)
     public static string GetDisplayPath(string? webRootPath, string? imagePath)
     {
         if (webRootPath == null ||
@@ -116,6 +120,7 @@ public static class RoomImageStorage
         return imagePath!;
     }
 
+    // แปลง URL รูปเป็นที่อยู่ไฟล์ในเครื่อง
     public static bool TryGetPhysicalPath(
         string webRootPath,
         string? imagePath,
@@ -160,6 +165,7 @@ public static class RoomImageStorage
         }
     }
 
+    // ดูข้อมูลต้นไฟล์ว่าเป็นรูปจริง ไม่ใช่แค่นามสกุล
     private static async Task<bool> HasValidImageSignatureAsync(
         Stream stream,
         string extension,
@@ -189,6 +195,7 @@ public static class RoomImageStorage
         };
     }
 
+    // กันที่อยู่ไฟล์หลุดออกนอกโฟลเดอร์
     private static void EnsurePathIsWithinDirectory(
         string physicalPath,
         string directoryPath)

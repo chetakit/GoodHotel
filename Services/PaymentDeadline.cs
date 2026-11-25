@@ -20,12 +20,14 @@ public static class PaymentDeadline
 
     public static TimeSpan Window { get; private set; } = TimeSpan.FromMinutes(DefaultMinutes);
 
+    // อ่านเวลาที่ให้จ่ายจาก appsettings.json
     public static void Configure(IConfiguration configuration)
     {
         var minutes = configuration.GetValue<int?>("Booking:PaymentWindowMinutes") ?? DefaultMinutes;
         Window = TimeSpan.FromMinutes(Math.Clamp(minutes, 1, 24 * 60));
     }
 
+    // เส้นตาย = เวลาจอง + เวลาที่ให้
     public static DateTime? DueAtUtc(DateTime? createdAtUtc) => createdAtUtc + Window;
 
     /// <summary>
@@ -52,6 +54,7 @@ public static class PaymentDeadline
         return expired;
     }
 
+    // การจองที่หมดเวลาและยังไม่จ่าย
     private static IQueryable<Booking> Overdue(GoodHotelDbContext db, DateTime nowUtc)
     {
         var cutoff = nowUtc - Window;
@@ -71,6 +74,7 @@ public sealed class PaymentDeadlineSweeper(
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
+    // วนยกเลิกการจองที่หมดเวลา
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(Interval);

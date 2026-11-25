@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 namespace GoodHotel.Services;
 
+// จัดเก็บรูปหลักฐานการโอน (ระบบเก่า)
 public sealed class PaymentEvidenceStorage(
     IWebHostEnvironment environment, IConfiguration configuration, ILogger<PaymentEvidenceStorage> logger)
 {
@@ -26,6 +27,7 @@ public sealed class PaymentEvidenceStorage(
         }
     }
 
+    // ตรวจว่าเป็นรูปจริงแล้วบันทึก
     public async Task<(string FileName, string Sha256)> SaveAsync(IFormFile file, CancellationToken ct)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -73,6 +75,7 @@ public sealed class PaymentEvidenceStorage(
         }
     }
 
+    // หาที่อยู่ไฟล์
     public string GetPath(string fileName)
     {
         var extension = Path.GetExtension(fileName);
@@ -83,6 +86,7 @@ public sealed class PaymentEvidenceStorage(
         return Path.Combine(DirectoryPath, fileName);
     }
 
+    // ลบไฟล์
     public void Delete(string fileName)
     {
         try

@@ -12,6 +12,7 @@ using System.Data;
 
 namespace GoodHotel.Controllers
 {
+    // หน้าที่ของผู้ดูแลระบบ: ห้อง โปรโมชั่น บัญชีผู้ใช้ พนักงาน รายงาน (เฉพาะ role Admin)
     [Authorize(Roles = "Admin")]
     public class AdminController : Controller
     {
@@ -34,6 +35,7 @@ namespace GoodHotel.Controllers
         private readonly UserAccessCache _userAccess;
         private readonly ParallelReader _reader;
 
+        // รับ Service ที่ต้องใช้จากระบบ DI
         public AdminController(
             GoodHotelDbContext db,
             IPasswordHasher<User> passwordHasher,
@@ -56,6 +58,7 @@ namespace GoodHotel.Controllers
             _availability = availability;
         }
 
+        // หน้าภาพรวม: จำนวนห้อง การจอง สถานะห้องตอนนี้ และกราฟ
         public async Task<IActionResult> Dashboard(CancellationToken ct)
         {
             // สถานะห้องจริง (ดูจากการเข้าพัก/งานทำความสะอาด/งานซ่อม) ให้ตรงกับหน้า Room Status ของ Staff
@@ -174,6 +177,7 @@ namespace GoodHotel.Controllers
                 .SumAsync(ct);
         }
 
+        // รายการห้องทั้งหมด พร้อมสถานะจริงตอนนี้
         public async Task<IActionResult> Rooms(CancellationToken ct)
         {
             // สถานะจริงตอนนี้ (รวมการเข้าพัก งานทำความสะอาด งานซ่อม) แสดงคู่กับสถานะที่ Admin ตั้งไว้
@@ -204,15 +208,18 @@ namespace GoodHotel.Controllers
             return View(rooms);
         }
 
+        // [GET] ฟอร์มเพิ่มห้อง
         public IActionResult AddRoom()
         {
             return View("RoomForm", new RoomFormViewModel());
         }
 
+        // [POST] บันทึกห้องใหม่พร้อมรูป
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddRoom(RoomFormViewModel data)
         {
+            // ตรวจข้อมูลฝั่ง server เสมอ เพราะฝั่งเบราว์เซอร์ถูกข้ามได้
             ValidateRoom(data);
             ValidateRoomImage(data.Image);
 
@@ -263,6 +270,7 @@ namespace GoodHotel.Controllers
                     ImagePath = uploadedImagePath
                 };
 
+                // เพิ่มแถวลงตาราง rooms แล้ว SaveChanges = ส่งคำสั่ง INSERT ไป MySQL
                 _db.Rooms.Add(room);
                 await _db.SaveChangesAsync(HttpContext.RequestAborted);
             }
@@ -296,6 +304,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(Rooms));
         }
 
+        // [GET] ฟอร์มแก้ไขห้อง (จำสถานะตอนเปิดหน้าไว้ เพื่อเช็คว่ามีคนอื่นแก้ก่อนหรือเปล่า)
         public IActionResult EditRoom(int id)
         {
             var room = _db.Rooms.FirstOrDefault(room => room.RoomId == id);
@@ -329,6 +338,7 @@ namespace GoodHotel.Controllers
             return View("RoomForm", data);
         }
 
+        // [POST] บันทึกการแก้ไขห้อง ล็อกห้องก่อน กันชนกับคนที่กำลังจองหรือแจ้งซ่อม
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditRoom(RoomFormViewModel data)
@@ -402,6 +412,7 @@ namespace GoodHotel.Controllers
                 var latestEventId = await _db.MaintenanceReportEvents
                     .Where(item => item.Report.RoomId == room.RoomId)
                     .MaxAsync(item => (int?)item.EventId, HttpContext.RequestAborted) ?? 0;
+                // สถานะเปลี่ยนไประหว่างเปิดหน้าค้างไว้: ไม่เขียนทับ ให้เปิดใหม่
                 if (data.HasStaleRoomStatus(room.Status, room.PreMaintenanceStatus, latestEventId))
                 {
                     DeleteNewUpload(uploadedImagePath);
@@ -412,6 +423,7 @@ namespace GoodHotel.Controllers
                 var hasUnresolved = await _db.MaintenanceReports.AnyAsync(
                     report => report.RoomId == data.RoomId && report.Status != MaintenanceReport.Resolved,
                     HttpContext.RequestAborted);
+                // ยังมีงานซ่อมค้าง ห้ามเปิดขาย
                 if (data.Status != "Maintenance" && hasUnresolved)
                 {
                     DeleteNewUpload(uploadedImagePath);
@@ -437,6 +449,7 @@ namespace GoodHotel.Controllers
                     return View("RoomForm", data);
                 }
 
+                // ผ่านทุกเงื่อนไขแล้ว เขียนค่าใหม่
                 room.Room1 = data.RoomNumber;
                 room.Type = data.Type;
                 room.Description = data.Description;
@@ -515,6 +528,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(Rooms));
         }
 
+        // ตรวจชนิดและขนาดไฟล์รูป
         private void ValidateRoomImage(IFormFile? image)
         {
             var validationError = RoomImageStorage.GetUploadValidationError(image);
@@ -524,6 +538,7 @@ namespace GoodHotel.Controllers
             }
         }
 
+        // บันทึกไม่สำเร็จ: ลบรูปที่เพิ่งอัปโหลดทิ้ง
         private void DeleteNewUpload(string? imagePath)
         {
             if (imagePath == null ||
@@ -549,6 +564,7 @@ namespace GoodHotel.Controllers
             }
         }
 
+        // เปลี่ยนรูปแล้ว: ลบรูปเก่าถ้าไม่มีห้องอื่นใช้
         private void DeletePreviousImageIfUnused(string? imagePath, int roomId)
         {
             if (imagePath == null ||
@@ -580,6 +596,7 @@ namespace GoodHotel.Controllers
             }
         }
 
+        // [POST] ลบห้อง (ห้องที่มีประวัติการจองลบไม่ได้)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult DeleteRoom(int id)
@@ -620,6 +637,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(Rooms));
         }
 
+        // ตรวจข้อมูลห้องเพิ่มเติมจากที่ ViewModel ตรวจให้
         private void ValidateRoom(RoomFormViewModel data)
         {
             // ช่องว่าง/ความยาว/ช่วงตัวเลข ตรวจจาก RoomFormViewModel แล้ว เหลือเช็คค่าที่อนุญาต
@@ -635,6 +653,7 @@ namespace GoodHotel.Controllers
 
         // ---------- Promotions ----------
 
+        // รายการโปรโมชั่น
         public async Task<IActionResult> Promotion(CancellationToken ct)
         {
             // โปรที่ตั้งเงื่อนไขแล้วขึ้นก่อน → เปิดอยู่ก่อนปิด → ตามลำดับที่สร้าง
@@ -646,11 +665,13 @@ namespace GoodHotel.Controllers
             return View(promotions.Select(PromotionListViewModel.From).ToList());
         }
 
+        // [GET] ฟอร์มเพิ่มโปร
         public IActionResult AddPromotion()
         {
             return View("PromotionForm", new PromotionFormViewModel());
         }
 
+        // [POST] บันทึกโปรใหม่
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddPromotion(PromotionFormViewModel form, CancellationToken ct)
@@ -671,6 +692,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(Promotion));
         }
 
+        // [GET] ฟอร์มแก้โปร
         public async Task<IActionResult> EditPromotion(int id, CancellationToken ct)
         {
             var promotion = await _db.Promotions.AsNoTracking()
@@ -678,6 +700,7 @@ namespace GoodHotel.Controllers
             return promotion == null ? NotFound() : View("PromotionForm", CreatePromotionForm(promotion));
         }
 
+        // [POST] บันทึกการแก้โปร
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditPromotion(PromotionFormViewModel form, CancellationToken ct)
@@ -720,6 +743,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(Promotion));
         }
 
+        // [POST] ลบโปร (โปรที่มีการจองใช้แล้วลบไม่ได้)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePromotion(int id, CancellationToken ct)
@@ -745,6 +769,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(Promotion));
         }
 
+        // ตรวจเงื่อนไขโปร เช่น ส่วนลดและช่วงวันที่
         private void ValidatePromotionForm(PromotionFormViewModel form)
         {
             if (form.RuleType == null || !PromotionRules.All.ContainsKey(form.RuleType))
@@ -773,6 +798,7 @@ namespace GoodHotel.Controllers
             }
         }
 
+        // แปลงข้อความวันที่จากฟอร์มเป็นวันที่
         private DateOnly? ParseFormDate(string? value, string field)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -789,6 +815,7 @@ namespace GoodHotel.Controllers
             return date;
         }
 
+        // คัดลอกค่าจากฟอร์มลง Promotion (ก่อนบันทึก)
         private static void CopyFormToPromotion(PromotionFormViewModel form, Promotion promotion)
         {
             promotion.PromotionName = form.PromotionName!.Trim();
@@ -810,6 +837,7 @@ namespace GoodHotel.Controllers
                 ? date
                 : null;
 
+        // คัดลอกค่าจาก Promotion ลงฟอร์ม (ก่อนแสดง)
         private static PromotionFormViewModel CreatePromotionForm(Promotion promotion) => new()
         {
             PromotionId = promotion.PromotionId,
@@ -826,6 +854,7 @@ namespace GoodHotel.Controllers
             IsActive = promotion.IsActive
         };
 
+        // รายชื่อบัญชีผู้ใช้ ค้นหาและกรองตาม role ได้
         public async Task<IActionResult> Members(string? q, string? role, CancellationToken ct)
         {
             var users = _db.Users.AsNoTracking();
@@ -856,6 +885,7 @@ namespace GoodHotel.Controllers
                 .ToListAsync(ct));
         }
 
+        // [GET] ฟอร์มแก้บัญชี
         public IActionResult EditUser(int id)
         {
             if (id <= 0) return BadRequest();
@@ -880,6 +910,7 @@ namespace GoodHotel.Controllers
             return NotFound();
         }
 
+        // [POST] บันทึกการแก้บัญชี
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditUser(EditUserViewModel data, CancellationToken ct)
@@ -966,6 +997,7 @@ namespace GoodHotel.Controllers
             return null;
         }
 
+        // [POST] ลบบัญชี (ถ้ามีข้อมูลอื่นอ้างถึงจะลบไม่ได้)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult DeleteUser(int id)
@@ -1018,11 +1050,13 @@ namespace GoodHotel.Controllers
                 new { status = "DeleteFailed" });
         }
 
+        // [GET] ฟอร์มเพิ่มบัญชี
         public IActionResult AddUser()
         {
             return View();
         }
 
+        // [POST] สร้างบัญชีใหม่ เก็บรหัสผ่านแบบ hash
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddUser(
@@ -1132,6 +1166,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction("Members");
         }
 
+        // รายชื่อพนักงาน (พนักงานต้อนรับ แม่บ้าน ฝ่ายบัญชี)
         public IActionResult Employees()
         {
             var employees = _db.Users
@@ -1153,6 +1188,7 @@ namespace GoodHotel.Controllers
             return View(employees);
         }
 
+        // ข้อมูลพนักงานหนึ่งคน
         public IActionResult EmployeeProfile(int id)
         {
             var employee = _db.Users
@@ -1180,6 +1216,7 @@ namespace GoodHotel.Controllers
             return View(employee);
         }
 
+        // [POST] เปิด/ปิดบัญชีพนักงาน (ปิดแล้วเข้าระบบไม่ได้)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SetEmployeeActive(
@@ -1210,6 +1247,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(EmployeeProfile), new { id });
         }
 
+        // รายการงานแม่บ้าน (ไม่มีในเมนู งานปกติเกิดเองตอนเช็คเอาท์)
         [HttpGet]
         public async Task<IActionResult> HousekeepingAssignments(
             int? taskId, string? status, int? roomId, int? assigneeId, CancellationToken ct)
@@ -1219,6 +1257,7 @@ namespace GoodHotel.Controllers
             return View(await _housekeeping.AdminTasks(status, roomId, assigneeId).ToListAsync(ct));
         }
 
+        // รายละเอียดและประวัติของงานแม่บ้าน
         [HttpGet]
         public async Task<IActionResult> HousekeepingDetails(int id, CancellationToken ct)
         {
@@ -1227,6 +1266,7 @@ namespace GoodHotel.Controllers
             return task == null ? NotFound() : View(task);
         }
 
+        // [POST] มอบหมายงานให้แม่บ้าน
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AssignHousekeepingTask(
@@ -1250,6 +1290,7 @@ namespace GoodHotel.Controllers
             return RedirectToAction(nameof(HousekeepingDetails), new { id });
         }
 
+        // ตรวจค่าตัวกรองใน URL
         private bool ValidTaskFilters(string? status, int? roomId, int? assigneeId) =>
             ModelState.IsValid && roomId is not <= 0 && assigneeId is not <= 0 &&
             (string.IsNullOrEmpty(status) || status is "Pending" or "Accepted" or "InProgress" or "Completed" or "Verified");
